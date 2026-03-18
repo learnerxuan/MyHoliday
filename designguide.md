@@ -18,7 +18,6 @@
 6. [Naming Conventions](#6-naming-conventions)
 7. [How the Layout Works](#7-how-the-layout-works)
 8. [Marketplace Status Labels](#8-marketplace-status-labels)
-9. [Do Not Do List](#9-do-not-do-list)
 
 ---
 
@@ -466,23 +465,5 @@ Traveller accepts offer     →  status: confirmed
 
 ---
 
-## 9. Do Not Do List
-
-- **Do not install new packages** without informing ZX — conflicts break everyone's build
-- **Do not edit `tailwind.config.js`** — ask ZX if a token is missing
-- **Do not edit `app/layout.jsx`** — changes affect every page
-- **Do not edit `app/globals.css`** — base styles are already set
-- **Do not use `<form>` tags** — use `div` wrappers with `onClick` and `onChange` handlers
-- **Do not use `localStorage` or `sessionStorage`** — use React state or Supabase auth
-- **Do not hardcode hex colours** — use named tokens like `text-amber` not `text-[#C4874A]`
-- **Do not build your own Button, Input, or Card** — import from `@/components/ui/`
-- **Do not push directly to `main`** — always use a feature branch and open a pull request
-- **Do not use `<img>` tags** — use Next.js `<Image>` from `next/image`
-- **Do not apply `italic` to `font-display`** — use `.italic-accent` class instead
-- **Do not leave `console.log` statements** before pushing
-
----
-
-*Maintained by ZX — Frontend / UI Designer*
 *MyHoliday | AAPP011-4-2 Capstone Project | Group 1 | UCDF2407ICT(DI)*
 *Last updated: Week 4*
