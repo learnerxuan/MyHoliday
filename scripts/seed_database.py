@@ -1,3 +1,5 @@
+# Don't run this file. It is used to seed the database.
+
 import pandas as pd
 import psycopg2
 import json
