@@ -95,8 +95,8 @@
 - [x] Public routes (no auth required): `/`, `/auth/*`, `/destinations` (read-only view)
 
 ### Logout
-- [ ] Add logout function in Navbar → calls `supabase.auth.signOut()` → redirect to `/`
-- [ ] Show logout button only when session is active
+- [x] Add logout function in Navbar → calls `supabase.auth.signOut()` → redirect to `/`
+- [x] Show logout button only when session is active
 
 ### RLS Policies
 - [ ] `traveller_profiles`: users can only read/update their own row
