@@ -9,7 +9,8 @@
 
 Paste the **System Context** section plus your **own module section** as the opening message when using an LLM to help you code. The LLM will then have accurate knowledge of the stack, database, components, and conventions before you ask it anything.
 
-| Role | Section |
+| Module | Jump to |
+|---|---|
 | Leader + Frontend/UI | Section 4 (Design Tokens) + Section 5 (Components) + Section 6.1 (Homepage) |
 | Auth & Profile | Section 6.2 |
 | Recommendation Engine + Admin Dashboard | Section 6.3 + Section 6.8 |
