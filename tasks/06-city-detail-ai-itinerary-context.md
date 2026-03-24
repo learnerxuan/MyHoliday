@@ -226,6 +226,7 @@ Every AI response returns **two things simultaneously** — a chat message AND a
       "type": "hotel | restaurant | attraction | transport | note",
       "name": "Kyoto Garden Inn",
       "time": "14:00",
+      "time_end": "16:00",
       "lat": 35.0116,
       "lng": 135.7681,
       "price": "RM 220/night",
@@ -270,7 +271,7 @@ const [messages, setMessages] = useState([])
 
 const [itinerary, setItinerary] = useState({})
 // { day1: [items], day2: [items], ... }
-// Each item: { type, name, time, lat, lng, price, notes, status, booking_url }
+// Each item: { type, name, time, time_end, lat, lng, price, notes, status, booking_url }
 
 const [activeTab, setActiveTab] = useState('itinerary')
 // 'itinerary' | 'map' | 'options'
@@ -283,6 +284,12 @@ const [pendingOptions, setPendingOptions] = useState([])
 
 const [isLoading, setIsLoading] = useState(false)
 // True while waiting for AI response — shows typing indicator
+
+const [toolStatus, setToolStatus] = useState(null)
+// e.g. "🔍 Searching for hotels in Kyoto..." — shown as transient bubble during tool execution
+
+const [sessionId, setSessionId] = useState(null)
+// UUID of the current chat_sessions row — null until first message creates the session
 ```
 
 ---
@@ -293,6 +300,7 @@ const [isLoading, setIsLoading] = useState(false)
 <ChatWindow
   messages={messages}
   isLoading={isLoading}
+  toolStatus={toolStatus}
   onSend={(text) => handleSend(text)}
 />
 ```
@@ -323,7 +331,7 @@ When the AI is executing a tool (typically 2–5 seconds), show a status message
 - Groups items by day
 - Each item shows: icon (🏨/🍽/🎯/🚌), name, time, price
 - **Green** = `status: 'confirmed'`, **Grey** = `status: 'suggested'`
-- **Export to My Plans** button at the bottom — saves to Supabase `itineraries` table then redirects to `/itinerary/my-plans`
+- **Export to My Plans** button at the bottom — triggers the export flow (confirmation dialog → save → chat stays open, no redirect)
 
 ---
 
@@ -388,7 +396,7 @@ When the AI is executing a tool (typically 2–5 seconds), show a status message
 ```json
 {
   "message": "user's latest message",
-  "history": [ { "role": "user|assistant", "content": "..." } ],
+  "sessionId": "uuid",
   "destinationId": "uuid",
   "userId": "uuid"
 }
@@ -404,7 +412,7 @@ When the AI is executing a tool (typically 2–5 seconds), show a status message
 7. LLM returns final structured JSON response
 8. Return the JSON to the frontend
 
-> API key (`OPENAI_API_KEY` or `GEMINI_API_KEY`) is **never** sent to the browser. All LLM calls are server-side only.
+> `OPENAI_API_KEY` is **never** sent to the browser. All LLM calls are server-side only.
 
 ---
 
@@ -484,7 +492,7 @@ Your job:
 1. Ask at most 2 questions (trip duration, hotel tier). Use profile defaults if user says "dk".
 2. Call tools to find real hotels, restaurants, attractions, weather, transport.
 3. Recommend the best option and explain why, but always give the user 2–3 alternatives.
-4. Return a structured JSON response with "message", "itinerary_update", and "options" fields.
+4. Return a structured JSON response with "message", "itinerary_updates" (array), and "options" fields.
 5. Always respect dietary restrictions and accessibility needs — never suggest non-halal food to a halal user.
 6. Build the itinerary day by day, confirming with the user as you go.
 ```

@@ -29,8 +29,8 @@
 - [x] Add RLS policies (see RLS section below)
 
 ### Admin Account (Seed manually — no UI needed)
-- [ ] Create admin user in Supabase Auth → Authentication → Users → Add User
-- [ ] Set metadata to `{ "role": "admin" }` via SQL:
+- [x] Create admin user in Supabase Auth → Authentication → Users → Add User
+- [x] Set metadata to `{ "role": "admin" }` via SQL:
   ```sql
   UPDATE auth.users SET raw_user_meta_data = '{"role": "admin"}' WHERE email = 'admin@myholiday.com';
   ```

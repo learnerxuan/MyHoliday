@@ -2,20 +2,27 @@
 
 /* ── MyHoliday Design Tokens ─────────────────────────────── */
 @theme inline {
-  /* Colors */
-  --color-charcoal:   #1C1C1E;
-  --color-warmwhite:  #FAF9F6;
-  --color-amber:      #F5A623;
-  --color-amberdark:  #D4891A;
-  --color-error:      #D0021B;
-  --color-error-bg:   #FFF0F0;
-  --color-border:     #E5E5E5;
-  --color-secondary:  #6B7280;
-  --color-tertiary:   #9CA3AF;
+  /* Colors — exact values from design-guide.md */
+  --color-charcoal:    #1A1A1A;
+  --color-warmwhite:   #FAF9F7;
+  --color-amber:       #C4874A;
+  --color-amberdark:   #8B6A3E;
+  --color-subtle:      #F5F2EE;
+  --color-muted:       #F0EBE3;
+  --color-secondary:   #666666;
+  --color-tertiary:    #999999;
+  --color-disabled:    #AAAAAA;
+  --color-border:      #EBEBEB;
+  --color-success:     #059669;
+  --color-success-bg:  #ECFDF5;
+  --color-warning:     #D97706;
+  --color-warning-bg:  #FEF3C7;
+  --color-error:       #DC2626;
+  --color-error-bg:    #FEF2F2;
 
-  /* Typography */
-  --font-display: 'Inter', system-ui, sans-serif;
-  --font-body:    'Inter', system-ui, sans-serif;
+  /* Typography — Funnel Display for headings, Noto Serif for body */
+  --font-display: 'Funnel Display', system-ui, sans-serif;
+  --font-body:    'Noto Serif', Georgia, serif;
 }
 
 /* ── Base resets ─────────────────────────────────────────── */
@@ -31,11 +38,13 @@ body {
 /* ── Reusable utility: input fields ─────────────────────── */
 .input-base {
   width: 100%;
-  padding: 0.625rem 0.875rem;   /* py-2.5 px-3.5 */
-  border-radius: 0.75rem;       /* rounded-xl */
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.5rem;
   border: 1px solid var(--color-border);
-  font-size: 0.875rem;          /* text-sm */
+  font-size: 0.875rem;
+  font-family: var(--font-body);
   color: var(--color-charcoal);
+  background-color: white;
   outline: none;
   transition: border-color 0.15s;
 }
@@ -46,4 +55,16 @@ body {
 
 .input-base:focus {
   border-color: var(--color-amber);
+}
+
+/* ── Italic accent (Funnel Display has no true italic) ───── */
+.italic-accent {
+  font-style: normal;
+  font-weight: 800;
+  color: var(--color-amber);
+}
+
+/* ── Leaflet Routing Machine — hide directions panel ─────── */
+.leaflet-routing-container {
+  display: none !important;
 }

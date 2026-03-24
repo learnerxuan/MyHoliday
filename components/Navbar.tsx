@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { supabase, signOut } from '@/lib/supabase/auth'
+import { supabase } from '@/lib/supabase/client'
+import { signOut } from '@/lib/supabase/auth'
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null)

@@ -6,6 +6,7 @@ const PROTECTED_PREFIXES = [
   '/profile',
   '/quiz',
   '/planner',
+  '/itinerary',
   '/my-plans',
   '/marketplace',
   '/guide',
