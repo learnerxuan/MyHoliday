@@ -180,34 +180,118 @@ All state is managed in `itinerary/page.jsx` and passed down as props.
 
 ---
 
-## AI Conversation Flow
+## User–AI Interaction Design
 
-### Opening (A+C Hybrid)
+### Principles
+- The AI drives the conversation — it always ends its message with a clear next step or question
+- Plan one day at a time — never dump all days at once
+- Be proactive — after each confirmation, suggest the natural next action
+- Never ask about things already in the traveller profile (dietary, accessibility, nationality, language)
+- Always give 2–3 options for hotels/restaurants — never just one choice
+- Gracefully handle "idk" / "dk" / "surprise me" by falling back to profile defaults
 
-When the page loads, the AI sends an opening message using the destination name and the user's profile:
+---
 
-> "You've picked **Kyoto** 🎌 I can see you prefer halal food from your profile. Two quick questions before I build your plan:
+### Phase 1 — Opening (AI speaks first)
+
+When the planner page loads, the AI sends an opening message **without waiting for the user to type**.
+It uses the destination name and traveller profile to personalise immediately.
+
+**Example opening message:**
+> "You've picked **Kyoto** 🎌 Great choice! I can see you prefer halal food — I'll keep that in mind throughout. Just two quick questions before I start building your plan:
 > 1. How many days are you thinking?
-> 2. Any hotel preference? (Budget / 3-star / 4-star / Luxury)"
+> 2. What's your hotel preference — budget, mid-range, or luxury?"
 
-**If user answers** → AI uses those answers + profile to call tools and generate a draft.
+**If user answers both** → proceed to Phase 2.
+**If user says "idk" / "dk" / "surprise me"** → use defaults: 5 days, mid-range hotel.
+**If user answers one** → accept it and use the default for the other.
 
-**If user says "idk" / "dk" / "surprise me"** → AI falls back to profile defaults:
-- Duration → 5 days (default)
-- Hotel tier → matches `budget_level` from user's quiz preference
+> **Implementation note:** On mount, `ItineraryPlanner` should POST to `/api/chat` with a
+> special system-triggered opening message (e.g. `"__INIT__"`) so the AI generates the
+> greeting. This message is NOT shown in the chat as a user bubble — only the AI response is shown.
 
-The AI **never asks** about things already in the profile (dietary restrictions, accessibility needs, nationality, language). It uses them automatically.
+---
 
-### Refinement (at any time)
+### Phase 2 — Hotel Selection (Day 0)
 
-After the draft is generated, users can say anything:
-- "Swap Day 2 lunch to somewhere halal near Arashiyama"
-- "Find me a cheaper hotel, under RM 150/night"
-- "What's the weather like in April?"
-- "Add a tea ceremony on Day 3"
-- "Show me transport options from the hotel to Fushimi Inari"
+After the user confirms duration + hotel tier, the AI calls `search_hotels` and presents options.
 
-The AI calls the relevant tool and updates only the affected part of the itinerary.
+**AI behaviour:**
+- Returns 2–3 hotel options in the `options` array (shown in OptionsPanel)
+- Message in chat is short: "I found 3 hotels that match — check the panel on the right to pick one."
+- Does NOT start Day 1 planning yet — waits for hotel selection
+
+**User selects a hotel:**
+- OptionsPanel sends `"I'll go with [Hotel Name]"` to chat
+- AI confirms, adds hotel to itinerary as `status: "confirmed"`, then **proactively asks**:
+  > "Perfect! [Hotel Name] is confirmed for all 5 nights. Ready to plan Day 1? I'll find you some morning attractions and a halal lunch spot near the hotel."
+
+---
+
+### Phase 3 — Day-by-Day Planning
+
+The AI plans **one day at a time**. It never plans Day 2 until the user confirms Day 1 is done.
+
+**Typical Day 1 flow:**
+1. AI suggests a morning attraction (calls `search_attractions`) → adds to itinerary as `suggested`
+2. AI suggests a halal lunch restaurant (calls `search_restaurants`) → shows in OptionsPanel
+3. User picks a restaurant → AI confirms, adds to itinerary
+4. AI suggests an afternoon attraction
+5. AI suggests a dinner spot
+6. AI asks: "That's Day 1 sorted! Want me to check the transport between stops? Or shall we move on to Day 2?"
+
+**User can deviate at any time:**
+- "Skip the museum, I want something outdoors" → AI replaces with an outdoor attraction
+- "Find me a cheaper restaurant" → AI calls `search_restaurants` with a lower price filter
+- "What's the weather like that week?" → AI calls `get_weather`
+- "How far is the hotel from the station?" → AI calls `check_transport`
+- "Show me the budget so far" → AI calls `estimate_budget`
+
+**Moving to the next day:**
+- AI always asks before moving on: "Day 1 looks great! Shall we plan Day 2?"
+- User can say "yes", "sure", "next", "continue" → AI starts Day 2 planning
+- User can say "let me check the map first" → AI waits; user switches to Map tab manually
+
+---
+
+### Phase 4 — Refinement (any time)
+
+After a day is planned, users can refine any part:
+
+| User says | AI does |
+|---|---|
+| "Swap Day 2 lunch to somewhere near the temple" | Calls `search_restaurants` with location filter, shows new options |
+| "Find me a cheaper hotel, under RM 150/night" | Calls `search_hotels` with budget filter, shows alternatives |
+| "Add a tea ceremony on Day 3 afternoon" | Calls `search_attractions` with category=culture, adds to Day 3 |
+| "What's the transport from hotel to Fushimi Inari?" | Calls `check_transport`, replies with distance + duration |
+| "What's the total budget so far?" | Calls `estimate_budget` with current itinerary data |
+
+The AI updates **only the affected part** of the itinerary — it does not regenerate the whole plan.
+
+---
+
+### Phase 5 — Export
+
+When the user is satisfied:
+- User clicks "Export to My Plans" button (in ItineraryPanel)
+- Modal appears with auto-generated title: "Kyoto · 5 Days · March 2026"
+- User can edit the title, then confirms
+- Itinerary saved to `itineraries` table as a new row
+- Chat stays open — user can keep refining and export again
+- AI acknowledges: "Your plan has been saved! You can keep chatting to refine it further."
+
+---
+
+### Edge Cases & Guardrails
+
+| Situation | Behaviour |
+|---|---|
+| User asks about non-travel topic | Guardrail blocks it instantly; polite refusal returned |
+| User tries to jailbreak AI | Guardrail blocks it instantly; no OpenAI call made |
+| User asks for non-halal food (halal profile) | AI refuses and finds a halal alternative instead |
+| OpenAI API error | Stream returns `error` chunk; chat shows "Sorry, something went wrong. Please try again." |
+| Google Places returns no results | AI informs user and suggests a nearby area instead |
+| User closes page mid-session | Session stays `active`; resumes on next visit to same city |
 
 ---
 

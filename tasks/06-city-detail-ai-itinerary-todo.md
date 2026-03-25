@@ -131,6 +131,15 @@
 - [x] After export: show success confirmation; **keep chat open** — do NOT redirect
 - [x] User can export again after further refinements
 
+### User–AI Interaction Flow
+- [ ] AI sends opening message on mount — POST `__INIT__` to `/api/chat` on page load; only show AI response bubble (no user bubble)
+- [ ] System prompt handles `__INIT__` trigger — AI greets user by destination name, references dietary preference from profile, asks 2 questions (duration + hotel tier)
+- [ ] After hotel selected — AI proactively asks to start Day 1 without waiting for user to prompt
+- [ ] Day-by-day gate — AI never plans Day N+1 until user confirms Day N is done
+- [ ] Proactive next-step suggestions — after each item is confirmed, AI suggests what to plan next
+- [ ] Handle "idk" / "surprise me" gracefully — fall back to profile defaults (5 days, mid-range hotel)
+- [ ] After export — AI sends acknowledgement message: "Your plan has been saved! Keep chatting to refine it."
+
 ### Extras (beyond original spec)
 - [x] Google Places photo proxy (`app/api/places-photo/`) — keeps API key server-side
 - [x] `react-markdown` rendering in ChatWindow — properly renders AI prose responses
