@@ -24,8 +24,8 @@ Users who already know where they want to go can skip the quiz and navigate dire
 
 | Page | Route | Owner |
 |---|---|---|
-| Preference Quiz | `app/recommendations/page.jsx` | HS |
-| Matched City Results | `app/recommendations/results/page.jsx` | HS |
+| Preference Quiz | `app/recommendations/page.jsx` | ES |
+| Matched City Results | `app/recommendations/results/page.jsx` | ES |
 
 ## API Route
 - `app/api/recommendation/route.js` — preference matching and scoring logic
