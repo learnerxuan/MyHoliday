@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase/client'
@@ -16,6 +16,31 @@ const TABS = [
   { id: 'options',   label: '🏨 Options' },
 ]
 
+// ── Coordinate sanitiser ──────────────────────────────────────
+// Swaps lat/lng if they are obviously reversed, drops (0,0) and out-of-range values
+function sanitiseCoords(item) {
+  let { lat, lng } = item
+  if (lat == null || lng == null) return item
+
+  lat = Number(lat)
+  lng = Number(lng)
+
+  // (0, 0) is the middle of the ocean — the AI put placeholders; drop them
+  if (lat === 0 && lng === 0) return { ...item, lat: null, lng: null }
+
+  // If lat > 90 or lat < -90 it must actually be a longitude — swap
+  if (Math.abs(lat) > 90) {
+    ;[lat, lng] = [lng, lat]
+  }
+
+  // Final sanity: lat in [-90,90] lng in [-180,180]
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return { ...item, lat: null, lng: null }
+  }
+
+  return { ...item, lat, lng }
+}
+
 // ── Itinerary state helpers ───────────────────────────────────
 
 function applyUpdates(prev, updates) {
@@ -24,14 +49,15 @@ function applyUpdates(prev, updates) {
   for (const update of updates) {
     const key = `day${update.day}`
     if (!next[key]) next[key] = []
+    const sanitised = sanitiseCoords(update)
 
     if (update.action === 'add') {
-      next[key] = [...next[key], update]
+      next[key] = [...next[key], sanitised]
     } else if (update.action === 'remove') {
       next[key] = next[key].filter(i => i.name !== update.name)
     } else if (update.action === 'update') {
       next[key] = next[key].map(i =>
-        i.name === update.name ? { ...i, ...update } : i
+        i.name === update.name ? { ...i, ...sanitised } : i
       )
     }
   }
@@ -62,6 +88,7 @@ export default function ItineraryPlanner() {
   const [exportTitle,   setExportTitle]   = useState('')
   const [exportSaving,  setExportSaving]  = useState(false)
   const [exportDone,    setExportDone]    = useState(false)
+  const initDone = useRef(false)
 
   // ── Init: auth + destination + existing session ─────────────
   useEffect(() => {
@@ -74,7 +101,7 @@ export default function ItineraryPlanner() {
 
       const { data: dest } = await supabase
         .from('destinations')
-        .select('id, city, country')
+        .select('id, city, country, latitude, longitude')
         .eq('id', cityId)
         .single()
 
@@ -82,6 +109,8 @@ export default function ItineraryPlanner() {
       setDestination(dest)
 
       // Resume existing active session if found
+      let hasSessionHistory = false
+
       const { data: session } = await supabase
         .from('chat_sessions')
         .select('id')
@@ -99,14 +128,102 @@ export default function ItineraryPlanner() {
           .select('role, content')
           .eq('session_id', session.id)
           .order('created_at', { ascending: true })
-        if (history?.length) setMessages(history)
+        if (history?.length) {
+          hasSessionHistory = true
+          setMessages(history)
+        }
       }
+
+      // Restore itinerary from localStorage (survives page refresh)
+      // Key uses user.id + cityId — both are available synchronously here
+      try {
+        const lsKey = `itinerary-${user.id}-${cityId}`
+        const saved = localStorage.getItem(lsKey)
+        if (saved && hasSessionHistory) {
+          setItinerary(JSON.parse(saved))
+        } else if (saved) {
+          localStorage.removeItem(lsKey)
+          setItinerary({})
+        }
+      } catch { /* ignore parse errors */ }
 
       setPageReady(true)
     }
 
     init()
   }, [cityId, router])
+
+  // ── Persist itinerary to localStorage on every change ────────
+  useEffect(() => {
+    if (!userId || !cityId || Object.keys(itinerary).length === 0) return
+    try {
+      localStorage.setItem(`itinerary-${userId}-${cityId}`, JSON.stringify(itinerary))
+    } catch { /* storage full or unavailable */ }
+  }, [itinerary, userId, cityId])
+
+  // ── Auto-send opening message on fresh session ───────────────
+  useEffect(() => {
+    if (!pageReady || initDone.current || messages.length > 0 || !userId || !destination) return
+    initDone.current = true
+
+    // POST __INIT__ silently — no user bubble, no UI update before sending
+    const sendInit = async () => {
+      setIsLoading(true)
+      setToolStatus(null)
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: '__INIT__', sessionId, destinationId: cityId, userId, itinerary }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+        const reader  = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer    = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop()
+          for (const line of lines) {
+            if (!line.trim()) continue
+            try {
+              const chunk = JSON.parse(line)
+              if (chunk.type === 'session') setSessionId(chunk.sessionId)
+              else if (chunk.type === 'status') setToolStatus(chunk.message)
+              else if (chunk.type === 'result') {
+                setToolStatus(null)
+                if (chunk.sessionId) setSessionId(chunk.sessionId)
+                const { message, itinerary_updates, options, quick_replies } = chunk.data
+                setMessages([{ role: 'assistant', content: message, quickReplies: quick_replies ?? [] }])
+                if (itinerary_updates?.length) setItinerary(prev => applyUpdates(prev, itinerary_updates))
+                if (options?.length) { setPendingOptions(options); setSelectedOptionNames(new Set()); setActiveTab('options') }
+              }
+            } catch { /* skip malformed */ }
+          }
+        }
+      } catch {
+        setMessages([{
+          role: 'assistant',
+          content: "Whistler is a great choice for a mountain getaway.\n\nHow many days is the trip?",
+          quickReplies: [
+            { label: '3 days', value: '3 days' },
+            { label: '5 days', value: '5 days' },
+            { label: '7 days', value: '7 days' },
+          ],
+        }])
+      } finally {
+        setIsLoading(false)
+        setToolStatus(null)
+      }
+    }
+
+    sendInit()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageReady, userId, destination])
 
   // ── Send message ────────────────────────────────────────────
   const handleSend = useCallback(async (text) => {
@@ -120,7 +237,7 @@ export default function ItineraryPlanner() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, sessionId, destinationId: cityId, userId }),
+        body: JSON.stringify({ message: text, sessionId, destinationId: cityId, userId, itinerary }),
       })
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -151,9 +268,9 @@ export default function ItineraryPlanner() {
             } else if (chunk.type === 'result') {
               setToolStatus(null)
               if (chunk.sessionId) setSessionId(chunk.sessionId)
-              const { message, itinerary_updates, options } = chunk.data
+              const { message, itinerary_updates, options, quick_replies } = chunk.data
 
-              setMessages(prev => [...prev, { role: 'assistant', content: message }])
+              setMessages(prev => [...prev, { role: 'assistant', content: message, quickReplies: quick_replies ?? [] }])
               if (itinerary_updates?.length) {
                 setItinerary(prev => applyUpdates(prev, itinerary_updates))
               }
@@ -170,7 +287,7 @@ export default function ItineraryPlanner() {
                 content: 'Sorry, something went wrong. Please try again.',
               }])
             }
-          } catch (_) { /* skip malformed line */ }
+          } catch { /* skip malformed line */ }
         }
       }
     } catch {
@@ -182,7 +299,7 @@ export default function ItineraryPlanner() {
       setIsLoading(false)
       setToolStatus(null)
     }
-  }, [isLoading, sessionId, cityId, userId])
+  }, [isLoading, sessionId, cityId, userId, itinerary])
 
   // ── Select option from Options panel ───────────────────────
   function handleOptionSelect(option) {
@@ -196,6 +313,19 @@ export default function ItineraryPlanner() {
   function handleOptionsDone() {
     setPendingOptions([])
     setSelectedOptionNames(new Set())
+  }
+
+  // ── Save & Exit ─────────────────────────────────────────────
+  async function handleSaveAndExit() {
+    if (sessionId) {
+      await supabase
+        .from('chat_sessions')
+        .update({ status: 'completed' })
+        .eq('id', sessionId)
+    }
+    // Clear persisted itinerary — session is done
+    try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
+    router.push(`/destinations/${cityId}`)
   }
 
   // ── Export flow ─────────────────────────────────────────────
@@ -260,6 +390,12 @@ export default function ItineraryPlanner() {
               ✓ Saved to My Plans
             </span>
           )}
+          <button
+            onClick={handleSaveAndExit}
+            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md border border-border text-secondary hover:text-charcoal hover:border-charcoal transition-colors"
+          >
+            Save &amp; Exit
+          </button>
         </div>
       </header>
 
@@ -315,6 +451,8 @@ export default function ItineraryPlanner() {
                 itinerary={itinerary}
                 activeDay={activeDay}
                 onDayChange={setActiveDay}
+                cityLat={destination?.latitude}
+                cityLng={destination?.longitude}
               />
             )}
             {activeTab === 'options' && (
