@@ -143,8 +143,8 @@ export default function ProfilePage() {
   const avatarUrl = user.user_metadata?.avatar_url
 
   return (
-    <main className="min-h-screen bg-warmwhite py-12 px-4">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <main className="min-h-screen bg-warmwhite py-8 sm:py-12 px-4">
+      <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8">
 
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -165,7 +165,7 @@ export default function ProfilePage() {
 
         {/* ── TRAVELLER VIEW ── */}
         {role === 'traveller' && (
-          <form onSubmit={saveTraveller} className="bg-white rounded-2xl shadow-md border border-border px-8 py-8 space-y-5">
+          <form onSubmit={saveTraveller} className="bg-white rounded-2xl shadow-md border border-border px-4 sm:px-8 py-6 sm:py-8 space-y-5">
 
             <h2 className="text-lg font-extrabold font-display text-charcoal">Personal Details</h2>
 
@@ -226,7 +226,7 @@ export default function ProfilePage() {
 
         {/* ── GUIDE VIEW ── */}
         {role === 'guide' && guide && (
-          <div className="bg-white rounded-2xl shadow-md border border-border px-8 py-8 space-y-5">
+          <div className="bg-white rounded-2xl shadow-md border border-border px-4 sm:px-8 py-6 sm:py-8 space-y-5">
 
             <h2 className="text-lg font-extrabold font-display text-charcoal">Guide Profile</h2>
 

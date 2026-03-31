@@ -277,12 +277,12 @@ function DestinationsInner() {
     <div className="min-h-screen bg-warmwhite flex flex-col">
 
       {/* Page header */}
-      <div className="bg-charcoal text-warmwhite pt-16 pb-10 px-6">
+      <div className="bg-charcoal text-warmwhite pt-12 sm:pt-16 pb-8 sm:pb-10 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto">
           <p className="text-xs font-semibold font-body text-amber uppercase tracking-widest mb-2">
             {hasResults ? 'Your personalised results' : 'Browse destinations'}
           </p>
-          <h1 className="text-4xl font-extrabold font-display mb-2">
+          <h1 className="text-2xl sm:text-4xl font-extrabold font-display mb-2">
             {hasResults ? 'Your best matches' : 'Explore the world'}
           </h1>
           <p className="text-sm font-body text-disabled">
@@ -293,7 +293,7 @@ function DestinationsInner() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
 
         {tripMeta && <TripMetaBanner meta={tripMeta} />}
 

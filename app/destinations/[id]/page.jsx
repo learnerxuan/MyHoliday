@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { query } from '@/lib/supabase/db'
+import BookingLinks from './BookingLinks'
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -183,7 +184,7 @@ export default async function DestinationPage({ params }) {
       </div>
 
       {/* ── Body ── */}
-      <div className="max-w-5xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
         {/* Left column — main content */}
         <div className="lg:col-span-2 flex flex-col gap-8">
@@ -323,64 +324,7 @@ export default async function DestinationPage({ params }) {
           {/* External booking links */}
           <section>
             <h2 className="text-xl font-extrabold font-display mb-4">Plan Your Trip</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <a
-                href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(dest.city)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-amber transition-colors group"
-              >
-                <span className="text-2xl">🏨</span>
-                <div>
-                  <p className="text-sm font-semibold font-body text-charcoal group-hover:text-amber transition-colors">
-                    Find Hotels
-                  </p>
-                  <p className="text-xs font-body text-secondary">Search on Booking.com</p>
-                </div>
-              </a>
-              <a
-                href={`https://www.google.com/flights?q=flights+to+${encodeURIComponent(dest.city)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-amber transition-colors group"
-              >
-                <span className="text-2xl">✈️</span>
-                <div>
-                  <p className="text-sm font-semibold font-body text-charcoal group-hover:text-amber transition-colors">
-                    Find Flights
-                  </p>
-                  <p className="text-xs font-body text-secondary">Search on Google Flights</p>
-                </div>
-              </a>
-              <a
-                href={`https://www.tripadvisor.com/Search?q=${encodeURIComponent(dest.city)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-amber transition-colors group"
-              >
-                <span className="text-2xl">🎯</span>
-                <div>
-                  <p className="text-sm font-semibold font-body text-charcoal group-hover:text-amber transition-colors">
-                    Things To Do
-                  </p>
-                  <p className="text-xs font-body text-secondary">Browse on TripAdvisor</p>
-                </div>
-              </a>
-              <a
-                href={`https://www.lonelyplanet.com/search?q=${encodeURIComponent(dest.city)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-amber transition-colors group"
-              >
-                <span className="text-2xl">📖</span>
-                <div>
-                  <p className="text-sm font-semibold font-body text-charcoal group-hover:text-amber transition-colors">
-                    Travel Guide
-                  </p>
-                  <p className="text-xs font-body text-secondary">Read on Lonely Planet</p>
-                </div>
-              </a>
-            </div>
+            <BookingLinks city={dest.city} />
           </section>
 
           {/* ── Historical Trips section ── */}
@@ -493,8 +437,8 @@ export default async function DestinationPage({ params }) {
 
         </div>
 
-        {/* Right column — sticky CTA card */}
-        <div className="lg:col-span-1">
+        {/* Right column — sticky CTA card, shows at top on mobile */}
+        <div className="lg:col-span-1 order-first lg:order-last">
           <div className="sticky top-6 bg-white rounded-2xl border border-border p-6 flex flex-col gap-4 shadow-sm">
             <div>
               <h3 className="text-lg font-extrabold font-display">{dest.city}</h3>

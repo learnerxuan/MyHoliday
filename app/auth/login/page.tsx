@@ -22,7 +22,7 @@ export default function LoginPage() {
 
         {/* Logo / Brand */}
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-extrabold font-display text-charcoal tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold font-display text-charcoal tracking-tight">
             My<span className="text-amber">Holiday</span>
           </h1>
           <p className="mt-3 text-sm font-body text-secondary">
@@ -31,7 +31,7 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-md border border-border px-8 py-10 space-y-6">
+        <div className="bg-white rounded-2xl shadow-md border border-border px-4 sm:px-8 py-8 sm:py-10 space-y-6">
 
           <div className="text-center">
             <h2 className="text-2xl font-extrabold font-display text-charcoal">
