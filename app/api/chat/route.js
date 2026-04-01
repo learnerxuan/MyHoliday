@@ -31,10 +31,19 @@ function deepMergePlannerState(base, patch) {
   return merged
 }
 
+const PHASE_COERCE = {
+  intake:           'setup',
+  anchor_selection: 'planning',
+  drafting:         'planning',
+  day_planning:     'planning',
+  review:           'planning',
+  complete:         'planning',
+}
+
 function normalisePlannerState(rawState, profile) {
-  return deepMergePlannerState({
+  const merged = deepMergePlannerState({
     mode: null,
-    phase: 'intake',
+    phase: 'setup',
     trip_days: null,
     pace: null,
     budget_profile: 'unknown',
@@ -58,6 +67,10 @@ function normalisePlannerState(rawState, profile) {
       accessibility: profile?.accessibility_needs ? 'yes' : 'none',
     },
   }, rawState)
+
+  // Coerce stale phase values from old sessions; 'setup' and 'planning' pass through as-is
+  merged.phase = PHASE_COERCE[merged.phase] ?? merged.phase
+  return merged
 }
 
 function extractPlannerStatePatch(value) {
@@ -84,191 +97,15 @@ function toTitleCase(value) {
     .join(' ')
 }
 
-function buildTripSummary({ tripDays, pace, mode, budgetProfile, day1StartTime }) {
-  const modeLabel = mode === 'guided' ? 'Guided Planning' : 'Quick Draft'
-  const budgetLabel = toTitleCase(budgetProfile ?? 'mid-range')
-  const startLabel = formatTimeLabel(day1StartTime)
-  return `Perfect. I've set this up as a ${tripDays}-day ${pace} trip in ${modeLabel} mode with a ${budgetLabel} budget, starting Day 1 at ${startLabel}.`
-}
-
-function parseHotelSelection(message) {
-  const match = message.match(/(?:i(?:'|’)ll go with|i choose|i picked|i pick|selected|select)\s+(.+)/i)
-  if (match?.[1]) return match[1].trim().replace(/[.!]+$/, '')
-  return null
-}
-
-function getDay1StartBucket(time24) {
-  if (!time24) return 'morning'
-  const [hourText] = time24.split(':')
-  const hour = Number(hourText)
-  if (hour < 11) return 'morning'
-  if (hour < 17) return 'afternoon'
-  return 'evening'
-}
-
-function enrichHotelOption(option) {
-  const price = option.price ?? option.price_estimate ?? 'Price not available'
-  const ratingText = option.rating ? `${option.rating}/5 rating` : 'rating not available'
-  const starsText = option.stars ? `${option.stars}-star feel` : 'stay profile not available'
-
+function normaliseOption(opt) {
+  // Resolve price first so the notes fallback can reference it
+  const resolvedPrice = opt.price ?? opt.price_estimate ?? 'Price not available'
   return {
-    ...option,
-    type: 'hotel',
-    price,
-    notes: option.notes ?? `${price}. ${ratingText}. ${starsText}.`,
+    ...opt,
+    type:  opt.type  ?? 'attraction',
+    price: resolvedPrice,
+    notes: opt.notes ?? ([resolvedPrice, opt.rating ? `${opt.rating}/5` : null].filter(Boolean).join(' · ') || ''),
   }
-}
-
-function enrichPlaceOption(option, type, fallbackNotes) {
-  return {
-    ...option,
-    type,
-    notes: option.notes ?? fallbackNotes,
-  }
-}
-
-async function buildGuidedDayOneResponse(destination, plannerState, selectedHotelName, profile) {
-  const startTime = plannerState.day1_start_time ?? '09:00'
-  const startLabel = formatTimeLabel(startTime)
-  const bucket = getDay1StartBucket(startTime)
-  const commonPatch = {
-    hotel_status: 'selected',
-    selected_hotel_name: selectedHotelName,
-    phase: 'day_planning',
-    current_day: 1,
-  }
-
-  if (bucket === 'morning') {
-    const attractionOptions = await executeTool('search_attractions', {
-      city: destination.city,
-      lat: destination.latitude,
-      lng: destination.longitude,
-      category: plannerState.pace === 'relaxed' ? 'nature' : 'landmark',
-    })
-
-    return {
-      message: `Locked in ${selectedHotelName}. Since Day 1 starts at ${startLabel}, I'll begin with a morning activity and build the rest of the day around it. Pick the first stop you want.`,
-      itinerary_updates: [],
-      options: (attractionOptions ?? [])
-        .slice(0, 5)
-        .map((option) => enrichPlaceOption(option, 'attraction', 'Good first stop for the morning.')),
-      planner_state_patch: {
-        ...commonPatch,
-        current_cluster: 'morning',
-      },
-      quick_replies: [],
-    }
-  }
-
-  if (bucket === 'afternoon') {
-    const attractionOptions = await executeTool('search_attractions', {
-      city: destination.city,
-      lat: destination.latitude,
-      lng: destination.longitude,
-      category: 'shopping',
-    })
-
-    return {
-      message: `Locked in ${selectedHotelName}. Since Day 1 starts at ${startLabel}, I'll begin with an afternoon activity before we decide on dinner. Pick the first stop you want.`,
-      itinerary_updates: [],
-      options: (attractionOptions ?? [])
-        .slice(0, 5)
-        .map((option) => enrichPlaceOption(option, 'attraction', 'Good first stop for the afternoon.')),
-      planner_state_patch: {
-        ...commonPatch,
-        current_cluster: 'afternoon',
-      },
-      quick_replies: [],
-    }
-  }
-
-  const restaurantOptions = await executeTool('search_restaurants', {
-    city: destination.city,
-    lat: destination.latitude,
-    lng: destination.longitude,
-    budget_profile: plannerState.budget_profile,
-    dietary: profile?.dietary_restrictions || undefined,
-  })
-
-  return {
-    message: `Locked in ${selectedHotelName}. Since Day 1 starts at ${startLabel}, I'll begin with an evening dinner plan nearby. Pick the dinner option you want first.`,
-    itinerary_updates: [],
-    options: (restaurantOptions ?? [])
-      .slice(0, 5)
-      .map((option) => enrichPlaceOption(option, 'restaurant', 'Good first dinner option for Day 1.')),
-    planner_state_patch: {
-      ...commonPatch,
-      current_cluster: 'evening',
-    },
-    quick_replies: [],
-  }
-}
-
-function parseTripDays(message) {
-  const directMatch = message.match(/\b(\d{1,2})\s*(day|days|night|nights)\b/i)
-  if (directMatch) return Number(directMatch[1])
-
-  const wordMap = {
-    one: 1,
-    two: 2,
-    three: 3,
-    four: 4,
-    five: 5,
-    six: 6,
-    seven: 7,
-    eight: 8,
-    nine: 9,
-    ten: 10,
-  }
-
-  for (const [word, value] of Object.entries(wordMap)) {
-    if (new RegExp(`\\b${word}\\s+(day|days|night|nights)\\b`, 'i').test(message)) {
-      return value
-    }
-  }
-
-  return null
-}
-
-function parsePace(message) {
-  if (/\brelaxed\b/i.test(message)) return 'relaxed'
-  if (/\bpacked\b/i.test(message)) return 'packed'
-  if (/\bbalanced\b/i.test(message)) return 'balanced'
-  return null
-}
-
-function parseMode(message) {
-  if (/\bguided\s+planning\b|\bguided\b/i.test(message)) return 'guided'
-  if (/\bquick\s+draft\b|\bdraft\b/i.test(message)) return 'quick_draft'
-  return null
-}
-
-function parseBudgetProfile(message) {
-  if (/\bluxury\b|\bpremium\b|\bhigh[- ]end\b/i.test(message)) return 'luxury'
-  if (/\bbudget\b|\bcheap\b|\baffordable\b|\blow[- ]cost\b/i.test(message)) return 'budget'
-  if (/\bmid[- ]range\b|\bmoderate\b|\bbalanced budget\b/i.test(message)) return 'mid-range'
-  return null
-}
-
-function parseDay1StartTime(message) {
-  const twelveHourMatch = message.match(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i)
-  if (twelveHourMatch) {
-    let hour = Number(twelveHourMatch[1])
-    const minute = twelveHourMatch[2] ?? '00'
-    const period = twelveHourMatch[3].toLowerCase()
-
-    if (period === 'pm' && hour !== 12) hour += 12
-    if (period === 'am' && hour === 12) hour = 0
-
-    return `${String(hour).padStart(2, '0')}:${minute}`
-  }
-
-  const twentyFourHourMatch = message.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/)
-  if (twentyFourHourMatch) {
-    return `${twentyFourHourMatch[1].padStart(2, '0')}:${twentyFourHourMatch[2]}`
-  }
-
-  return null
 }
 
 function formatTimeLabel(time24) {
@@ -278,28 +115,6 @@ function formatTimeLabel(time24) {
   const period = hour >= 12 ? 'PM' : 'AM'
   hour = hour % 12 || 12
   return `${hour}:${minute} ${period}`
-}
-
-function parseHotelIntent(message) {
-  if (/\b(i already have|i've booked|i have a hotel|already booked)\b/i.test(message)) {
-    return 'has_hotel'
-  }
-
-  if (
-    /\b(suggest|recommend|show me|find me)\b.*\b(hotel|hotels)\b/i.test(message) ||
-    /\b(plan for me|you decide|surprise me|no idea|no ideas|anything works)\b/i.test(message)
-  ) {
-    return 'needs_suggestions'
-  }
-
-  return null
-}
-
-function parseMustDoResponse(message) {
-  if (/\b(no preferences|no preference|none|nothing specific|anything is fine|surprise me)\b/i.test(message)) {
-    return []
-  }
-  return null
 }
 
 function buildInitMessage(destination, profile, known = null) {
@@ -328,198 +143,6 @@ function buildInitMessage(destination, profile, known = null) {
   }
 
   return lines.join('\n')
-}
-
-async function buildIntakeResponse(message, currentPlannerState, destination) {
-  const parsedTripDays = parseTripDays(message)
-  const parsedPace = parsePace(message)
-  const parsedMode = parseMode(message)
-  const parsedBudgetProfile = parseBudgetProfile(message)
-  const parsedDay1StartTime = parseDay1StartTime(message)
-  const hotelIntent = parseHotelIntent(message)
-  const mustDoResponse = parseMustDoResponse(message)
-
-  let selectedHotelName = currentPlannerState.selected_hotel_name
-  if (
-    currentPlannerState.hotel_status === 'user_has_hotel' &&
-    !selectedHotelName &&
-    !hotelIntent &&
-    !parsedTripDays &&
-    !parsedPace &&
-    !parsedMode &&
-    !parsedBudgetProfile &&
-    !parsedDay1StartTime
-  ) {
-    selectedHotelName = message.trim()
-  }
-
-  const tripDays = parsedTripDays ?? currentPlannerState.trip_days
-  const pace = parsedPace ?? currentPlannerState.pace
-  const mode = parsedMode ?? currentPlannerState.mode
-  const budgetProfile = parsedBudgetProfile
-    ?? (currentPlannerState.budget_profile && currentPlannerState.budget_profile !== 'unknown'
-      ? currentPlannerState.budget_profile
-      : null)
-    ?? destination.budget_level
-  const day1StartTime = parsedDay1StartTime ?? currentPlannerState.day1_start_time ?? null
-
-  const plannerStatePatch = {
-    trip_days: tripDays ?? currentPlannerState.trip_days ?? null,
-    pace: pace ?? currentPlannerState.pace ?? null,
-    mode: mode ?? currentPlannerState.mode ?? null,
-    budget_profile: budgetProfile ?? currentPlannerState.budget_profile ?? 'unknown',
-    day1_start_time: day1StartTime,
-    arrival_time_hint: day1StartTime ? formatTimeLabel(day1StartTime) : currentPlannerState.arrival_time_hint,
-    hotel_status: hotelIntent === 'has_hotel' ? 'user_has_hotel' : currentPlannerState.hotel_status,
-    selected_hotel_name: selectedHotelName,
-    needs: {
-      ...currentPlannerState.needs,
-      must_do: mustDoResponse ?? currentPlannerState.needs?.must_do ?? [],
-    },
-    phase: 'intake',
-  }
-
-  if (!tripDays) {
-    return {
-      message: 'How many days is the trip?',
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: plannerStatePatch,
-      quick_replies: [],
-    }
-  }
-
-  if (!pace) {
-    return {
-      message: 'What pace do you want: relaxed, balanced, or packed?',
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: plannerStatePatch,
-      quick_replies: [quickReply('Relaxed'), quickReply('Balanced'), quickReply('Packed')],
-    }
-  }
-
-  if (!mode) {
-    return {
-      message: 'Which planning mode do you want: Quick Draft or Guided Planning?',
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: plannerStatePatch,
-      quick_replies: [quickReply('Quick Draft'), quickReply('Guided Planning')],
-    }
-  }
-
-  if (!budgetProfile || budgetProfile === 'unknown') {
-    return {
-      message: 'What overall budget do you want: budget, mid-range, or luxury?',
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: plannerStatePatch,
-      quick_replies: [quickReply('Budget'), quickReply('Mid-range'), quickReply('Luxury')],
-    }
-  }
-
-  if (!day1StartTime) {
-    return {
-      message: 'What time would you like to start Day 1?',
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: plannerStatePatch,
-      quick_replies: [
-        quickReply('8:00 AM'),
-        quickReply('10:00 AM'),
-        quickReply('12:00 PM'),
-        quickReply('3:00 PM'),
-        quickReply('6:00 PM'),
-      ],
-    }
-  }
-
-  const summary = buildTripSummary({
-    tripDays,
-    pace,
-    mode,
-    budgetProfile,
-    day1StartTime,
-  })
-
-  if (hotelIntent === 'needs_suggestions') {
-    const hotelOptions = await executeTool('search_hotels', {
-      city: destination.city,
-      lat: destination.latitude,
-      lng: destination.longitude,
-      budget_tier: budgetProfile,
-    })
-
-    return {
-      message: "I'll start with hotel options that fit the overall trip budget so we can anchor the rest of the plan.",
-      itinerary_updates: [],
-      options: (hotelOptions ?? []).slice(0, 5).map(enrichHotelOption),
-      planner_state_patch: {
-        ...plannerStatePatch,
-        hotel_status: 'needs_suggestions',
-        phase: 'anchor_selection',
-      },
-      quick_replies: [],
-    }
-  }
-
-  if (hotelIntent === 'has_hotel') {
-    return {
-      message: 'What is the name of your hotel?',
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: {
-        ...plannerStatePatch,
-        hotel_status: 'user_has_hotel',
-      },
-      quick_replies: [],
-    }
-  }
-
-  if (!currentPlannerState.hotel_status || currentPlannerState.hotel_status === 'unknown') {
-    return {
-      message: `${summary} Do you already have a hotel, or would you like me to suggest some options?`,
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: plannerStatePatch,
-      quick_replies: [
-        quickReply('Suggest hotels'),
-        quickReply('I already have a hotel'),
-      ],
-    }
-  }
-
-  if (plannerStatePatch.hotel_status === 'user_has_hotel' && !selectedHotelName) {
-    return {
-      message: 'What is the name of your hotel?',
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: plannerStatePatch,
-      quick_replies: [],
-    }
-  }
-
-  if ((plannerStatePatch.needs?.must_do?.length ?? 0) === 0 && mustDoResponse == null) {
-    return {
-      message: 'Any must-do places, food priorities, or hard constraints I should build around?',
-      itinerary_updates: [],
-      options: [],
-      planner_state_patch: plannerStatePatch,
-      quick_replies: [quickReply('No preferences')],
-    }
-  }
-
-  return {
-    message: `${summary} I have the key details, so I'm ready to start planning.`,
-    itinerary_updates: [],
-    options: [],
-    planner_state_patch: {
-      ...plannerStatePatch,
-      phase: 'drafting',
-    },
-    quick_replies: [],
-  }
 }
 
 export async function POST(request) {
@@ -656,7 +279,7 @@ export async function POST(request) {
             message: buildInitMessage(destination, profile, known),
             itinerary_updates: [],
             options: [],
-            planner_state_patch: { phase: 'intake' },
+            planner_state_patch: { phase: 'setup' },
             // If days are already known, skip to pace chips; otherwise show day-count chips
             quick_replies: known
               ? [quickReply('Relaxed'), quickReply('Balanced'), quickReply('Packed')]
@@ -684,81 +307,6 @@ export async function POST(request) {
             type: 'result',
             sessionId: currentSessionId,
             data: initResponse,
-          })
-          return
-        }
-
-        if (currentPlannerState?.phase === 'intake') {
-          const intakeResponse = await buildIntakeResponse(message, currentPlannerState, destination)
-          const nextPlannerState = normalisePlannerState(
-            deepMergePlannerState(currentPlannerState, intakeResponse.planner_state_patch),
-            profile
-          )
-
-          await supabase
-            .from('chat_sessions')
-            .update({ planner_state: nextPlannerState })
-            .eq('id', currentSessionId)
-
-          await supabase.from('chat_messages').insert([
-            { session_id: currentSessionId, role: 'user', content: message },
-            { session_id: currentSessionId, role: 'assistant', content: intakeResponse.message },
-          ])
-
-          send(controller, {
-            type: 'result',
-            sessionId: currentSessionId,
-            data: intakeResponse,
-          })
-          return
-        }
-
-        const selectedHotelName = parseHotelSelection(message)
-          ?? (
-            currentPlannerState?.hotel_status === 'user_has_hotel'
-            && currentPlannerState?.selected_hotel_name == null
-            && currentPlannerState?.phase !== 'intake'
-              ? message.trim()
-              : null
-          )
-
-        if (
-          selectedHotelName
-          && (currentPlannerState?.phase === 'anchor_selection' || currentPlannerState?.hotel_status === 'user_has_hotel')
-        ) {
-          const hotelResponse = currentPlannerState?.mode === 'guided'
-            ? await buildGuidedDayOneResponse(destination, currentPlannerState, selectedHotelName, profile)
-            : {
-                message: `Locked in ${selectedHotelName}. I'll use it as the base and build your first full draft from ${formatTimeLabel(currentPlannerState?.day1_start_time ?? '09:00')}.`,
-                itinerary_updates: [],
-                options: [],
-                planner_state_patch: {
-                  hotel_status: 'selected',
-                  selected_hotel_name: selectedHotelName,
-                  phase: 'drafting',
-                },
-                quick_replies: [],
-              }
-
-          const nextPlannerState = normalisePlannerState(
-            deepMergePlannerState(currentPlannerState, hotelResponse.planner_state_patch),
-            profile
-          )
-
-          await supabase
-            .from('chat_sessions')
-            .update({ planner_state: nextPlannerState })
-            .eq('id', currentSessionId)
-
-          await supabase.from('chat_messages').insert([
-            { session_id: currentSessionId, role: 'user', content: message },
-            { session_id: currentSessionId, role: 'assistant', content: hotelResponse.message },
-          ])
-
-          send(controller, {
-            type: 'result',
-            sessionId: currentSessionId,
-            data: hotelResponse,
           })
           return
         }
@@ -842,7 +390,7 @@ export async function POST(request) {
         }
 
         parsed.itinerary_updates = parsed.itinerary_updates ?? []
-        parsed.options = parsed.options ?? []
+        parsed.options = (parsed.options ?? []).map(normaliseOption)
         parsed.planner_state_patch = extractPlannerStatePatch(parsed.planner_state_patch)
         parsed.quick_replies = extractQuickReplies(parsed.quick_replies)
 
