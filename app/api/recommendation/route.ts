@@ -1,4 +1,4 @@
-import { query } from '@/lib/supabase/db'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // ── Encoding Maps ────────────────────────────────────────────
 const BUDGET_ENCODING: Record<string, number> = {
@@ -275,18 +275,23 @@ export async function POST(req: Request) {
     const travelMonth     = new Date(prefs.travelDateStart).getMonth() + 1 // 1–12
 
     // Fetch all destinations
-    const result = await query(`
-      SELECT
+    const supabase = await createSupabaseServerClient()
+    const { data: destinationsArray, error: dbError } = await supabase
+      .from('destinations')
+      .select(`
         id, city, country, region, short_description,
         latitude, longitude, budget_level, ideal_durations,
         avg_temp_monthly,
         culture, adventure, nature, beaches, nightlife,
         cuisine, wellness, urban, seclusion,
         categories, best_time_to_visit
-      FROM destinations
-    `)
+      `)
 
-    const destinations: Destination[] = result.rows
+    if (dbError || !destinationsArray) {
+      throw new Error(dbError?.message || 'Failed to fetch destinations')
+    }
+
+    const destinations: Destination[] = destinationsArray
 
     // Build user vector
     const userVector = buildUserVector(prefs, durationEncoded)

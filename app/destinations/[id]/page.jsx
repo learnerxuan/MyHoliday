@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { query } from '@/lib/supabase/db'
 import BookingLinks from './BookingLinks'
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -73,11 +72,12 @@ export default async function DestinationPage({ params }) {
   // Fetch historical trips that match this city name (fuzzy, case-insensitive)
   let historicalTrips = []
   try {
-    const result = await query(
-      `SELECT * FROM historical_trips WHERE LOWER(destination) LIKE LOWER($1)`,
-      [`%${dest.city}%`]
-    )
-    historicalTrips = result.rows
+    const { data: hTrips } = await supabase
+      .from('historical_trips')
+      .select('*')
+      .ilike('destination', `%${dest.city}%`)
+
+    if (hTrips) historicalTrips = hTrips
   } catch { /* non-fatal */ }
 
   // Fetch a city image directly from Wikipedia (server-side, no localhost needed)
