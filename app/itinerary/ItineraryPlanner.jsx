@@ -168,13 +168,33 @@ export default function ItineraryPlanner() {
 
     // POST __INIT__ silently — no user bubble, no UI update before sending
     const sendInit = async () => {
+      // Read quiz answers from sessionStorage (only needed for this single __INIT__ call)
+      // Both keys must exist; if either is missing, quizContext stays null (user arrived directly)
+      let quizContext = null
+      try {
+        const rawPrefs = sessionStorage.getItem('quiz_prefs')
+        const rawMeta  = sessionStorage.getItem('quiz_trip_meta')
+        if (rawPrefs && rawMeta) {
+          const prefs = JSON.parse(rawPrefs)
+          const meta  = JSON.parse(rawMeta)
+          quizContext = {
+            trip_days:         meta.duration_days   ?? null,
+            budget:            prefs.budget         ?? null,   // e.g. "Mid-range"
+            travel_date_start: meta.date_start      ?? null,   // ISO string
+            travel_date_end:   meta.date_end        ?? null,
+            group_size:        prefs.groupSize      ?? null,   // e.g. "Couple"
+            preferred_styles:  prefs.styles         ?? [],     // e.g. ["Culture", "Food & Cuisine"]
+          }
+        }
+      } catch { /* sessionStorage unavailable or corrupted — fall back to null */ }
+
       setIsLoading(true)
       setToolStatus(null)
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: '__INIT__', sessionId, destinationId: cityId, userId, itinerary }),
+          body: JSON.stringify({ message: '__INIT__', sessionId, destinationId: cityId, userId, itinerary, quizContext }),
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
@@ -206,14 +226,15 @@ export default function ItineraryPlanner() {
           }
         }
       } catch {
+        const fallbackQuickReplies = quizContext?.trip_days
+          ? [{ label: 'Relaxed', value: 'Relaxed' }, { label: 'Balanced', value: 'Balanced' }, { label: 'Packed', value: 'Packed' }]
+          : [{ label: '3 days', value: '3 days' }, { label: '5 days', value: '5 days' }, { label: '7 days', value: '7 days' }]
         setMessages([{
           role: 'assistant',
-          content: "Whistler is a great choice for a mountain getaway.\n\nHow many days is the trip?",
-          quickReplies: [
-            { label: '3 days', value: '3 days' },
-            { label: '5 days', value: '5 days' },
-            { label: '7 days', value: '7 days' },
-          ],
+          content: quizContext?.trip_days
+            ? `${destination?.city ?? 'This destination'} is a great pick.\n\nI can see you're planning **${quizContext.trip_days} days** — what pace suits you: relaxed, balanced, or packed?`
+            : `${destination?.city ?? 'This destination'} is a great pick.\n\nHow many days is the trip?`,
+          quickReplies: fallbackQuickReplies,
         }])
       } finally {
         setIsLoading(false)
