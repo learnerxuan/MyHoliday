@@ -45,6 +45,12 @@ function normalisePlannerState(rawState, profile) {
     draft_generated: false,
     current_day: 1,
     current_cluster: 'none',
+    // ── Quiz context fields ────────────────────────────────────
+    travel_date_start: null,
+    travel_date_end: null,
+    group_size: null,
+    preferred_styles: [],
+    // ─────────────────────────────────────────────────────────
     needs: {
       must_do: [],
       must_avoid: [],
@@ -296,7 +302,7 @@ function parseMustDoResponse(message) {
   return null
 }
 
-function buildInitMessage(destination, profile) {
+function buildInitMessage(destination, profile, known = null) {
   const dietary = profile?.dietary_restrictions || 'none'
   const accessibility = profile?.accessibility_needs ? 'yes' : 'none'
   const city = destination.city
@@ -309,7 +315,18 @@ function buildInitMessage(destination, profile) {
     lines.push("I'll keep accessibility in mind as I build the plan.")
   }
 
-  lines.push('', 'How many days is the trip?')
+  if (known?.knownDays && known?.knownBudget) {
+    // Both values are known from the quiz — confirm them and ask pace next
+    lines.push(
+      ``,
+      `I can see you're planning **${known.knownDays} days** with a **${known.knownBudget}** budget — I'll work from those.`,
+      ``,
+      `What pace suits you: relaxed, balanced, or packed?`
+    )
+  } else {
+    lines.push('', 'How many days is the trip?')
+  }
+
   return lines.join('\n')
 }
 
@@ -506,7 +523,7 @@ async function buildIntakeResponse(message, currentPlannerState, destination) {
 }
 
 export async function POST(request) {
-  const { message, sessionId, destinationId, userId, itinerary } = await request.json()
+  const { message, sessionId, destinationId, userId, itinerary, quizContext } = await request.json()
 
   if (!message || !destinationId || !userId) {
     return Response.json({ error: 'Missing required fields' }, { status: 400 })
@@ -584,6 +601,23 @@ export async function POST(request) {
 
           currentSessionId = newSession.id
           currentPlannerState = normalisePlannerState(newSession.planner_state, profile)
+
+          // Pre-fill plannerState from quiz answers before sending the session ID.
+          // deepMergePlannerState is sufficient — currentPlannerState is already fully normalised.
+          if (quizContext) {
+            const normalisedBudget = quizContext.budget
+              ? quizContext.budget.toLowerCase()   // "Mid-range" → "mid-range"
+              : null
+            currentPlannerState = deepMergePlannerState(currentPlannerState, {
+              trip_days:         quizContext.trip_days         ?? null,
+              budget_profile:    normalisedBudget              ?? currentPlannerState.budget_profile,
+              travel_date_start: quizContext.travel_date_start ?? null,
+              travel_date_end:   quizContext.travel_date_end   ?? null,
+              group_size:        quizContext.group_size        ?? null,
+              preferred_styles:  quizContext.preferred_styles  ?? [],
+            })
+          }
+
           send(controller, { type: 'session', sessionId: currentSessionId })
         } else {
           const { data: sessionRow } = await supabase
@@ -607,17 +641,30 @@ export async function POST(request) {
         }))
 
         if (isInit) {
+          // Determine which values are already known from the quiz
+          const knownDays   = currentPlannerState.trip_days ?? null
+          const knownBudget = currentPlannerState.budget_profile !== 'unknown'
+                                ? currentPlannerState.budget_profile
+                                : null
+
+          // known is non-null only when both values came from quiz context
+          const known = (knownDays && knownBudget)
+            ? { knownDays, knownBudget: knownBudget.charAt(0).toUpperCase() + knownBudget.slice(1) }
+            : null
+
           const initResponse = {
-            message: buildInitMessage(destination, profile),
+            message: buildInitMessage(destination, profile, known),
             itinerary_updates: [],
             options: [],
             planner_state_patch: { phase: 'intake' },
-            quick_replies: [
-              quickReply('3 days'),
-              quickReply('5 days'),
-              quickReply('7 days'),
-            ],
+            // If days are already known, skip to pace chips; otherwise show day-count chips
+            quick_replies: known
+              ? [quickReply('Relaxed'), quickReply('Balanced'), quickReply('Packed')]
+              : [quickReply('3 days'), quickReply('5 days'), quickReply('7 days')],
           }
+          // Note: nextPlannerState merges currentPlannerState (which already has quiz values
+          // applied above) with initResponse.planner_state_patch — so quiz values are persisted
+          // to Supabase correctly without any extra DB call.
 
           const nextPlannerState = normalisePlannerState(
             deepMergePlannerState(currentPlannerState, initResponse.planner_state_patch),
