@@ -145,6 +145,35 @@ function buildInitMessage(destination, profile, known = null) {
   return lines.join('\n')
 }
 
+// Robust JSON extractor: handles markdown code fences and doubled-JSON output
+function extractJSON(raw) {
+  if (!raw) return null
+  // Strip markdown code fences (AI sometimes wraps JSON in ```json ... ```)
+  const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+  // Fast path: try the whole string
+  try { return JSON.parse(stripped) } catch { /* continue */ }
+  // Slow path: find and parse just the first complete JSON object
+  // (handles cases where the AI outputs two JSON blobs back-to-back)
+  const start = stripped.indexOf('{')
+  if (start === -1) return null
+  let depth = 0, inStr = false, esc = false
+  for (let i = start; i < stripped.length; i++) {
+    const c = stripped[i]
+    if (esc)            { esc = false; continue }
+    if (c === '\\' && inStr) { esc = true;  continue }
+    if (c === '"')      { inStr = !inStr; continue }
+    if (inStr)          continue
+    if (c === '{')      depth++
+    if (c === '}') {
+      depth--
+      if (depth === 0) {
+        try { return JSON.parse(stripped.slice(start, i + 1)) } catch { return null }
+      }
+    }
+  }
+  return null
+}
+
 export async function POST(request) {
   const { message, sessionId, destinationId, userId, itinerary, quizContext } = await request.json()
 
@@ -377,11 +406,15 @@ export async function POST(request) {
         }
 
         let parsed
-        try {
-          parsed = JSON.parse(finalContent)
-        } catch {
+        parsed = extractJSON(finalContent)
+        if (!parsed) {
+          // If content looks like raw JSON that failed to parse, show a friendly error
+          // rather than dumping raw JSON into the chat
+          const looksLikeJSON = typeof finalContent === 'string' && finalContent.trim().startsWith('{')
           parsed = {
-            message: finalContent,
+            message: looksLikeJSON
+              ? 'Sorry, I had trouble formatting my response. Please try again.'
+              : (finalContent ?? 'Sorry, something went wrong. Please try again.'),
             itinerary_updates: [],
             options: [],
             planner_state_patch: {},
