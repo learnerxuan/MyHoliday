@@ -91,7 +91,10 @@ function RoutingMachine({ waypoints }) {
 
     return () => {
       if (controlRef.current) {
-        try { map.removeControl(controlRef.current) } catch (_) {}
+        // Guard: map may already be destroyed if MapContainer remounted
+        if (map && map._loaded) {
+          try { map.removeControl(controlRef.current) } catch (_) {}
+        }
         controlRef.current = null
       }
     }
@@ -102,7 +105,7 @@ function RoutingMachine({ waypoints }) {
 
 // ── Main component ────────────────────────────────────────────
 
-export default function MapPanel({ itinerary = {}, activeDay, onDayChange }) {
+export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityLat, cityLng }) {
   const dayKeys = Object.keys(itinerary)
     .filter(k => Array.isArray(itinerary[k]) && itinerary[k].length > 0)
     .sort()
@@ -121,14 +124,18 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange }) {
   // All pins (including transport)
   const pins = visibleItems.filter(item => item.lat && item.lng)
 
-  // Map centre: average of pins, or a safe default
+  // Map centre: average of pins → city fallback → world fallback
   const centre =
     pins.length > 0
       ? [
           pins.reduce((s, p) => s + p.lat, 0) / pins.length,
           pins.reduce((s, p) => s + p.lng, 0) / pins.length,
         ]
-      : [35.0116, 135.7681] // Kyoto fallback
+      : cityLat && cityLng
+      ? [cityLat, cityLng]
+      : [20, 0] // world overview fallback
+
+  const zoom = pins.length > 0 ? 13 : cityLat ? 11 : 2
 
   return (
     <div className="flex flex-col h-full">
@@ -162,24 +169,16 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange }) {
         })}
       </div>
 
-      {/* Map area — outer div is the flex child; inner absolute div gives Leaflet a concrete pixel size */}
+      {/* Map area */}
       <div className="flex-1 relative min-h-0">
         <div className="absolute inset-0">
-        {pins.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
-            <span className="text-4xl">🗺️</span>
-            <p className="text-sm font-body text-secondary">
-              Map pins will appear here as the AI adds places to your itinerary.
-            </p>
-          </div>
-        ) : (
-        <MapContainer
-          key={`${activeDay}-${pins.length}`}
-          center={centre}
-          zoom={13}
-          style={{ width: '100%', height: '100%' }}
-          zoomControl
-        >
+          <MapContainer
+            key={`map-${activeDay}`}
+            center={centre}
+            zoom={zoom}
+            style={{ width: '100%', height: '100%' }}
+            zoomControl
+          >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -216,7 +215,13 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange }) {
               <RoutingMachine waypoints={routeWaypoints} />
             )}
           </MapContainer>
-        )}
+
+          {/* Overlay hint when no pins yet */}
+          {pins.length === 0 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm border border-border rounded-full px-4 py-1.5 shadow-sm pointer-events-none">
+              <p className="text-xs font-body text-secondary whitespace-nowrap">📍 Pins will appear as the AI adds places</p>
+            </div>
+          )}
         </div>
       </div>
 

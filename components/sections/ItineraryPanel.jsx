@@ -1,5 +1,7 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+
 const TYPE_ICON = {
   hotel:      '🏨',
   restaurant: '🍽️',
@@ -8,7 +10,7 @@ const TYPE_ICON = {
   note:       '📝',
 }
 
-const TYPE_COLOUR = {
+const TYPE_BORDER = {
   hotel:      'border-l-amber',
   restaurant: 'border-l-red-400',
   attraction: 'border-l-blue-400',
@@ -18,7 +20,6 @@ const TYPE_COLOUR = {
 
 // ── Time helpers ──────────────────────────────────────────────
 
-// "14:30" → minutes from midnight (870)
 function toMinutes(time) {
   if (!time) return null
   const [h, m] = time.split(':').map(Number)
@@ -26,7 +27,6 @@ function toMinutes(time) {
   return h * 60 + (m || 0)
 }
 
-// "14:30" → "2:30 PM"
 function to12h(time24) {
   if (!time24) return null
   const [hStr, mStr] = time24.split(':')
@@ -44,7 +44,6 @@ function formatTimeRange(time, time_end) {
   return end ? `${start} – ${end}` : start
 }
 
-// Detect overlapping pairs — returns a Set of item indices that conflict
 function findConflicts(items) {
   const conflicts = new Set()
   for (let i = 0; i < items.length; i++) {
@@ -57,7 +56,6 @@ function findConflicts(items) {
       const bStart = toMinutes(b.time)
       const bEnd   = toMinutes(b.time_end)
       if (bStart == null) continue
-      // overlap: a starts before b ends AND a ends after b starts
       const aE = aEnd ?? aStart + 60
       const bE = bEnd ?? bStart + 60
       if (aStart < bE && aE > bStart) {
@@ -72,14 +70,51 @@ function findConflicts(items) {
 // ── Main export ───────────────────────────────────────────────
 
 export default function ItineraryPanel({ itinerary = {}, onExport }) {
-  const days = Object.keys(itinerary).sort()
-  const hasContent = days.some(d => itinerary[d]?.length > 0)
+  const allDays = Object.keys(itinerary).sort()
+  const daysWithContent = allDays.filter(d => itinerary[d]?.length > 0)
+  const hasContent = daysWithContent.length > 0
+
+  const [activeDay, setActiveDay] = useState(null)
+
+  // Default to first day with content when itinerary first populates
+  useEffect(() => {
+    if (daysWithContent.length > 0 && (activeDay === null || !daysWithContent.includes(activeDay))) {
+      setActiveDay(daysWithContent[0])
+    }
+  }, [daysWithContent.join(',')])
+
+  const currentDayKey = activeDay ?? daysWithContent[0] ?? null
+  const rawItems = currentDayKey ? (itinerary[currentDayKey] ?? []) : []
+  const items = [...rawItems].sort((a, b) => (toMinutes(a.time) ?? 9999) - (toMinutes(b.time) ?? 9999))
+  const conflicts = findConflicts(items)
 
   return (
     <div className="flex flex-col h-full">
 
-      {/* Day list */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+      {/* Day tabs */}
+      {hasContent && (
+        <div className="flex overflow-x-auto gap-1 px-3 py-2 border-b border-border bg-white shrink-0 scrollbar-none">
+          {daysWithContent.map(dayKey => {
+            const dayNum = parseInt(dayKey.replace('day', ''), 10)
+            const isActive = currentDayKey === dayKey
+            return (
+              <button
+                key={dayKey}
+                onClick={() => setActiveDay(dayKey)}
+                className={`shrink-0 text-xs font-semibold font-body px-3 py-1.5 rounded-md transition-colors
+                  ${isActive
+                    ? 'bg-charcoal text-warmwhite'
+                    : 'text-secondary hover:text-charcoal hover:bg-muted'}`}
+              >
+                Day {dayNum}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Content area */}
+      <div className="flex-1 overflow-y-auto px-4 py-4">
 
         {!hasContent && (
           <div className="flex flex-col items-center justify-center h-full text-center py-16 gap-3">
@@ -93,48 +128,25 @@ export default function ItineraryPanel({ itinerary = {}, onExport }) {
           </div>
         )}
 
-        {days.map((dayKey) => {
-          const rawItems = itinerary[dayKey] ?? []
-          if (rawItems.length === 0) return null
+        {hasContent && currentDayKey && (
+          <div className="space-y-1">
+            {items.map((item, idx) => (
+              <div key={idx}>
+                <ActivityCard item={item} isConflict={conflicts.has(idx)} />
+                {idx < items.length - 1 && (
+                  <div className="flex justify-center">
+                    <div className="w-px h-2 bg-border" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
-          // Sort by start time; items without time go to the end
-          const items = [...rawItems].sort((a, b) => {
-            const am = toMinutes(a.time) ?? 9999
-            const bm = toMinutes(b.time) ?? 9999
-            return am - bm
-          })
-
-          const dayNum   = parseInt(dayKey.replace('day', ''), 10)
-          const dayLabel = `Day ${dayNum}`
-          const conflicts = findConflicts(items)
-
-          return (
-            <DayTimeline
-              key={dayKey}
-              label={dayLabel}
-              items={items}
-              conflictSet={conflicts}
-            />
-          )
-        })}
       </div>
 
-      {/* Legend + Export */}
-      <div className="border-t border-border px-4 py-3 space-y-2">
-        <div className="flex gap-4 text-xs text-tertiary flex-wrap">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-success inline-block" />
-            Confirmed
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-disabled inline-block" />
-            Suggested
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-            Time conflict
-          </span>
-        </div>
+      {/* Export */}
+      <div className="border-t border-border px-4 py-3">
         <button
           onClick={onExport}
           disabled={!hasContent}
@@ -148,132 +160,88 @@ export default function ItineraryPanel({ itinerary = {}, onExport }) {
   )
 }
 
-// ── DayTimeline ───────────────────────────────────────────────
+// ── Activity card ─────────────────────────────────────────────
 
-function DayTimeline({ label, items, conflictSet }) {
-  // Hours to show — find the range from items or default to 7am–10pm
-  const startMins = items.reduce((min, item) => {
-    const m = toMinutes(item.time)
-    return m != null ? Math.min(min, m) : min
-  }, 7 * 60)
+function ActivityCard({ item, isConflict }) {
+  const timeLabel   = formatTimeRange(item.time, item.time_end)
+  const icon        = TYPE_ICON[item.type]  ?? '📌'
+  const borderColor = TYPE_BORDER[item.type] ?? 'border-l-gray-300'
+  const confirmed   = item.status === 'confirmed'
 
-  const endMins = items.reduce((max, item) => {
-    const m = toMinutes(item.time_end ?? item.time)
-    return m != null ? Math.max(max, m + 60) : max
-  }, 22 * 60)
-
-  // Round to nearest hour boundary
-  const firstHour = Math.floor(Math.min(startMins, 7 * 60) / 60)
-  const lastHour  = Math.ceil(Math.max(endMins, 22 * 60) / 60)
-
-  // Items without time — show separately below timeline
-  const untimedItems = items.filter(item => toMinutes(item.time) == null)
+  // Prefer Google Maps place link (accurate) over raw coordinates
+  const isGoogleMapsUrl = item.booking_url?.includes('google.com/maps') || item.booking_url?.includes('maps.google.com')
+  const mapUrl = isGoogleMapsUrl
+    ? item.booking_url
+    : (item.lat && item.lng ? `https://maps.google.com/?q=${item.lat},${item.lng}` : null)
+  // Only show a separate Book button when booking_url is NOT a Google Maps link
+  const bookUrl = (!isGoogleMapsUrl && item.booking_url) ? item.booking_url : null
 
   return (
-    <div>
-      <h3 className="text-xs font-semibold font-body text-secondary uppercase tracking-wide mb-3 px-1">
-        {label}
-      </h3>
-
-      {/* Timeline */}
-      <div className="relative">
-        {/* Hour grid lines */}
-        {Array.from({ length: lastHour - firstHour + 1 }, (_, i) => {
-          const hour = firstHour + i
-          const label12 = hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`
-          return (
-            <div key={hour} className="flex items-start gap-2 mb-0">
-              <span className="text-xs text-tertiary font-body w-12 shrink-0 pt-1 text-right select-none">
-                {label12}
-              </span>
-              <div className="flex-1 border-t border-dashed border-border pt-1 pb-3 relative min-h-[2rem]" />
-            </div>
-          )
-        })}
-
-        {/* Activity cards — absolutely positioned over the grid */}
-        <div className="absolute top-0 left-14 right-0">
-          {items.map((item, idx) => {
-            const startM = toMinutes(item.time)
-            if (startM == null) return null
-            const endM   = toMinutes(item.time_end) ?? startM + 60
-            const isConflict = conflictSet.has(idx)
-
-            // Each hour row is ~2.5rem (40px). Offset = (startM - firstHour*60) / 60 * 40px
-            const HOUR_PX = 40
-            const top    = ((startM - firstHour * 60) / 60) * HOUR_PX
-            const height = Math.max(((endM - startM) / 60) * HOUR_PX, 32)
-
-            const confirmed = item.status === 'confirmed'
-            const typeColour = TYPE_COLOUR[item.type] ?? 'border-l-gray-300'
-
-            return (
-              <div
-                key={idx}
-                className={`absolute left-0 right-1 rounded-lg border-l-4 px-2 py-1 text-xs shadow-sm
-                  ${typeColour}
-                  ${isConflict
-                    ? 'bg-red-50 border border-red-300 border-l-red-500'
-                    : confirmed
-                      ? 'bg-success-bg border border-success/30'
-                      : 'bg-white border border-border'
-                  }`}
-                style={{ top: `${top}px`, height: `${height}px`, overflow: 'hidden' }}
-              >
-                <div className="flex items-center gap-1 leading-tight">
-                  <span className="text-sm">{TYPE_ICON[item.type] ?? '📌'}</span>
-                  <span className={`font-semibold truncate ${isConflict ? 'text-red-700' : confirmed ? 'text-success' : 'text-charcoal'}`}>
-                    {item.name}
-                  </span>
-                </div>
-                {height > 38 && (
-                  <p className="text-tertiary truncate mt-0.5 text-[10px]">
-                    {formatTimeRange(item.time, item.time_end)}
-                    {item.price ? ` · ${item.price}` : ''}
-                    {isConflict ? ' ⚠ Conflict' : ''}
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Untimed items (e.g. hotel, notes without specific time) */}
-      {untimedItems.length > 0 && (
-        <div className="mt-3 space-y-2">
-          <p className="text-xs text-tertiary px-1">No specific time:</p>
-          {untimedItems.map((item, i) => (
-            <UntimedCard key={i} item={item} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function UntimedCard({ item }) {
-  const confirmed  = item.status === 'confirmed'
-  const icon       = TYPE_ICON[item.type] ?? '📌'
-  const typeColour = TYPE_COLOUR[item.type] ?? 'border-l-gray-300'
-
-  return (
-    <div className={`flex items-center gap-3 p-2.5 rounded-xl border-l-4 border border-border text-sm
-      ${typeColour}
-      ${confirmed ? 'bg-success-bg border-success/30' : 'bg-white'}`}
+    <div
+      className={`rounded-xl border border-border border-l-4 px-3 py-2.5 bg-white shadow-sm
+        ${borderColor}
+        ${isConflict ? 'bg-red-50 border-red-200' : confirmed ? 'bg-success-bg border-success/20' : ''}`}
     >
-      <span className="text-base">{icon}</span>
-      <div className="flex-1 min-w-0">
-        <p className={`font-semibold truncate text-xs ${confirmed ? 'text-success' : 'text-charcoal'}`}>
-          {item.name}
-        </p>
-        {item.notes && (
-          <p className="text-[10px] text-tertiary truncate">{item.notes}</p>
+      {/* Time range + confirmed badge */}
+      <div className="flex items-center justify-between mb-1">
+        {timeLabel ? (
+          <span className={`text-[11px] font-semibold font-body px-2 py-0.5 rounded-full
+            ${isConflict ? 'bg-red-100 text-red-600' : 'bg-muted text-secondary'}`}>
+            {timeLabel}
+            {isConflict && ' ⚠'}
+          </span>
+        ) : (
+          <span className="text-[11px] text-tertiary font-body">No time set</span>
+        )}
+        {confirmed && !isConflict && (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-success">
+            <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
+            Confirmed
+          </span>
         )}
       </div>
-      {item.price && (
-        <span className="text-xs text-amber font-semibold shrink-0">{item.price}</span>
+
+      {/* Icon + name */}
+      <div className="flex items-start gap-2">
+        <span className="text-base leading-snug">{icon}</span>
+        <p className={`font-semibold text-sm leading-snug ${isConflict ? 'text-red-700' : 'text-charcoal'}`}>
+          {item.name}
+        </p>
+      </div>
+
+      {/* Notes */}
+      {item.notes && (
+        <p className="text-xs text-secondary mt-1 leading-relaxed line-clamp-2 pl-6">
+          {item.notes}
+        </p>
       )}
+
+      {/* Footer: price + links */}
+      <div className="flex items-center gap-3 mt-2 pl-6 flex-wrap">
+        {item.price && (
+          <span className="text-xs font-semibold text-amber">{item.price}</span>
+        )}
+        {mapUrl && (
+          <a
+            href={mapUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold text-blue-500 hover:text-blue-700 transition-colors"
+          >
+            Maps ↗
+          </a>
+        )}
+        {bookUrl && (
+          <a
+            href={bookUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold text-amber hover:text-amberdark transition-colors"
+          >
+            Book ↗
+          </a>
+        )}
+      </div>
     </div>
   )
 }
