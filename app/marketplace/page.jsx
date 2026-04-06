@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase/client'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 import Spinner from '@/components/ui/Spinner'
@@ -28,38 +29,63 @@ export default function MarketplacePage() {
   const [selectedCityId, setSelectedCityId] = useState('')
 
   useEffect(() => {
-    // Fetch user session and role first
     const fetchSessionAndData = async () => {
       try {
-        const profileRes = await fetch('/api/profile')
-        if (!profileRes.ok) {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError || !session?.user) {
           router.push('/auth/login')
           return
         }
         
-        const userData = await profileRes.json()
-        setUser(userData)
+        const currentUser = session.user
+        const role = currentUser.user_metadata?.role || 'traveller'
+        const baseUserData = { id: currentUser.id, email: currentUser.email, role }
 
-        if (userData.role === 'traveler') {
-          // Fetch traveller's own listings
-          const listingsRes = await fetch('/api/marketplace/listings')
-          const listingsData = await listingsRes.json()
-          setListings(listingsData)
-        } else if (userData.role === 'guide') {
-          if (userData.verification_status === 'approved') {
-            setSelectedCityId(userData.city_id)
+        if (role === 'traveller') {
+          setUser(baseUserData)
+          
+          const { data: listingsData } = await supabase
+            .from('marketplace_listings')
+            .select('*, destinations(city)')
+            .eq('traveller_id', currentUser.id)
             
-            // Fetch cities for the filter dropdown
-            const destRes = await fetch('/api/destinations')
-            const destData = await destRes.json()
-            setDestinations(destData)
+          const formattedListings = (listingsData || []).map(l => ({
+            ...l,
+            city_name: l.destinations?.city || 'Unknown'
+          }))
+          setListings(formattedListings)
+        } else if (role === 'guide') {
+          const { data: guideData } = await supabase
+            .from('tour_guides')
+            .select('verification_status, destinations(id, city)')
+            .eq('user_id', currentUser.id)
+            .single()
+            
+          const city_id = guideData?.destinations?.id || ''
+          setUser({
+            ...baseUserData,
+            verification_status: guideData?.verification_status,
+            city_id
+          })
+          
+          if (guideData?.verification_status === 'approved') {
+            setSelectedCityId(city_id)
+            
+            const { data: destData } = await supabase.from('destinations').select('*')
+            setDestinations(destData || [])
 
-            // Fetch listings scoped to guide's city
-            const listingsRes = await fetch(`/api/marketplace/listings?destination_id=${userData.city_id}`)
-            const listingsData = await listingsRes.json()
+            const { data: listingsData } = await supabase
+              .from('marketplace_listings')
+              .select('*, destinations(city)')
+              .eq('destination_id', city_id)
+              
+            const formattedListings = (listingsData || []).map(l => ({
+              ...l,
+              city_name: l.destinations?.city || 'Unknown'
+            }))
             
-            // Guides only see 'open' status listings on the board
-            setListings(listingsData.filter(item => item.status === 'open'))
+            setListings(formattedListings.filter(item => item.status === 'open'))
           }
         }
       } catch (err) {
@@ -72,16 +98,22 @@ export default function MarketplacePage() {
     fetchSessionAndData()
   }, [router])
 
-  // Handle guide changing the city filter
   const handleCityFilterChange = async (e) => {
     const newCityId = e.target.value
     setSelectedCityId(newCityId)
     setLoading(true)
     
     try {
-      const res = await fetch(`/api/marketplace/listings?destination_id=${newCityId}`)
-      const data = await res.json()
-      setListings(data.filter(item => item.status === 'open'))
+      const { data: listingsData } = await supabase
+        .from('marketplace_listings')
+        .select('*, destinations(city)')
+        .eq('destination_id', newCityId)
+        
+      const formattedListings = (listingsData || []).map(l => ({
+        ...l,
+        city_name: l.destinations?.city || 'Unknown'
+      }))
+      setListings(formattedListings.filter(item => item.status === 'open'))
     } catch (err) {
       setError('Failed to filter listings.')
     } finally {

@@ -61,10 +61,9 @@ export default function Navbar() {
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-1">
           {role === 'admin'      && <NavLink href="/admin" onClick={close}>Admin Dashboard</NavLink>}
-          {role === 'guide'      && <NavLink href="/guide/marketplace" onClick={close}>Marketplace</NavLink>}
           {(role === 'traveller' || !role) && <NavLink href="/quiz" onClick={close}>Plan a Trip</NavLink>}
           <NavLink href="/destinations" onClick={close}>Destinations</NavLink>
-          <NavLink href="/guide/marketplace" onClick={close}>Guides</NavLink>
+          <NavLink href="/marketplace" onClick={close}>Marketplace</NavLink>
 
           <div className="ml-3 pl-3 border-l border-border flex items-center gap-2">
             {user ? (
@@ -111,10 +110,9 @@ export default function Navbar() {
       {menuOpen && (
         <div className="md:hidden border-t border-border bg-white px-4 pb-4 space-y-1">
           {role === 'admin'      && <MobileNavLink href="/admin"              onClick={close}>Admin Dashboard</MobileNavLink>}
-          {role === 'guide'      && <MobileNavLink href="/guide/marketplace"  onClick={close}>Marketplace</MobileNavLink>}
           {(role === 'traveller' || !role) && <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>}
           <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
-          <MobileNavLink href="/guide/marketplace" onClick={close}>Local Guides</MobileNavLink>
+          <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
 
           <div className="pt-2 border-t border-border space-y-1">
             {user ? (
