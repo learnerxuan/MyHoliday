@@ -64,6 +64,7 @@ export default function Navbar() {
           {(role === 'traveller' || !role) && <NavLink href="/quiz" onClick={close}>Plan a Trip</NavLink>}
           <NavLink href="/destinations" onClick={close}>Destinations</NavLink>
           <NavLink href="/marketplace" onClick={close}>Marketplace</NavLink>
+          <NavLink href="/about" onClick={close}>About</NavLink>
 
           <div className="ml-3 pl-3 border-l border-border flex items-center gap-2">
             {user ? (
@@ -77,13 +78,22 @@ export default function Navbar() {
                 </button>
               </>
             ) : (
-              <Link
-                href="/auth/login"
-                onClick={close}
-                className="text-sm font-semibold font-body bg-amber text-warmwhite px-4 py-2 rounded-lg hover:bg-amberdark transition-colors"
-              >
-                Sign in
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/auth/login"
+                  onClick={close}
+                  className="text-sm font-semibold font-body text-charcoal border border-border px-4 py-2 rounded-lg hover:bg-subtle transition-colors tracking-wide"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/auth/register"
+                  onClick={close}
+                  className="text-sm font-semibold font-body bg-charcoal text-white px-4 py-2 rounded-lg hover:bg-black transition-colors tracking-wide"
+                >
+                  Register
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -113,6 +123,7 @@ export default function Navbar() {
           {(role === 'traveller' || !role) && <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>}
           <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
           <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
+          <MobileNavLink href="/about" onClick={close}>About</MobileNavLink>
 
           <div className="pt-2 border-t border-border space-y-1">
             {user ? (
@@ -126,13 +137,22 @@ export default function Navbar() {
                 </button>
               </>
             ) : (
-              <Link
-                href="/auth/login"
-                onClick={close}
-                className="block text-center text-sm font-semibold font-body bg-amber text-warmwhite px-4 py-2.5 rounded-lg hover:bg-amberdark transition-colors"
-              >
-                Sign in
-              </Link>
+              <div className="flex flex-col gap-2 pt-2">
+                <Link
+                  href="/auth/login"
+                  onClick={close}
+                  className="block text-center text-sm font-semibold font-body text-charcoal border border-border px-4 py-2.5 rounded-lg hover:bg-subtle transition-colors tracking-wide"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/auth/register"
+                  onClick={close}
+                  className="block text-center text-sm font-semibold font-body bg-charcoal text-white px-4 py-2.5 rounded-lg hover:bg-black transition-colors tracking-wide"
+                >
+                  Register
+                </Link>
+              </div>
             )}
           </div>
         </div>

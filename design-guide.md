@@ -114,15 +114,19 @@ myholiday/
 
 ## Root Layout Behaviour
 
-`app/layout.jsx` automatically wraps every page with Navbar and Footer. **Never import Navbar or Footer inside any page file.**
+`app/layout.tsx` automatically wraps every page with the universal Navbar and the standardised dark Capstone `<Footer />`. **Never import or implement Navbar or Footer manually inside any page file.**
+
+The Footer (`components/Footer.tsx`) is a dark `#1C1A1A` block containing the trademark, capstone descriptor, and quick routing links spanning Explore, Account, and System. It dynamically locks to the bottom of the page viewport using Flexbox.
 
 ```jsx
-// Your page file only needs this — Navbar and Footer are already there
+// Your page file SHOULD NEVER contain a <footer> tag. Navbar and Footer are already there natively.
 export default function YourPage() {
   return (
-    <section className="py-20">
-      {/* your content */}
-    </section>
+    <div className="bg-warmwhite min-h-screen">
+      <section className="py-20">
+        {/* your content */}
+      </section>
+    </div>
   )
 }
 ```

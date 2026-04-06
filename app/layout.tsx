@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Funnel_Display, Noto_Serif } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
+import Footer from '@/components/Footer'
 
 const funnelDisplay = Funnel_Display({
   variable: '--font-display',
@@ -29,8 +30,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${funnelDisplay.variable} ${notoSerif.variable} antialiased h-screen overflow-hidden bg-warmwhite flex flex-col`}>
         <Navbar />
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {children}
+        <div className="flex-1 min-h-0 overflow-y-auto block">
+          <div className="flex flex-col min-h-full">
+            <main className="flex-1 flex flex-col">
+              {children}
+            </main>
+            <Footer />
+          </div>
         </div>
       </body>
     </html>
