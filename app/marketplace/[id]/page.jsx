@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase/client'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 import Spinner from '@/components/ui/Spinner'
@@ -50,10 +51,15 @@ export default function ListingDetailPage() {
     const fetchAllData = async () => {
       try {
         // 1. Fetch User Profile
-        const profileRes = await fetch('/api/profile')
-        if (!profileRes.ok) throw new Error('Not authenticated')
-        const userData = await profileRes.json()
-        setUser(userData)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError || !session?.user) throw new Error('Not authenticated')
+        
+        const currentUser = session.user
+        setUser({ 
+          id: currentUser.id, 
+          email: currentUser.email,
+          role: currentUser.user_metadata?.role || 'traveller'
+        })
 
         // 2. Fetch Listing
         const listingRes = await fetch(`/api/marketplace/listings/${listingId}`)
