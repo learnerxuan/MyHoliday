@@ -116,6 +116,8 @@ myholiday/
 
 `app/layout.tsx` automatically wraps every page with the universal Navbar and the standardised dark Capstone `<Footer />`. **Never import or implement Navbar or Footer manually inside any page file.**
 
+The Navbar (`components/Navbar.tsx`) is a floating component that implements a "Dynamic Island" responsive pattern. When at the top of the viewport, it spans full width and uses separated styling for navigation groups. Upon scrolling, it shrinks into a singular `bg-white/75 backdrop-blur-md` floating unified pill.
+
 The Footer (`components/Footer.tsx`) is a dark `#1C1A1A` block containing the trademark, capstone descriptor, and quick routing links spanning Explore, Account, and System. It dynamically locks to the bottom of the page viewport using Flexbox.
 
 ```jsx

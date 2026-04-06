@@ -28,16 +28,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${funnelDisplay.variable} ${notoSerif.variable} antialiased h-screen overflow-hidden bg-warmwhite flex flex-col`}>
+      <body className={`${funnelDisplay.variable} ${notoSerif.variable} antialiased min-h-screen flex flex-col bg-warmwhite`}>
         <Navbar />
-        <div className="flex-1 min-h-0 overflow-y-auto block">
-          <div className="flex flex-col min-h-full">
-            <main className="flex-1 flex flex-col">
-              {children}
-            </main>
-            <Footer />
-          </div>
-        </div>
+        <main className="flex-1 flex flex-col pt-24 pt-safe">
+          {children}
+        </main>
+        <Footer />
       </body>
     </html>
   )
