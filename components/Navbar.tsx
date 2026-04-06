@@ -48,12 +48,13 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center shrink-0" onClick={close}>
           <Image
-            src="/logo.png"
+            src="/logo.png?v=2"
             alt="MyHoliday"
             width={140}
             height={40}
             className="h-8 sm:h-9 w-auto object-contain"
             priority
+            unoptimized
           />
         </Link>
 
