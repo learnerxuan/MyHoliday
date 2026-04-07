@@ -244,18 +244,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Footer ───────────────────────────────────────────── */}
-      <footer className="bg-charcoal border-t border-white/10 py-8">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm font-body text-disabled">© 2026 MyHoliday. All rights reserved.</p>
-          <div className="flex gap-6 text-sm font-body text-disabled">
-            <Link href="/destinations" className="hover:text-warmwhite transition-colors">Destinations</Link>
-            <Link href="/guide/marketplace" className="hover:text-warmwhite transition-colors">Guides</Link>
-            <Link href="/auth/login" className="hover:text-warmwhite transition-colors">Login</Link>
-          </div>
-        </div>
-      </footer>
-
     </div>
   )
 }
