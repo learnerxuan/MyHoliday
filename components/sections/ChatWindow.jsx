@@ -51,13 +51,13 @@ export default function ChatWindow({ messages = [], isLoading = false, toolStatu
 
         {toolStatus && (
           <div className="flex justify-start">
-            <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-tl-sm bg-muted text-secondary text-sm italic">
+            <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-tl-sm bg-muted text-secondary text-sm italic animate-pulse">
               {toolStatus}
             </div>
           </div>
         )}
 
-        {isLoading && !toolStatus && (
+        {isLoading && (
           <div className="flex justify-start">
             <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-muted">
               <TypingDots />

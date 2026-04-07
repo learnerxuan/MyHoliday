@@ -29,7 +29,25 @@ function StarRating({ rating }) {
   )
 }
 
-export default function OptionsPanel({ options = [], selectedNames = new Set(), onSelect, onDone }) {
+import { useState, useEffect } from 'react'
+
+export default function OptionsPanel({ options = [], selectedNames = new Set(), onSelect, onDone, city }) {
+  const [quizContext, setQuizContext] = useState({ start: '', end: '', adults: 2 })
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('quiz_prefs')
+      if (raw) {
+        const quiz = JSON.parse(raw)
+        let adults = 2
+        if (quiz.groupSize === 'Solo') adults = 1
+        else if (quiz.groupSize === 'Couple') adults = 2
+        else if (quiz.groupSize === 'Small Group') adults = 4
+        else if (quiz.groupSize === 'Large Group') adults = 8
+        setQuizContext({ start: quiz.travelDateStart, end: quiz.travelDateEnd, adults })
+      }
+    } catch { /* ignore */ }
+  }, [])
   if (options.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-16 gap-3 px-4">
@@ -66,7 +84,7 @@ export default function OptionsPanel({ options = [], selectedNames = new Set(), 
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-8">
         {options.map((option, i) => (
           <OptionCard
             key={i}
@@ -74,8 +92,25 @@ export default function OptionsPanel({ options = [], selectedNames = new Set(), 
             index={i + 1}
             isAdded={selectedNames.has(option.name)}
             onSelect={onSelect}
+            quizContext={quizContext}
+            city={city}
           />
         ))}
+
+        {/* Global Booking.com link at the bottom if there are hotels */}
+        {city && options.some(o => o.type === 'hotel') && quizContext.start && quizContext.end && (
+          <div className="pt-4 border-t border-border mt-4">
+            <a
+              href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}&checkin=${quizContext.start}&checkout=${quizContext.end}&group_adults=${quizContext.adults}&no_rooms=1&group_children=0`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-border rounded-xl text-sm font-semibold font-body text-secondary hover:text-amber hover:border-amber transition-colors shadow-sm"
+            >
+              <span>🏨</span>
+              Search all hotels on Booking.com
+            </a>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -83,9 +118,15 @@ export default function OptionsPanel({ options = [], selectedNames = new Set(), 
 
 // ── Option Card ──────────────────────────────────────────────
 
-function OptionCard({ option, index, isAdded, onSelect }) {
+function OptionCard({ option, index, isAdded, onSelect, quizContext, city }) {
   const typeLabel  = TYPE_LABEL[option.type]  ?? option.type
   const typeColour = TYPE_COLOUR[option.type] ?? 'bg-muted text-charcoal'
+
+  // Construct booking.com specific deep link for hotels
+  let specificBookingUrl = option.booking_url
+  if (option.type === 'hotel' && city && quizContext?.start && quizContext?.end) {
+    specificBookingUrl = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(option.name + ' ' + city)}&checkin=${quizContext.start}&checkout=${quizContext.end}&group_adults=${quizContext.adults}&no_rooms=1&group_children=0`
+  }
 
   return (
     <div className={`border rounded-xl overflow-hidden bg-white transition-colors
@@ -153,14 +194,14 @@ function OptionCard({ option, index, isAdded, onSelect }) {
           >
             {isAdded ? 'Added ✓' : 'Select'}
           </button>
-          {option.booking_url && (
+          {(specificBookingUrl || option.booking_url) && (
             <a
-              href={option.booking_url}
+              href={specificBookingUrl || option.booking_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-2 border border-border rounded-lg text-xs font-semibold text-secondary hover:border-amber hover:text-amber transition-colors"
+              className="px-3 py-2 border border-border rounded-lg text-xs font-semibold text-secondary hover:border-amber hover:text-amber transition-colors flex items-center justify-center text-center"
             >
-              View on Maps
+              {option.type === 'hotel' ? 'Book\u00A0Hotel' : 'View'}
             </a>
           )}
         </div>

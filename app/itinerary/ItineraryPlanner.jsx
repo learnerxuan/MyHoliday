@@ -349,6 +349,28 @@ export default function ItineraryPlanner() {
     router.push(`/destinations/${cityId}`)
   }
 
+  // ── Reset Chat ──────────────────────────────────────────────
+  async function handleResetChat() {
+    if (!confirm('Are you sure you want to reset? This will clear your current plan.')) return
+
+    if (sessionId) {
+      // Archive current session
+      await supabase.from('chat_sessions').update({ status: 'archived' }).eq('id', sessionId)
+    }
+
+    setMessages([])
+    setItinerary({})
+    setSessionId(null)
+    setPendingOptions([])
+    setSelectedOptionNames(new Set())
+    setActiveTab('itinerary')
+    setActiveDay('all')
+    try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
+
+    // Re-trigger __INIT__ fetch
+    initDone.current = false
+  }
+
   // ── Export flow ─────────────────────────────────────────────
   function handleExport() {
     const month = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -412,8 +434,14 @@ export default function ItineraryPlanner() {
             </span>
           )}
           <button
+            onClick={handleResetChat}
+            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md border border-border text-secondary hover:text-charcoal hover:border-charcoal transition-colors ml-2"
+          >
+            Reset Chat
+          </button>
+          <button
             onClick={handleSaveAndExit}
-            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md border border-border text-secondary hover:text-charcoal hover:border-charcoal transition-colors"
+            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md bg-charcoal text-warmwhite hover:bg-amber transition-colors ml-2"
           >
             Save &amp; Exit
           </button>
@@ -465,6 +493,7 @@ export default function ItineraryPlanner() {
               <ItineraryPanel
                 itinerary={itinerary}
                 onExport={handleExport}
+                city={destination?.city}
               />
             )}
             {activeTab === 'map' && (
@@ -482,6 +511,7 @@ export default function ItineraryPlanner() {
                 selectedNames={selectedOptionNames}
                 onSelect={handleOptionSelect}
                 onDone={handleOptionsDone}
+                city={destination?.city}
               />
             )}
           </div>

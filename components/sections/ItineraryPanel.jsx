@@ -69,7 +69,7 @@ function findConflicts(items) {
 
 // ── Main export ───────────────────────────────────────────────
 
-export default function ItineraryPanel({ itinerary = {}, onExport }) {
+export default function ItineraryPanel({ itinerary = {}, onExport, city }) {
   const allDays = Object.keys(itinerary).sort()
   const daysWithContent = allDays.filter(d => itinerary[d]?.length > 0)
   const hasContent = daysWithContent.length > 0
@@ -132,7 +132,7 @@ export default function ItineraryPanel({ itinerary = {}, onExport }) {
           <div className="space-y-1">
             {items.map((item, idx) => (
               <div key={idx}>
-                <ActivityCard item={item} isConflict={conflicts.has(idx)} />
+                <ActivityCard item={item} isConflict={conflicts.has(idx)} city={city} />
                 {idx < items.length - 1 && (
                   <div className="flex justify-center">
                     <div className="w-px h-2 bg-border" />
@@ -162,7 +162,7 @@ export default function ItineraryPanel({ itinerary = {}, onExport }) {
 
 // ── Activity card ─────────────────────────────────────────────
 
-function ActivityCard({ item, isConflict }) {
+function ActivityCard({ item, isConflict, city }) {
   const timeLabel   = formatTimeRange(item.time, item.time_end)
   const icon        = TYPE_ICON[item.type]  ?? '📌'
   const borderColor = TYPE_BORDER[item.type] ?? 'border-l-gray-300'
@@ -173,8 +173,11 @@ function ActivityCard({ item, isConflict }) {
   const mapUrl = isGoogleMapsUrl
     ? item.booking_url
     : (item.lat && item.lng ? `https://maps.google.com/?q=${item.lat},${item.lng}` : null)
-  // Only show a separate Book button when booking_url is NOT a Google Maps link
-  const bookUrl = (!isGoogleMapsUrl && item.booking_url) ? item.booking_url : null
+  
+  // Replace hallucinated AI ticket links with a reliable Google Search
+  // If the item type suggests tickets (only attractions), we form a search query
+  const canBeBooked = item.type === 'attraction'
+  const bookUrl = canBeBooked ? `https://www.google.com/search?q=${encodeURIComponent(`${item.name} ${city || ''} tickets booking`)}` : null
 
   return (
     <div
@@ -238,7 +241,7 @@ function ActivityCard({ item, isConflict }) {
             rel="noopener noreferrer"
             className="text-xs font-semibold text-amber hover:text-amberdark transition-colors"
           >
-            Book ↗
+            Find Tickets ↗
           </a>
         )}
       </div>
