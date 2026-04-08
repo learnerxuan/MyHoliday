@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import HeroCarousel from '@/components/ui/HeroCarousel'
 
 // ── Types ──────────────────────────────────────────────────────
 interface Destination {
@@ -120,18 +121,9 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Stats panel — 2×2 on mobile, 2×2 on desktop */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:col-start-2">
-            {STATS.map(s => (
-              <div
-                key={s.label}
-                className="bg-white/8 border border-white/10 rounded-2xl p-6 flex flex-col gap-2 hover:bg-white/15 hover:border-amber/40 hover:-translate-y-1 hover:shadow-lg hover:shadow-amber/10 transition-all duration-200 cursor-default"
-              >
-                <span className="text-3xl">{s.icon}</span>
-                <p className="text-2xl font-extrabold font-display text-warmwhite">{s.value}</p>
-                <p className="text-xs font-body text-disabled leading-snug">{s.label}</p>
-              </div>
-            ))}
+          {/* Hero Carousel — Recommended Destinations */}
+          <div className="lg:col-start-2 h-full flex flex-col justify-center">
+            <HeroCarousel destinations={destinations} />
           </div>
         </div>
       </section>
@@ -181,8 +173,8 @@ export default async function HomePage() {
           <div className="max-w-5xl mx-auto px-6">
             <div className="flex items-end justify-between mb-8 gap-4">
               <div>
-                <p className="text-xs font-semibold font-body text-amber uppercase tracking-widest mb-1">Editor picks</p>
-                <h2 className="text-4xl font-extrabold font-display text-charcoal">Destinations worth dreaming about</h2>
+                <p className="text-xs font-semibold font-body text-amber uppercase tracking-widest mb-1">Editor's picks</p>
+                <h2 className="text-4xl font-extrabold font-display text-charcoal">Destinations worth dreaming about.</h2>
               </div>
               <Link
                 href="/quiz"
@@ -344,7 +336,7 @@ const DIFFERENTIATORS = [
     desc: 'We use content-based filtering (cosine similarity) across 12 travel dimensions — not ads, popularity, or sponsorships.',
   },
   {
-    icon: '🤖',
+    icon: '✨',
     title: 'AI that plans, not just suggests',
     desc: 'Our AI planner builds a full day-by-day itinerary with real venue data, time planning, and budget awareness — not generic lists.',
   },
