@@ -77,7 +77,8 @@ function getTripDurationDays(startDate: string, endDate: string): number {
   const start = new Date(startDate)
   const end   = new Date(endDate)
   const ms    = end.getTime() - start.getTime()
-  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)))
+  // Add 1 to make the duration inclusive of both start and end calendar days (e.g., 14th to 17th = 4 days)
+  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1)
 }
 
 /**

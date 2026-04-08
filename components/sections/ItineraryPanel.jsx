@@ -3,73 +3,56 @@
 import { useState, useEffect } from 'react'
 
 const TYPE_ICON = {
-  hotel:      '🏨',
+  hotel: '🏨',
   restaurant: '🍽️',
   attraction: '🎯',
-  transport:  '🚌',
-  note:       '📝',
+  transport: '🚌',
+  note: '📝',
 }
 
 const TYPE_BORDER = {
-  hotel:      'border-l-amber',
+  hotel: 'border-l-amber',
   restaurant: 'border-l-red-400',
   attraction: 'border-l-blue-400',
-  transport:  'border-l-gray-400',
-  note:       'border-l-yellow-400',
+  transport: 'border-l-gray-400',
+  note: 'border-l-yellow-400',
 }
 
-// ── Time helpers ──────────────────────────────────────────────
+// ── Time sorting helper ──────────────────────────────────────────────
 
-function toMinutes(time) {
-  if (!time) return null
-  const [h, m] = time.split(':').map(Number)
-  if (isNaN(h)) return null
-  return h * 60 + (m || 0)
-}
-
-function to12h(time24) {
-  if (!time24) return null
-  const [hStr, mStr] = time24.split(':')
-  let h = parseInt(hStr, 10)
-  const m = mStr ?? '00'
-  const period = h >= 12 ? 'PM' : 'AM'
-  h = h % 12 || 12
-  return `${h}:${m} ${period}`
-}
-
-function formatTimeRange(time, time_end) {
-  const start = to12h(time)
-  if (!start) return null
-  const end = to12h(time_end)
-  return end ? `${start} – ${end}` : start
-}
-
-function findConflicts(items) {
-  const conflicts = new Set()
-  for (let i = 0; i < items.length; i++) {
-    const a = items[i]
-    const aStart = toMinutes(a.time)
-    const aEnd   = toMinutes(a.time_end)
-    if (aStart == null) continue
-    for (let j = i + 1; j < items.length; j++) {
-      const b = items[j]
-      const bStart = toMinutes(b.time)
-      const bEnd   = toMinutes(b.time_end)
-      if (bStart == null) continue
-      const aE = aEnd ?? aStart + 60
-      const bE = bEnd ?? bStart + 60
-      if (aStart < bE && aE > bStart) {
-        conflicts.add(i)
-        conflicts.add(j)
-      }
-    }
+function guessMinutes(timeStr) {
+  if (!timeStr) return 9999
+  const s = timeStr.toLowerCase()
+  
+  // Try matching HH:MM AM/PM or H AM/PM
+  const timeMatch = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
+  if (timeMatch) {
+    let h = parseInt(timeMatch[1], 10)
+    const m = parseInt(timeMatch[2] || '0', 10)
+    const ampm = timeMatch[3]
+    
+    if (ampm === 'pm' && h < 12) h += 12
+    if (ampm === 'am' && h === 12) h = 0
+    return h * 60 + m
   }
-  return conflicts
+  
+  let offset = 0
+  if (s.includes('early')) offset = -60
+  if (s.includes('late')) offset = 60
+
+  // Keyword fallbacks
+  if (s.includes('morning')) return 9 * 60 + offset
+  if (s.includes('afternoon')) return 14 * 60 + offset
+  if (s.includes('lunch') || s.includes('noon')) return 12 * 60 + offset
+  if (s.includes('evening')) return 18 * 60 + offset
+  if (s.includes('night') || s.includes('dinner')) return 20 * 60 + offset
+  
+  return 9999
 }
 
 // ── Main export ───────────────────────────────────────────────
 
-export default function ItineraryPanel({ itinerary = {}, onExport, city }) {
+export default function ItineraryPanel({ itinerary = {}, onExport, onDelete, city }) {
   const allDays = Object.keys(itinerary).sort()
   const daysWithContent = allDays.filter(d => itinerary[d]?.length > 0)
   const hasContent = daysWithContent.length > 0
@@ -85,8 +68,9 @@ export default function ItineraryPanel({ itinerary = {}, onExport, city }) {
 
   const currentDayKey = activeDay ?? daysWithContent[0] ?? null
   const rawItems = currentDayKey ? (itinerary[currentDayKey] ?? []) : []
-  const items = [...rawItems].sort((a, b) => (toMinutes(a.time) ?? 9999) - (toMinutes(b.time) ?? 9999))
-  const conflicts = findConflicts(items)
+  // Filter out AI-generated 'note' items if they aren't lunch breaks (lunch is ok)
+  const filteredItems = rawItems
+  const items = [...filteredItems].sort((a, b) => guessMinutes(a.time) - guessMinutes(b.time))
 
   return (
     <div className="flex flex-col h-full">
@@ -132,7 +116,12 @@ export default function ItineraryPanel({ itinerary = {}, onExport, city }) {
           <div className="space-y-1">
             {items.map((item, idx) => (
               <div key={idx}>
-                <ActivityCard item={item} isConflict={conflicts.has(idx)} city={city} />
+                <ActivityCard
+                  item={item}
+                  isConflict={false}
+                  onDelete={() => onDelete && onDelete(currentDayKey, item.name)}
+                  city={city}
+                />
                 {idx < items.length - 1 && (
                   <div className="flex justify-center">
                     <div className="w-px h-2 bg-border" />
@@ -162,41 +151,48 @@ export default function ItineraryPanel({ itinerary = {}, onExport, city }) {
 
 // ── Activity card ─────────────────────────────────────────────
 
-function ActivityCard({ item, isConflict, city }) {
-  const timeLabel   = formatTimeRange(item.time, item.time_end)
-  const icon        = TYPE_ICON[item.type]  ?? '📌'
+function ActivityCard({ item, isConflict, onDelete, city }) {
+  const timeLabel = item.time
+  const icon = TYPE_ICON[item.type] ?? '📌'
   const borderColor = TYPE_BORDER[item.type] ?? 'border-l-gray-300'
-  const confirmed   = item.status === 'confirmed'
+  const confirmed = item.status === 'confirmed'
 
-  // Prefer Google Maps place link (accurate) over raw coordinates
-  const isGoogleMapsUrl = item.booking_url?.includes('google.com/maps') || item.booking_url?.includes('maps.google.com')
-  const mapUrl = isGoogleMapsUrl
-    ? item.booking_url
-    : (item.lat && item.lng ? `https://maps.google.com/?q=${item.lat},${item.lng}` : null)
-  
+  // Generic Google maps link using place name instead of coordinates
+  const query = encodeURIComponent(`${item.name} ${city || ''}`)
+  const mapUrl = `https://www.google.com/maps/search/?api=1&query=${query}`
+
   // Replace hallucinated AI ticket links with a reliable Google Search
-  // If the item type suggests tickets (only attractions), we form a search query
-  const canBeBooked = item.type === 'attraction'
+  // We only form a search query if the AI explicitly flagged it as requiring a ticket
+  const canBeBooked = item.requires_ticket === true
   const bookUrl = canBeBooked ? `https://www.google.com/search?q=${encodeURIComponent(`${item.name} ${city || ''} tickets booking`)}` : null
 
   return (
     <div
-      className={`rounded-xl border border-border border-l-4 px-3 py-2.5 bg-white shadow-sm
+      className={`relative rounded-xl border border-border border-l-4 px-3 py-2.5 bg-white shadow-sm hover:shadow-md transition-shadow group
         ${borderColor}
         ${isConflict ? 'bg-red-50 border-red-200' : confirmed ? 'bg-success-bg border-success/20' : ''}`}
     >
+      {/* ── Delete Button ── */}
+      {onDelete && (
+        <button
+          onClick={(e) => { e.preventDefault(); onDelete() }}
+          className="absolute top-2 right-2 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 rounded-full w-6 h-6 flex items-center justify-center text-xs"
+          title="Remove item"
+        >
+          ✕
+        </button>
+      )}
+
       {/* Time range + confirmed badge */}
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-1 pr-6">
         {timeLabel ? (
-          <span className={`text-[11px] font-semibold font-body px-2 py-0.5 rounded-full
-            ${isConflict ? 'bg-red-100 text-red-600' : 'bg-muted text-secondary'}`}>
+          <span className="text-[11px] font-semibold font-body px-2 py-0.5 rounded-full bg-muted text-secondary">
             {timeLabel}
-            {isConflict && ' ⚠'}
           </span>
         ) : (
-          <span className="text-[11px] text-tertiary font-body">No time set</span>
+          <span className="text-[11px] text-tertiary font-body">flexible time</span>
         )}
-        {confirmed && !isConflict && (
+        {confirmed && (
           <span className="flex items-center gap-1 text-[10px] font-semibold text-success">
             <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
             Confirmed
@@ -205,11 +201,16 @@ function ActivityCard({ item, isConflict, city }) {
       </div>
 
       {/* Icon + name */}
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2 pr-4">
         <span className="text-base leading-snug">{icon}</span>
-        <p className={`font-semibold text-sm leading-snug ${isConflict ? 'text-red-700' : 'text-charcoal'}`}>
+        <a
+          href={`https://www.google.com/search?q=${query}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`font-semibold text-sm leading-snug hover:underline ${isConflict ? 'text-red-700' : 'text-charcoal'}`}
+        >
           {item.name}
-        </p>
+        </a>
       </div>
 
       {/* Notes */}
@@ -231,7 +232,7 @@ function ActivityCard({ item, isConflict, city }) {
             rel="noopener noreferrer"
             className="text-xs font-semibold text-blue-500 hover:text-blue-700 transition-colors"
           >
-            Maps ↗
+            View on Map ↗
           </a>
         )}
         {bookUrl && (
