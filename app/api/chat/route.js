@@ -119,25 +119,28 @@ function formatTimeLabel(time24) {
 
 function buildInitMessage(destination, profile, known = null) {
   const city = destination.city
-
   const lines = [`${city} is a great pick for a well-planned getaway.`]
-
-  if (known?.knownDays) {
-    lines.push(
-      ``,
-      `Now, would you like me to instantly draft a full itinerary based on your preferences?`
-    )
-  } else {
+  if (!known?.knownDays) {
     lines.push('', 'How many days is the trip?')
   }
-
   return lines.join('\n')
 }
 
 async function geocodeItem(item, city) {
-  if (item.type !== 'attraction' && item.type !== 'restaurant') return
+  // Only attempt geocode if it doesn't have coordinates already
   if (item.lat && item.lng) return
 
+  // Safety Catch: If the AI mis-tagged a generic item, or the name is vague, skip pinning and coerce to generic types.
+  const genericKeywords = ['local', 'authentic', 'nearby', 'suggested', 'recommendation', 'lunch at a', 'dinner at a', 'breakfast at a', 'brunch at a']
+  const isGeneric = genericKeywords.some(kw => item.name?.toLowerCase().includes(kw))
+  
+  if (isGeneric) {
+    if (item.type === 'restaurant') item.type = 'food_recommendation'
+    if (item.type === 'attraction') item.type = 'note'
+    return
+  }
+
+  // If we reach here, it's a specific name. Attempt geocoding.
   const query = encodeURIComponent(`${item.name} ${city || ''}`)
   const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=geometry&key=${process.env.GOOGLE_PLACES_API_KEY}`
   
@@ -147,6 +150,14 @@ async function geocodeItem(item, city) {
     if (data.status === 'OK' && data.candidates?.[0]?.geometry?.location) {
       item.lat = data.candidates[0].geometry.location.lat
       item.lng = data.candidates[0].geometry.location.lng
+
+      // Upgrade the type if we found a real location. 
+      // If the AI forgot to send 'type', or sent a generic one, promote it.
+      if (!item.type || item.type === 'food_recommendation') {
+        item.type = 'restaurant'
+      } else if (item.type === 'note') {
+        item.type = 'attraction'
+      }
     }
   } catch (err) {
     console.error('Geocoding error for', item.name, err)
@@ -183,7 +194,7 @@ function extractJSON(raw) {
 }
 
 export async function POST(request) {
-  const { message, sessionId, destinationId, userId, itinerary, quizContext } = await request.json()
+  let { message, sessionId, destinationId, userId, itinerary, quizContext } = await request.json()
 
   if (!message || !destinationId || !userId) {
     return Response.json({ error: 'Missing required fields' }, { status: 400 })
@@ -313,40 +324,42 @@ export async function POST(request) {
             ? { knownDays, knownBudget: knownBudget.charAt(0).toUpperCase() + knownBudget.slice(1) }
             : null
 
-          const initResponse = {
-            message: buildInitMessage(destination, profile, known),
-            itinerary_updates: [],
-            options: [],
-            planner_state_patch: known ? { phase: 'planning', mode: 'quick_draft' } : { phase: 'setup' },
-            // If days are already known, skip to hotel/activity chips; otherwise show day-count chips
-            quick_replies: known
-              ? [quickReply('Suggest full itineraries')]
-              : [quickReply('3 days'), quickReply('5 days'), quickReply('7 days')],
+          if (!known) {
+            // No quiz data — return static greeting asking for days
+            const initResponse = {
+              message: buildInitMessage(destination, profile, null),
+              itinerary_updates: [],
+              options: [],
+              planner_state_patch: { phase: 'setup' },
+              quick_replies: [],
+            }
+
+            const nextPlannerState = normalisePlannerState(
+              deepMergePlannerState(currentPlannerState, initResponse.planner_state_patch),
+              profile
+            )
+
+            await supabase
+              .from('chat_sessions')
+              .update({ planner_state: nextPlannerState })
+              .eq('id', currentSessionId)
+
+            await supabase.from('chat_messages').insert([
+              { session_id: currentSessionId, role: 'assistant', content: initResponse.message },
+            ])
+
+            send(controller, {
+              type: 'result',
+              sessionId: currentSessionId,
+              data: initResponse,
+            })
+            return
+          } else {
+            // Quiz data exists — FAST TRACK: proceed to LLM loop with hidden instruction
+            message = `Initialize: Start by greeting me with: "${destination.city} is a great pick for a well-planned getaway." and then immediately call your generate_itinerary tool to start the plan for ${known.knownDays} days at a ${known.knownBudget} budget. Once the itinerary is generated, provide a brief, friendly summary of what you've planned in your final response.`
+            currentPlannerState.phase = 'planning'
+            currentPlannerState.mode = 'quick_draft'
           }
-          // Note: nextPlannerState merges currentPlannerState (which already has quiz values
-          // applied above) with initResponse.planner_state_patch — so quiz values are persisted
-          // to Supabase correctly without any extra DB call.
-
-          const nextPlannerState = normalisePlannerState(
-            deepMergePlannerState(currentPlannerState, initResponse.planner_state_patch),
-            profile
-          )
-
-          await supabase
-            .from('chat_sessions')
-            .update({ planner_state: nextPlannerState })
-            .eq('id', currentSessionId)
-
-          await supabase.from('chat_messages').insert([
-            { session_id: currentSessionId, role: 'assistant', content: initResponse.message },
-          ])
-
-          send(controller, {
-            type: 'result',
-            sessionId: currentSessionId,
-            data: initResponse,
-          })
-          return
         }
 
         const systemPrompt = buildSystemPrompt(destination, profile, currentPlannerState)
@@ -453,7 +466,11 @@ export async function POST(request) {
         }
 
         // --- Geocoding coordinates dynamically ---
-        const cityContext = currentPlannerState?.destination?.city || profile?.destination?.city || ''
+        // Use the destination from DB (already fetched above) as the authoritative city context.
+        // This ensures "Little India" geocodes as "Little India Singapore" not a random city.
+        const cityContext = destination?.city && destination?.country
+          ? `${destination.city}, ${destination.country}`
+          : destination?.city || ''
         const itemsToGeocode = []
         
         if (parsed.itinerary_updates) {
@@ -470,6 +487,11 @@ export async function POST(request) {
         parsed.options = (parsed.options ?? []).map(normaliseOption)
         parsed.planner_state_patch = extractPlannerStatePatch(parsed.planner_state_patch)
         parsed.quick_replies = extractQuickReplies(parsed.quick_replies)
+          .filter(qr => {
+            const l = qr.label?.toLowerCase() || ''
+            const v = qr.value?.toLowerCase() || ''
+            return !l.includes('full itinerary') && !v.includes('full itinerary')
+          })
 
         const nextPlannerState = normalisePlannerState(
           deepMergePlannerState(currentPlannerState, parsed.planner_state_patch),
@@ -481,10 +503,13 @@ export async function POST(request) {
           .update({ planner_state: nextPlannerState })
           .eq('id', currentSessionId)
 
-        await supabase.from('chat_messages').insert([
-          { session_id: currentSessionId, role: 'user', content: message },
-          { session_id: currentSessionId, role: 'assistant', content: parsed.message ?? finalContent },
-        ])
+        const messagesToInsert = []
+        if (!isInit) {
+          messagesToInsert.push({ session_id: currentSessionId, role: 'user', content: message })
+        }
+        messagesToInsert.push({ session_id: currentSessionId, role: 'assistant', content: parsed.message ?? finalContent })
+
+        await supabase.from('chat_messages').insert(messagesToInsert)
 
         send(controller, {
           type: 'result',

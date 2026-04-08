@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import 'leaflet-routing-machine'
 
 // ── Pin colours & labels ──────────────────────────────────────
 
@@ -29,79 +27,52 @@ const LEGEND_DOT_CLASS = {
   transport:  'bg-gray-500',
 }
 
-function makeDivIcon(type) {
+// ── Time sorting helper ───────────────────────────────────────────
+function guessMinutes(timeStr) {
+  if (!timeStr) return 9999
+  const s = timeStr.toLowerCase()
+  const timeMatch = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
+  if (timeMatch) {
+    let h = parseInt(timeMatch[1], 10)
+    const m = parseInt(timeMatch[2] || '0', 10)
+    const ampm = timeMatch[3]
+    if (ampm === 'pm' && h < 12) h += 12
+    if (ampm === 'am' && h === 12) h = 0
+    return h * 60 + m
+  }
+  let offset = 0
+  if (s.includes('early')) offset = -60
+  if (s.includes('late')) offset = 60
+  if (s.includes('morning')) return 9 * 60 + offset
+  if (s.includes('afternoon')) return 14 * 60 + offset
+  if (s.includes('lunch') || s.includes('noon')) return 12 * 60 + offset
+  if (s.includes('evening')) return 18 * 60 + offset
+  if (s.includes('night') || s.includes('dinner')) return 20 * 60 + offset
+  return 9999
+}
+
+function makeDivIcon(type, numberStr) {
   const bg    = PIN_BG[type]    ?? '#6B7280'
-  const emoji = PIN_EMOJI[type] ?? '📍'
   return L.divIcon({
     html: `
       <div style="
         background:${bg};
-        width:34px;height:34px;
+        width:30px;height:30px;
         border-radius:50% 50% 50% 0;
         transform:rotate(-45deg);
         border:2px solid white;
         box-shadow:0 2px 6px rgba(0,0,0,0.3);
         display:flex;align-items:center;justify-content:center;
       ">
-        <span style="transform:rotate(45deg);font-size:15px;line-height:1">${emoji}</span>
+        <span style="transform:rotate(45deg);font-size:13px;font-weight:bold;color:white;line-height:1;margin-top:1px;margin-right:1px;">${numberStr}</span>
       </div>`,
     className: '',
-    iconSize:    [34, 34],
-    iconAnchor:  [17, 34],
-    popupAnchor: [0, -36],
+    iconSize:    [30, 30],
+    iconAnchor:  [15, 30],
+    popupAnchor: [0, -32],
   })
 }
 
-// ── Routing Machine (imperative, added directly to Leaflet map) ───────────
-
-function RoutingMachine({ waypoints }) {
-  const map        = useMap()
-  const controlRef = useRef(null)
-
-  useEffect(() => {
-    if (!map) return
-
-    // Remove previous control
-    if (controlRef.current) {
-      try { map.removeControl(controlRef.current) } catch (_) {}
-      controlRef.current = null
-    }
-
-    if (waypoints.length < 2) return
-
-    const control = L.Routing.control({
-      waypoints: waypoints.map(w => L.latLng(w.lat, w.lng)),
-      router: L.Routing.osrmv1({
-        serviceUrl: 'https://router.project-osrm.org/route/v1',
-        profile: 'driving',
-      }),
-      routeWhileDragging:  false,
-      show:                false,   // hide turn-by-turn panel
-      addWaypoints:        false,
-      draggableWaypoints:  false,
-      fitSelectedRoutes:   false,
-      lineOptions: {
-        styles: [{ color: '#C4874A', weight: 4, opacity: 0.75 }],
-      },
-      createMarker: () => null,     // we render our own markers
-    })
-
-    control.addTo(map)
-    controlRef.current = control
-
-    return () => {
-      if (controlRef.current) {
-        // Guard: map may already be destroyed if MapContainer remounted
-        if (map && map._loaded) {
-          try { map.removeControl(controlRef.current) } catch (_) {}
-        }
-        controlRef.current = null
-      }
-    }
-  }, [map, waypoints])
-
-  return null
-}
 
 // ── Main component ────────────────────────────────────────────
 
@@ -110,11 +81,13 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityL
     .filter(k => Array.isArray(itinerary[k]) && itinerary[k].length > 0)
     .sort()
 
-  // Items visible on the map
+  const getSortedItems = (k) => [...(itinerary[k] ?? [])].sort((a, b) => guessMinutes(a.time) - guessMinutes(b.time))
+
+  // Items visible on the map (correctly sorted by time so routes don't zigzag chaotically)
   const visibleItems =
     activeDay === 'all'
-      ? dayKeys.flatMap(k => itinerary[k] ?? [])
-      : (itinerary[`day${activeDay}`] ?? [])
+      ? dayKeys.flatMap(k => getSortedItems(k))
+      : getSortedItems(`day${activeDay}`)
 
   // Waypoints for the route (skip transport stops — they're mid-path)
   const routeWaypoints = visibleItems.filter(
@@ -173,7 +146,7 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityL
       <div className="flex-1 relative min-h-0">
         <div className="absolute inset-0">
           <MapContainer
-            key={`map-${activeDay}`}
+            key={`map-${activeDay}-${cityLat ?? 'nocity'}`}
             center={centre}
             zoom={zoom}
             style={{ width: '100%', height: '100%' }}
@@ -188,7 +161,7 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityL
               <Marker
                 key={idx}
                 position={[item.lat, item.lng]}
-                icon={makeDivIcon(item.type)}
+                icon={makeDivIcon(item.type, idx + 1)}
               >
                 <Popup>
                   <div style={{ minWidth: 140 }}>
@@ -212,7 +185,10 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityL
             ))}
 
             {routeWaypoints.length >= 2 && (
-              <RoutingMachine waypoints={routeWaypoints} />
+              <Polyline
+                positions={routeWaypoints.map(w => [w.lat, w.lng])}
+                pathOptions={{ color: '#C4874A', weight: 3, opacity: 0.7, dashArray: '8, 6' }}
+              />
             )}
           </MapContainer>
 

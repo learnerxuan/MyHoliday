@@ -59,9 +59,15 @@ function applyUpdates(prev, updates) {
     } else if (update.action === 'update') {
       const exists = next[key].some(i => i.name === update.name)
       if (exists) {
-        next[key] = next[key].map(i =>
-          i.name === update.name ? { ...i, ...sanitised } : i
-        )
+        next[key] = next[key].map(i => {
+          if (i.name === update.name) {
+            // Apply rename if new_name provided
+            const merged = { ...i, ...sanitised }
+            if (update.new_name) merged.name = update.new_name
+            return merged
+          }
+          return i
+        })
       } else {
         next[key] = [...next[key], sanitised]
       }
@@ -99,6 +105,7 @@ export default function ItineraryPlanner() {
   const [exportSaving,  setExportSaving]  = useState(false)
   const [exportDone,    setExportDone]    = useState(false)
   const [tripContext,   setTripContext]   = useState(null)
+  const [autoMessage,   setAutoMessage]   = useState(null)
   const [resetKey,      setResetKey]      = useState(0)
   const initDone = useRef(false)
 
@@ -123,6 +130,12 @@ export default function ItineraryPlanner() {
       // Resume existing active session if found
       let hasSessionHistory = false
 
+      const { data: profile } = await supabase
+        .from('traveller_profiles')
+        .select('dietary_restrictions, accessibility_needs')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
       let savedQuizContext = null
       try {
         const rawPrefs = sessionStorage.getItem('quiz_prefs')
@@ -138,6 +151,7 @@ export default function ItineraryPlanner() {
             group_size:        prefs.groupSize      ?? null,
             pace:              prefs.pace           ?? null,
             preferred_styles:  prefs.styles         ?? [],
+            dietary:           profile?.dietary_restrictions && profile.dietary_restrictions !== 'None' ? profile.dietary_restrictions : null,
           }
           setTripContext(savedQuizContext)
         }
@@ -163,14 +177,9 @@ export default function ItineraryPlanner() {
         if (history?.length) {
           hasSessionHistory = true
           
-          // Quick replies don't persist in DB. If the user refreshed on the very first 
-          // assistant greeting, artificially restore the prompt chips so they aren't stuck.
+          // Quick replies don't persist in DB. Skip artificial restoration as requested.
           if (history.length === 1 && history[0].role === 'assistant') {
-            const ps = session.planner_state || {}
-            const knownDays = ps.trip_days || savedQuizContext?.trip_days
-            history[0].quickReplies = knownDays 
-              ? [{ label: 'Suggest full itineraries', value: 'Suggest full itineraries' }]
-              : [{ label: '3 days', value: '3 days' }, { label: '5 days', value: '5 days' }, { label: '7 days', value: '7 days' }]
+            history[0].quickReplies = []
           }
           
           setMessages(history)
@@ -240,24 +249,30 @@ export default function ItineraryPlanner() {
               else if (chunk.type === 'result') {
                 setToolStatus(null)
                 if (chunk.sessionId) setSessionId(chunk.sessionId)
-                const { message, itinerary_updates, options, quick_replies } = chunk.data
+                const { message, itinerary_updates, options, quick_replies, overwrite_itinerary } = chunk.data
+                
                 setMessages([{ role: 'assistant', content: message, quickReplies: quick_replies ?? [] }])
-                if (itinerary_updates?.length) setItinerary(prev => applyUpdates(prev, itinerary_updates))
+                
+                if (overwrite_itinerary) {
+                  const newItin = {}
+                  overwrite_itinerary.forEach(d => {
+                    newItin[`day${d.day}`] = d.items
+                  })
+                  setItinerary(newItin)
+                } else if (itinerary_updates?.length) {
+                  setItinerary(prev => applyUpdates(prev, itinerary_updates))
+                }
+
                 if (options?.length) { setPendingOptions(options); setSelectedOptionNames(new Set()); setActiveTab('options') }
               }
             } catch { /* skip malformed */ }
           }
         }
       } catch {
-        const fallbackQuickReplies = tripContext?.trip_days
-          ? [{ label: 'Suggest full itineraries', value: 'Suggest full itineraries' }]
-          : [{ label: '3 days', value: '3 days' }, { label: '5 days', value: '5 days' }, { label: '7 days', value: '7 days' }]
         setMessages([{
           role: 'assistant',
-          content: tripContext?.trip_days
-            ? `${destination?.city ?? 'This destination'} is a great pick.\n\nWould you like me to instantly draft a full itinerary based on your preferences?`
-            : `${destination?.city ?? 'This destination'} is a great pick.\n\nHow many days is the trip?`,
-          quickReplies: fallbackQuickReplies,
+          content: `${destination?.city ?? 'This destination'} is a great pick for a well-planned getaway.`,
+          quickReplies: [],
         }])
       } finally {
         setIsLoading(false)
@@ -269,23 +284,14 @@ export default function ItineraryPlanner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageReady, userId, destination, resetKey])
 
-  // ── Local deletions ─────────────────────────────────────────
-  const handleDeleteItem = useCallback((dayKey, itemName) => {
-    setItinerary(prev => {
-      const next = { ...prev }
-      if (!next[dayKey]) return next
-      next[dayKey] = next[dayKey].filter(i => i.name !== itemName)
-      
-      // If the day is now empty, delete the key entirely to clean up state
-      if (next[dayKey].length === 0) {
-        delete next[dayKey]
-      }
-      
-      // Also notify chat api context immediately if we had an internal patch queue
-      // For now, the next message sent will carry the updated itinerary anyway.
-      return next
-    })
+  // ── Local updates (`delete` / `update` from UI) ─────────────
+  const handleUpdateItem = useCallback((updates) => {
+    setItinerary(prev => applyUpdates(prev, updates))
   }, [])
+
+  const handleDeleteItem = useCallback((dayKey, itemName) => {
+    handleUpdateItem([{ action: 'remove', day: parseInt(dayKey.replace('day', '')), name: itemName }])
+  }, [handleUpdateItem])
 
   // ── Send message ────────────────────────────────────────────
   const handleSend = useCallback(async (text) => {
@@ -375,6 +381,14 @@ export default function ItineraryPlanner() {
     }
   }, [isLoading, sessionId, cityId, userId, itinerary])
 
+  useEffect(() => {
+    // Only fire once isLoading is clear so handleSend's guard doesn't block it
+    if (autoMessage && pageReady && !isLoading) {
+      const msg = autoMessage
+      setAutoMessage(null)
+      handleSend(msg)
+    }
+  }, [autoMessage, pageReady, isLoading, handleSend])
   // ── Save & Exit ─────────────────────────────────────────────
   async function handleSaveAndExit() {
     if (sessionId) {
@@ -409,15 +423,7 @@ export default function ItineraryPlanner() {
     setResetKey(prev => prev + 1)
   }
 
-  // ── Back Button ─────────────────────────────────────────────
-  async function handleBack() {
-    if (sessionId) {
-      // Automatically archive session if they leave explicitly via Back button
-      await supabase.from('chat_sessions').update({ status: 'archived' }).eq('id', sessionId)
-    }
-    try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
-    router.push(`/destinations/${cityId}`)
-  }
+
 
   // ── Export flow ─────────────────────────────────────────────
   function handleExport() {
@@ -462,18 +468,13 @@ export default function ItineraryPlanner() {
 
       {/* ── Header bar ── */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-white shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleBack}
-            className="text-sm font-body text-secondary hover:text-charcoal transition-colors"
-          >
-            ← Back
-          </button>
-          <span className="text-border">|</span>
-          <h1 className="text-sm font-extrabold font-display truncate">
-            Planning: {destination?.city}, {destination?.country}
-          </h1>
-        </div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base md:text-xl font-display truncate">
+              <span className="text-secondary font-medium mr-1.5 opacity-60">Planning:</span> 
+              <span className="font-extrabold text-charcoal">{destination?.city}</span>, 
+              <span className="font-semibold text-secondary ml-1">{destination?.country}</span>
+            </h1>
+          </div>
 
         <div className="flex items-center gap-3 shrink-0">
           {exportDone && (
@@ -513,6 +514,9 @@ export default function ItineraryPlanner() {
           )}
           {tripContext.group_size && (
             <span className="flex items-center gap-1.5"><span className="opacity-70">🙋</span> {tripContext.group_size}</span>
+          )}
+          {tripContext.dietary && (
+            <span className="flex items-center gap-1.5 bg-red-100 text-red-700 px-2 rounded-full font-bold ml-2">🍽 {tripContext.dietary}</span>
           )}
         </div>
       )}
@@ -563,7 +567,9 @@ export default function ItineraryPlanner() {
                 itinerary={itinerary}
                 onExport={handleExport}
                 onDelete={handleDeleteItem}
+                onUpdate={handleUpdateItem}
                 city={destination?.city}
+                tripContext={tripContext}
               />
             )}
             {activeTab === 'map' && (
