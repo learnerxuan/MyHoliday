@@ -38,30 +38,33 @@ const TYPE_BORDER = {
 function guessMinutes(timeStr) {
   if (!timeStr) return 9999
   const s = timeStr.toLowerCase()
-  
+
   // Try matching HH:MM AM/PM or H AM/PM
   const timeMatch = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
   if (timeMatch) {
     let h = parseInt(timeMatch[1], 10)
     const m = parseInt(timeMatch[2] || '0', 10)
     const ampm = timeMatch[3]
-    
+
     if (ampm === 'pm' && h < 12) h += 12
     if (ampm === 'am' && h === 12) h = 0
     return h * 60 + m
   }
-  
+
   let offset = 0
   if (s.includes('early')) offset = -60
   if (s.includes('late')) offset = 60
 
   // Keyword fallbacks
-  if (s.includes('morning')) return 9 * 60 + offset
+  if (s.includes('morning')) return 8 * 60 + offset
   if (s.includes('afternoon')) return 14 * 60 + offset
   if (s.includes('lunch') || s.includes('noon') || s.includes('midday')) return 12 * 60 + offset
   if (s.includes('evening')) return 18 * 60 + offset
   if (s.includes('night') || s.includes('dinner')) return 20 * 60 + offset
   
+  // Prioritise "All Day" or untimed activities at the very top
+  if (s.includes('all day') || s.includes('anytime')) return -1
+
   return 9999
 }
 
@@ -171,8 +174,8 @@ export default function ItineraryPanel({ itinerary = {}, onExport, onDelete, onU
 
 function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripContext }) {
   const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({ 
-    time: item.time || '', 
+  const [editForm, setEditForm] = useState({
+    time: item.time || '',
     notes: item.notes || '',
     price_estimate: item.price_estimate || ''
   })
@@ -183,8 +186,8 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
   }, [item])
 
   const timeLabel = item.time
-  const typeLabel = item.type === 'food_recommendation' 
-    ? 'Food Recommendation' 
+  const typeLabel = item.type === 'food_recommendation'
+    ? 'Food Recommendation'
     : (item.type ? item.type.charAt(0).toUpperCase() + item.type.slice(1) : '')
   const icon = TYPE_ICON[item.type] ?? '📌'
   const borderColor = TYPE_BORDER[item.type] ?? 'border-l-gray-300'
@@ -196,7 +199,7 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
   const canBeBooked = item.requires_ticket === true
   const bookUrl = canBeBooked ? `https://www.google.com/search?q=${encodeURIComponent(`${item.name} ${city || ''} tickets booking`)}` : null
   const isHotel = item.type === 'hotel' || item.name.toLowerCase().includes('hotel') || item.name.toLowerCase().includes('check-in')
-  
+
   // Build Booking.com URL with dates pre-filled (format: YYYY-MM-DD → split into year/month/day params)
   // Booking.com uses: checkin_year=, checkin_month=, checkin_monthday=  (same pattern for checkout)
   function bookingDateParams(iso, prefix) {
@@ -217,7 +220,7 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
 
   if (isEditing) {
     return (
-      <div className={`relative rounded-xl border border-border border-l-4 px-3 py-3 bg-white shadow-sm flex flex-col gap-3 ${borderColor}`}> 
+      <div className={`relative rounded-xl border border-border border-l-4 px-3 py-3 bg-white shadow-sm flex flex-col gap-3 ${borderColor}`}>
         <div>
           <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Start Time</label>
           <select
@@ -305,7 +308,7 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
         {item.price_estimate && (
           <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">{item.price_estimate}</span>
         )}
-        
+
         {item.type !== 'food_recommendation' && (
           <a
             href={mapUrl}
