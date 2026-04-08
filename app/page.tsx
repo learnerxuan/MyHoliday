@@ -94,22 +94,22 @@ export default async function HomePage() {
         <div className="relative max-w-5xl mx-auto px-6 py-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 bg-white/10 text-amber text-xs font-semibold font-body px-3 py-1.5 rounded-full border border-amber/20">
-              ✨ AI-powered travel planner
+              ✨ Powered by AI
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-display leading-tight">
-              Stop scrolling.<br />
-              <span className="text-amber italic">Find where you belong.</span>
+              Travel that feels<br />
+              <span className="text-amber italic">uniquely yours.</span>
             </h1>
             <p className="text-base font-body text-disabled leading-relaxed max-w-md">
               MyHoliday takes a 2-minute quiz — your travel style, budget, climate preference, and dates — then ranks
-              500+ destinations by how well they match <em>you</em>. No ads. No bias. Just your best trips.
+              300+ destinations by how well they match <em>you</em>. No ads. No bias. Just your best trips.
             </p>
             <div className="flex gap-3 flex-wrap">
               <Link
                 href="/quiz"
                 className="inline-block bg-amber text-warmwhite font-semibold font-body text-sm py-3 px-7 rounded-md hover:bg-amberdark transition-all hover:shadow-lg hover:shadow-amber/30 hover:-translate-y-0.5"
               >
-                Start the Quiz — Free ✨
+                Start the Quiz →
               </Link>
               <Link
                 href="/destinations"
@@ -161,8 +161,8 @@ export default async function HomePage() {
       {/* ── 3. Why MyHoliday ─────────────────────────────────── */}
       <section className="max-w-5xl mx-auto px-6 py-20">
         <div className="text-center mb-12">
-          <p className="text-xs font-semibold font-body text-amber uppercase tracking-widest mb-2">Why us</p>
-          <h2 className="text-4xl font-extrabold font-display text-charcoal">Not just another travel site</h2>
+          <p className="text-xs font-semibold font-body text-amber uppercase tracking-widest mb-2">Why Us?</p>
+          <h2 className="text-4xl font-extrabold font-display text-charcoal">Not just an ordinary travel site.</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {DIFFERENTIATORS.map(d => (
@@ -200,7 +200,7 @@ export default async function HomePage() {
 
             <p className="text-center text-sm font-body text-secondary mt-8">
               These are hand-picked examples. After the quiz, we&apos;ll rank{' '}
-              <strong className="text-charcoal">500+ destinations</strong> specifically for you.
+              <strong className="text-charcoal">300+ destinations</strong> specifically for you.
             </p>
           </div>
         </section>
@@ -304,10 +304,10 @@ function DestinationCard({ destination }: { destination: Destination & { imageUr
 // ── Static data ────────────────────────────────────────────────
 
 const STATS = [
-  { icon: '🌍', value: '500+',    label: 'Destinations scored by your preferences' },
+  { icon: '🌍', value: '300+',    label: 'Destinations scored by your preferences' },
   { icon: '🎯', value: '12D',     label: 'Dimensions used in our matching algorithm' },
-  { icon: '🤖', value: 'AI',      label: 'Day-by-day itinerary builder with real venue data' },
-  { icon: '🧑‍🤝‍🧑', value: 'LOCAL', label: 'Guide marketplace for boots-on-the-ground expertise' },
+  { icon: '✨', value: 'AI',      label: 'Day-by-day itinerary builder with real venue data' },
+  { icon: '🧑‍🤝‍🧑', value: 'Local', label: 'Guide marketplace for boots-on-the-ground expertise' },
 ]
 
 const STEPS = [
