@@ -6,14 +6,12 @@ import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase/client'
 import ChatWindow from '@/components/sections/ChatWindow'
 import ItineraryPanel from '@/components/sections/ItineraryPanel'
-import OptionsPanel from '@/components/sections/OptionsPanel'
 
 const MapPanel = dynamic(() => import('@/components/sections/MapPanel'), { ssr: false })
 
 const TABS = [
   { id: 'itinerary', label: '📋 Itinerary' },
   { id: 'map',       label: '🗺️ Map' },
-  { id: 'options',   label: '🏨 Options' },
 ]
 
 // ── Coordinate sanitiser ──────────────────────────────────────
@@ -52,13 +50,27 @@ function applyUpdates(prev, updates) {
     const sanitised = sanitiseCoords(update)
 
     if (update.action === 'add') {
-      next[key] = [...next[key], sanitised]
+      const exists = next[key].some(i => i.name === update.name)
+      if (!exists) {
+        next[key] = [...next[key], sanitised]
+      }
     } else if (update.action === 'remove') {
       next[key] = next[key].filter(i => i.name !== update.name)
     } else if (update.action === 'update') {
-      next[key] = next[key].map(i =>
-        i.name === update.name ? { ...i, ...sanitised } : i
-      )
+      const exists = next[key].some(i => i.name === update.name)
+      if (exists) {
+        next[key] = next[key].map(i =>
+          i.name === update.name ? { ...i, ...sanitised } : i
+        )
+      } else {
+        next[key] = [...next[key], sanitised]
+      }
+    }
+  }
+  // Remove day keys that ended up empty after remove actions
+  for (const key of Object.keys(next)) {
+    if (Array.isArray(next[key]) && next[key].length === 0) {
+      delete next[key]
     }
   }
   return next
@@ -78,8 +90,6 @@ export default function ItineraryPlanner() {
   const [itinerary,     setItinerary]     = useState({})
   const [activeTab,     setActiveTab]     = useState('itinerary')
   const [activeDay,     setActiveDay]     = useState('all')
-  const [pendingOptions,setPendingOptions]= useState([])
-  const [selectedOptionNames, setSelectedOptionNames] = useState(new Set())
   const [isLoading,     setIsLoading]     = useState(false)
   const [toolStatus,    setToolStatus]    = useState(null)
   const [sessionId,     setSessionId]     = useState(null)
@@ -88,6 +98,8 @@ export default function ItineraryPlanner() {
   const [exportTitle,   setExportTitle]   = useState('')
   const [exportSaving,  setExportSaving]  = useState(false)
   const [exportDone,    setExportDone]    = useState(false)
+  const [tripContext,   setTripContext]   = useState(null)
+  const [resetKey,      setResetKey]      = useState(0)
   const initDone = useRef(false)
 
   // ── Init: auth + destination + existing session ─────────────
@@ -111,9 +123,29 @@ export default function ItineraryPlanner() {
       // Resume existing active session if found
       let hasSessionHistory = false
 
+      let savedQuizContext = null
+      try {
+        const rawPrefs = sessionStorage.getItem('quiz_prefs')
+        const rawMeta  = sessionStorage.getItem('quiz_trip_meta')
+        if (rawPrefs && rawMeta) {
+          const prefs = JSON.parse(rawPrefs)
+          const meta  = JSON.parse(rawMeta)
+          savedQuizContext = {
+            trip_days:         meta.duration_days   ?? null,
+            budget:            prefs.budget         ?? null,
+            travel_date_start: meta.date_start      ?? null,
+            travel_date_end:   meta.date_end        ?? null,
+            group_size:        prefs.groupSize      ?? null,
+            pace:              prefs.pace           ?? null,
+            preferred_styles:  prefs.styles         ?? [],
+          }
+          setTripContext(savedQuizContext)
+        }
+      } catch { /* ignore */ }
+
       const { data: session } = await supabase
         .from('chat_sessions')
-        .select('id')
+        .select('id, planner_state')
         .eq('user_id', user.id)
         .eq('destination_id', cityId)
         .eq('status', 'active')
@@ -130,6 +162,17 @@ export default function ItineraryPlanner() {
           .order('created_at', { ascending: true })
         if (history?.length) {
           hasSessionHistory = true
+          
+          // Quick replies don't persist in DB. If the user refreshed on the very first 
+          // assistant greeting, artificially restore the prompt chips so they aren't stuck.
+          if (history.length === 1 && history[0].role === 'assistant') {
+            const ps = session.planner_state || {}
+            const knownDays = ps.trip_days || savedQuizContext?.trip_days
+            history[0].quickReplies = knownDays 
+              ? [{ label: 'Suggest full itineraries', value: 'Suggest full itineraries' }]
+              : [{ label: '3 days', value: '3 days' }, { label: '5 days', value: '5 days' }, { label: '7 days', value: '7 days' }]
+          }
+          
           setMessages(history)
         }
       }
@@ -168,33 +211,13 @@ export default function ItineraryPlanner() {
 
     // POST __INIT__ silently — no user bubble, no UI update before sending
     const sendInit = async () => {
-      // Read quiz answers from sessionStorage (only needed for this single __INIT__ call)
-      // Both keys must exist; if either is missing, quizContext stays null (user arrived directly)
-      let quizContext = null
-      try {
-        const rawPrefs = sessionStorage.getItem('quiz_prefs')
-        const rawMeta  = sessionStorage.getItem('quiz_trip_meta')
-        if (rawPrefs && rawMeta) {
-          const prefs = JSON.parse(rawPrefs)
-          const meta  = JSON.parse(rawMeta)
-          quizContext = {
-            trip_days:         meta.duration_days   ?? null,
-            budget:            prefs.budget         ?? null,   // e.g. "Mid-range"
-            travel_date_start: meta.date_start      ?? null,   // ISO string
-            travel_date_end:   meta.date_end        ?? null,
-            group_size:        prefs.groupSize      ?? null,   // e.g. "Couple"
-            preferred_styles:  prefs.styles         ?? [],     // e.g. ["Culture", "Food & Cuisine"]
-          }
-        }
-      } catch { /* sessionStorage unavailable or corrupted — fall back to null */ }
-
       setIsLoading(true)
       setToolStatus(null)
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: '__INIT__', sessionId, destinationId: cityId, userId, itinerary, quizContext }),
+          body: JSON.stringify({ message: '__INIT__', sessionId, destinationId: cityId, userId, itinerary, quizContext: tripContext }),
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
@@ -226,13 +249,13 @@ export default function ItineraryPlanner() {
           }
         }
       } catch {
-        const fallbackQuickReplies = quizContext?.trip_days
-          ? [{ label: 'Relaxed', value: 'Relaxed' }, { label: 'Balanced', value: 'Balanced' }, { label: 'Packed', value: 'Packed' }]
+        const fallbackQuickReplies = tripContext?.trip_days
+          ? [{ label: 'Suggest full itineraries', value: 'Suggest full itineraries' }]
           : [{ label: '3 days', value: '3 days' }, { label: '5 days', value: '5 days' }, { label: '7 days', value: '7 days' }]
         setMessages([{
           role: 'assistant',
-          content: quizContext?.trip_days
-            ? `${destination?.city ?? 'This destination'} is a great pick.\n\nI can see you're planning **${quizContext.trip_days} days** — what pace suits you: relaxed, balanced, or packed?`
+          content: tripContext?.trip_days
+            ? `${destination?.city ?? 'This destination'} is a great pick.\n\nWould you like me to instantly draft a full itinerary based on your preferences?`
             : `${destination?.city ?? 'This destination'} is a great pick.\n\nHow many days is the trip?`,
           quickReplies: fallbackQuickReplies,
         }])
@@ -244,11 +267,39 @@ export default function ItineraryPlanner() {
 
     sendInit()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageReady, userId, destination])
+  }, [pageReady, userId, destination, resetKey])
+
+  // ── Local deletions ─────────────────────────────────────────
+  const handleDeleteItem = useCallback((dayKey, itemName) => {
+    setItinerary(prev => {
+      const next = { ...prev }
+      if (!next[dayKey]) return next
+      next[dayKey] = next[dayKey].filter(i => i.name !== itemName)
+      
+      // If the day is now empty, delete the key entirely to clean up state
+      if (next[dayKey].length === 0) {
+        delete next[dayKey]
+      }
+      
+      // Also notify chat api context immediately if we had an internal patch queue
+      // For now, the next message sent will carry the updated itinerary anyway.
+      return next
+    })
+  }, [])
 
   // ── Send message ────────────────────────────────────────────
   const handleSend = useCallback(async (text) => {
     if (!text.trim() || isLoading) return
+
+    // When asking for a full itinerary generation, clear the current itinerary state
+    // so the AI sees a blank slate and generates ALL days from Day 1 instead of
+    // skipping days that are already populated in the itinerary context.
+    const isFullGen = /suggest full itinerar/i.test(text) || /plan everything/i.test(text) || /give me a full draft/i.test(text)
+    const itineraryToSend = isFullGen ? {} : itinerary
+    if (isFullGen) {
+      setItinerary({})
+      try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
+    }
 
     setMessages(prev => [...prev, { role: 'user', content: text }])
     setIsLoading(true)
@@ -258,7 +309,7 @@ export default function ItineraryPlanner() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, sessionId, destinationId: cityId, userId, itinerary }),
+        body: JSON.stringify({ message: text, sessionId, destinationId: cityId, userId, itinerary: itineraryToSend }),
       })
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -289,16 +340,18 @@ export default function ItineraryPlanner() {
             } else if (chunk.type === 'result') {
               setToolStatus(null)
               if (chunk.sessionId) setSessionId(chunk.sessionId)
-              const { message, itinerary_updates, options, quick_replies } = chunk.data
+              const { message, itinerary_updates, options, quick_replies, overwrite_itinerary } = chunk.data
 
               setMessages(prev => [...prev, { role: 'assistant', content: message, quickReplies: quick_replies ?? [] }])
-              if (itinerary_updates?.length) {
+              
+              if (overwrite_itinerary) {
+                const newItin = {}
+                overwrite_itinerary.forEach(d => {
+                  newItin[`day${d.day}`] = d.items
+                })
+                setItinerary(newItin)
+              } else if (itinerary_updates?.length) {
                 setItinerary(prev => applyUpdates(prev, itinerary_updates))
-              }
-              if (options?.length) {
-                setPendingOptions(options)
-                setSelectedOptionNames(new Set())
-                setActiveTab('options')
               }
 
             } else if (chunk.type === 'error') {
@@ -322,20 +375,6 @@ export default function ItineraryPlanner() {
     }
   }, [isLoading, sessionId, cityId, userId, itinerary])
 
-  // ── Select option from Options panel ───────────────────────
-  function handleOptionSelect(option) {
-    // Mark as selected but keep the full options list visible
-    setSelectedOptionNames(prev => new Set([...prev, option.name]))
-    setActiveTab('itinerary')
-    handleSend(`I'll go with ${option.name}`)
-  }
-
-  // ── Done with current options batch ─────────────────────────
-  function handleOptionsDone() {
-    setPendingOptions([])
-    setSelectedOptionNames(new Set())
-  }
-
   // ── Save & Exit ─────────────────────────────────────────────
   async function handleSaveAndExit() {
     if (sessionId) {
@@ -345,6 +384,37 @@ export default function ItineraryPlanner() {
         .eq('id', sessionId)
     }
     // Clear persisted itinerary — session is done
+    try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
+    router.push(`/destinations/${cityId}`)
+  }
+
+  // ── Reset Chat ──────────────────────────────────────────────
+  async function handleResetChat() {
+    if (!confirm('Are you sure you want to start over? This will clear your current plan.')) return
+
+    if (sessionId) {
+      // Archive current session
+      await supabase.from('chat_sessions').update({ status: 'archived' }).eq('id', sessionId)
+    }
+
+    setMessages([])
+    setItinerary({})
+    setSessionId(null)
+    setActiveTab('itinerary')
+    setActiveDay('all')
+    try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
+
+    // Re-trigger __INIT__ fetch
+    initDone.current = false
+    setResetKey(prev => prev + 1)
+  }
+
+  // ── Back Button ─────────────────────────────────────────────
+  async function handleBack() {
+    if (sessionId) {
+      // Automatically archive session if they leave explicitly via Back button
+      await supabase.from('chat_sessions').update({ status: 'archived' }).eq('id', sessionId)
+    }
     try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
     router.push(`/destinations/${cityId}`)
   }
@@ -378,7 +448,7 @@ export default function ItineraryPlanner() {
   // ── Page loading ────────────────────────────────────────────
   if (!pageReady) {
     return (
-      <div className="h-full flex items-center justify-center bg-warmwhite">
+      <div className="w-full flex items-center justify-center bg-warmwhite" style={{ height: 'calc(100dvh - 96px)' }}>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-amber border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-sm font-body text-secondary">Loading your planner...</p>
@@ -388,17 +458,17 @@ export default function ItineraryPlanner() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-warmwhite overflow-hidden">
+    <div className="w-full flex flex-col bg-warmwhite overflow-hidden" style={{ height: 'calc(100dvh - 96px)' }}>
 
       {/* ── Header bar ── */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-white shrink-0">
         <div className="flex items-center gap-3">
-          <a
-            href={`/destinations/${cityId}`}
+          <button
+            onClick={handleBack}
             className="text-sm font-body text-secondary hover:text-charcoal transition-colors"
           >
             ← Back
-          </a>
+          </button>
           <span className="text-border">|</span>
           <h1 className="text-sm font-extrabold font-display truncate">
             Planning: {destination?.city}, {destination?.country}
@@ -412,19 +482,46 @@ export default function ItineraryPlanner() {
             </span>
           )}
           <button
+            onClick={handleResetChat}
+            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md border border-border text-secondary hover:text-charcoal hover:border-charcoal transition-colors ml-2"
+          >
+            Reset Chat
+          </button>
+          <button
             onClick={handleSaveAndExit}
-            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md border border-border text-secondary hover:text-charcoal hover:border-charcoal transition-colors"
+            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md bg-charcoal text-warmwhite hover:bg-amber transition-colors ml-2"
           >
             Save &amp; Exit
           </button>
         </div>
       </header>
 
+      {/* ── Trip context bar (full-width) ── */}
+      {tripContext && (
+        <div className="px-5 py-2 border-b border-border/60 bg-white/70 backdrop-blur-sm shrink-0 flex items-center gap-5 text-xs font-body text-charcoal font-medium">
+          {tripContext.travel_date_start && tripContext.travel_date_end && (
+            <span className="flex items-center gap-1.5"><span className="opacity-70">🗓</span> {new Date(tripContext.travel_date_start).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} - {new Date(tripContext.travel_date_end).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
+          )}
+          {tripContext.trip_days && (
+            <span className="flex items-center gap-1.5"><span className="opacity-70">⏱</span> {tripContext.trip_days} Days</span>
+          )}
+          {tripContext.budget && (
+            <span className="flex items-center gap-1.5"><span className="opacity-70">💰</span> {tripContext.budget}</span>
+          )}
+          {tripContext.pace && (
+            <span className="flex items-center gap-1.5"><span className="opacity-70">🏃</span> {tripContext.pace}</span>
+          )}
+          {tripContext.group_size && (
+            <span className="flex items-center gap-1.5"><span className="opacity-70">🙋</span> {tripContext.group_size}</span>
+          )}
+        </div>
+      )}
+
       {/* ── Split pane ── */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 overflow-hidden">
 
         {/* Left — Chat (50%) */}
-        <div className="w-1/2 border-r border-border flex flex-col min-h-0">
+        <div className="w-1/2 border-r border-border flex flex-col min-h-0 bg-subtle/30">
           <ChatWindow
             messages={messages}
             isLoading={isLoading}
@@ -465,6 +562,8 @@ export default function ItineraryPlanner() {
               <ItineraryPanel
                 itinerary={itinerary}
                 onExport={handleExport}
+                onDelete={handleDeleteItem}
+                city={destination?.city}
               />
             )}
             {activeTab === 'map' && (
@@ -474,14 +573,6 @@ export default function ItineraryPlanner() {
                 onDayChange={setActiveDay}
                 cityLat={destination?.latitude}
                 cityLng={destination?.longitude}
-              />
-            )}
-            {activeTab === 'options' && (
-              <OptionsPanel
-                options={pendingOptions}
-                selectedNames={selectedOptionNames}
-                onSelect={handleOptionSelect}
-                onDone={handleOptionsDone}
               />
             )}
           </div>

@@ -118,31 +118,39 @@ function formatTimeLabel(time24) {
 }
 
 function buildInitMessage(destination, profile, known = null) {
-  const dietary = profile?.dietary_restrictions || 'none'
-  const accessibility = profile?.accessibility_needs ? 'yes' : 'none'
   const city = destination.city
 
   const lines = [`${city} is a great pick for a well-planned getaway.`]
 
-  if (dietary !== 'none') {
-    lines.push(`I'll keep your ${dietary} preferences in mind throughout.`)
-  } else if (accessibility !== 'none') {
-    lines.push("I'll keep accessibility in mind as I build the plan.")
-  }
-
-  if (known?.knownDays && known?.knownBudget) {
-    // Both values are known from the quiz — confirm them and ask pace next
+  if (known?.knownDays) {
     lines.push(
       ``,
-      `I can see you're planning **${known.knownDays} days** with a **${known.knownBudget}** budget — I'll work from those.`,
-      ``,
-      `What pace suits you: relaxed, balanced, or packed?`
+      `Now, would you like me to instantly draft a full itinerary based on your preferences?`
     )
   } else {
     lines.push('', 'How many days is the trip?')
   }
 
   return lines.join('\n')
+}
+
+async function geocodeItem(item, city) {
+  if (item.type !== 'attraction' && item.type !== 'restaurant') return
+  if (item.lat && item.lng) return
+
+  const query = encodeURIComponent(`${item.name} ${city || ''}`)
+  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=geometry&key=${process.env.GOOGLE_PLACES_API_KEY}`
+  
+  try {
+    const res = await fetch(url)
+    const data = await res.json()
+    if (data.status === 'OK' && data.candidates?.[0]?.geometry?.location) {
+      item.lat = data.candidates[0].geometry.location.lat
+      item.lng = data.candidates[0].geometry.location.lng
+    }
+  } catch (err) {
+    console.error('Geocoding error for', item.name, err)
+  }
 }
 
 // Robust JSON extractor: handles markdown code fences and doubled-JSON output
@@ -263,6 +271,7 @@ export async function POST(request) {
             currentPlannerState = deepMergePlannerState(currentPlannerState, {
               trip_days:         quizContext.trip_days         ?? null,
               budget_profile:    normalisedBudget              ?? currentPlannerState.budget_profile,
+              pace:              quizContext.pace              ?? null,
               travel_date_start: quizContext.travel_date_start ?? null,
               travel_date_end:   quizContext.travel_date_end   ?? null,
               group_size:        quizContext.group_size        ?? null,
@@ -308,10 +317,10 @@ export async function POST(request) {
             message: buildInitMessage(destination, profile, known),
             itinerary_updates: [],
             options: [],
-            planner_state_patch: { phase: 'setup' },
-            // If days are already known, skip to pace chips; otherwise show day-count chips
+            planner_state_patch: known ? { phase: 'planning', mode: 'quick_draft' } : { phase: 'setup' },
+            // If days are already known, skip to hotel/activity chips; otherwise show day-count chips
             quick_replies: known
-              ? [quickReply('Relaxed'), quickReply('Balanced'), quickReply('Packed')]
+              ? [quickReply('Suggest full itineraries')]
               : [quickReply('3 days'), quickReply('5 days'), quickReply('7 days')],
           }
           // Note: nextPlannerState merges currentPlannerState (which already has quiz values
@@ -355,6 +364,8 @@ export async function POST(request) {
         let finalContent = null
         let loopMessages = [...messages]
         const MAX_TOOL_ROUNDS = 5
+        const collectedUpdates = [] // accumulate modify_itinerary tool call args
+        let generatedItinerary = null // capture generate_itinerary payload
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           const response = await openai.chat.completions.create({
@@ -383,6 +394,15 @@ export async function POST(request) {
               type: 'status',
               message: getToolStatus(toolName, toolArgs),
             })
+
+            // Collect itinerary updates from the tool call args directly
+            if (toolName === 'modify_itinerary' && toolArgs.updates?.length) {
+              collectedUpdates.push(...toolArgs.updates)
+            }
+            // Capture full itinerary generation
+            if (toolName === 'generate_itinerary' && toolArgs.itinerary_days?.length) {
+              generatedItinerary = toolArgs.itinerary_days
+            }
 
             let toolResult
             try {
@@ -422,7 +442,31 @@ export async function POST(request) {
           }
         }
 
-        parsed.itinerary_updates = parsed.itinerary_updates ?? []
+        parsed.itinerary_updates = [
+          ...(parsed.itinerary_updates ?? []),
+          ...collectedUpdates,
+        ]
+        
+        // If the AI generated a full itinerary, attach it so frontend can overwrite state
+        if (generatedItinerary) {
+          parsed.overwrite_itinerary = generatedItinerary
+        }
+
+        // --- Geocoding coordinates dynamically ---
+        const cityContext = currentPlannerState?.destination?.city || profile?.destination?.city || ''
+        const itemsToGeocode = []
+        
+        if (parsed.itinerary_updates) {
+          itemsToGeocode.push(...parsed.itinerary_updates.filter(u => u.action === 'add' || u.action === 'update'))
+        }
+        if (parsed.overwrite_itinerary) {
+          for (const day of parsed.overwrite_itinerary) {
+            if (day.items) itemsToGeocode.push(...day.items)
+          }
+        }
+        
+        await Promise.all(itemsToGeocode.map(item => geocodeItem(item, cityContext)))
+        // -----------------------------------------
         parsed.options = (parsed.options ?? []).map(normaliseOption)
         parsed.planner_state_patch = extractPlannerStatePatch(parsed.planner_state_patch)
         parsed.quick_replies = extractQuickReplies(parsed.quick_replies)

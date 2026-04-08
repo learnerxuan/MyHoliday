@@ -12,11 +12,13 @@ type StyleOption =
 type Budget    = 'Budget' | 'Mid-range' | 'Luxury'
 type Climate   = 'Tropical' | 'Warm' | 'Mild' | 'Cold/Snow'
 type GroupSize = 'Solo' | 'Couple' | 'Small Group' | 'Large Group'
+type Pace      = 'Relaxed' | 'Balanced' | 'Packed'
 
 interface Preferences {
   styles:          StyleOption[]
   budget:          Budget | ''
   climate:         Climate | ''
+  pace:            Pace | ''
   groupSize:       GroupSize | ''
   travelDateStart: string
   travelDateEnd:   string
@@ -55,8 +57,14 @@ const GROUP_SIZES: { value: GroupSize; icon: string }[] = [
   { value: 'Large Group', icon: '👥' },
 ]
 
+const PACES: { value: Pace; icon: string; desc: string }[] = [
+  { value: 'Relaxed',  icon: '☕', desc: '1–2 activities max, slow mornings' },
+  { value: 'Balanced', icon: '🚶', desc: 'Good mix of touring and downtime' },
+  { value: 'Packed',   icon: '🏃', desc: 'Action-packed, see as much as possible' },
+]
+
 // ── Step indicator ───────────────────────────────────────────
-const STEPS = ['Travel Style', 'Budget', 'Climate', 'Group & Dates']
+const STEPS = ['Travel Style', 'Budget', 'Climate', 'Pace', 'Group & Dates']
 
 // ── Page ─────────────────────────────────────────────────────
 export default function QuizPage() {
@@ -69,6 +77,7 @@ export default function QuizPage() {
     styles:          [],
     budget:          '',
     climate:         '',
+    pace:            '',
     groupSize:       '',
     travelDateStart: '',
     travelDateEnd:   '',
@@ -87,7 +96,8 @@ export default function QuizPage() {
     if (step === 0) return prefs.styles.length > 0
     if (step === 1) return prefs.budget !== ''
     if (step === 2) return prefs.climate !== ''
-    if (step === 3) return (
+    if (step === 3) return prefs.pace !== ''
+    if (step === 4) return (
       prefs.groupSize !== '' &&
       prefs.travelDateStart !== '' &&
       prefs.travelDateEnd !== '' &&
@@ -257,8 +267,43 @@ export default function QuizPage() {
             </div>
           )}
 
-          {/* ── Step 3: Group & Dates ── */}
+          {/* ── Step 3: Pace ── */}
           {step === 3 && (
+            <div>
+              <h1 className="text-3xl font-extrabold font-display text-charcoal mb-2">
+                What pace suits you?
+              </h1>
+              <p className="text-sm font-body text-secondary mb-8">
+                This helps the AI plan realistic daily schedules for your itinerary.
+              </p>
+              <div className="flex flex-col gap-4">
+                {PACES.map(p => {
+                  const selected = prefs.pace === p.value
+                  return (
+                    <button
+                      key={p.value}
+                      onClick={() => setPrefs(prev => ({ ...prev, pace: p.value }))}
+                      className={`flex items-center gap-4 p-5 rounded-xl border text-left transition-all ${
+                        selected
+                          ? 'border-amber bg-amber/10 shadow-sm'
+                          : 'border-border bg-white hover:border-amber/50'
+                      }`}
+                    >
+                      <span className="text-3xl">{p.icon}</span>
+                      <div>
+                        <p className="text-base font-semibold font-body text-charcoal">{p.value}</p>
+                        <p className="text-sm font-body text-secondary">{p.desc}</p>
+                      </div>
+                      {selected && <span className="ml-auto text-amber text-lg">✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 4: Group & Dates ── */}
+          {step === 4 && (
             <div>
               <h1 className="text-3xl font-extrabold font-display text-charcoal mb-2">
                 Who&apos;s going, and when?
@@ -325,7 +370,7 @@ export default function QuizPage() {
                     {Math.round(
                       (new Date(prefs.travelDateEnd).getTime() - new Date(prefs.travelDateStart).getTime())
                       / (1000 * 60 * 60 * 24)
-                    )} day trip
+                    ) + 1} day trip
                   </span>
                 </div>
               )}
