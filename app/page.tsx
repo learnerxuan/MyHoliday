@@ -202,13 +202,12 @@ export default async function HomePage() {
       <section className="py-20" style={{ background: 'linear-gradient(135deg, #2a1800 0%, #1a1008 50%, #1c1c1e 100%)' }}>
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
           <div className="space-y-4">
-            <p className="text-xs font-semibold font-body text-amber uppercase tracking-widest">Step 4</p>
             <h2 className="text-3xl sm:text-4xl font-extrabold font-display text-warmwhite leading-tight">
-              Bring a local expert with you
+              Bring a local expert with you.
             </h2>
             <p className="text-base font-body text-disabled leading-relaxed">
               Once your itinerary is ready, connect with a verified local guide who knows the city inside-out.
-              Browse profiles, read traveller reviews, and book directly — no middlemen, no inflated prices.
+              Browse profiles, read traveller reviews, and book directly. No middlemen, no inflated prices.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
