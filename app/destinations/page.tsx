@@ -41,20 +41,20 @@ interface TripMeta {
 
 // ── Helpers ──────────────────────────────────────────────────
 const BUDGET_COLOUR: Record<string, string> = {
-  'Budget':    'bg-success-bg text-success',
+  'Budget': 'bg-success-bg text-success',
   'Mid-range': 'bg-warning-bg text-warning',
-  'Luxury':    'bg-muted text-amberdark',
+  'Luxury': 'bg-muted text-amberdark',
 }
 
 const TOP_TAGS: { key: keyof Destination; icon: string; label: string }[] = [
-  { key: 'culture',   icon: '🏛️', label: 'Culture'   },
+  { key: 'culture', icon: '🏛️', label: 'Culture' },
   { key: 'adventure', icon: '🏔️', label: 'Adventure' },
-  { key: 'nature',    icon: '🌿', label: 'Nature'    },
-  { key: 'beaches',   icon: '🏖️', label: 'Beach'    },
+  { key: 'nature', icon: '🌿', label: 'Nature' },
+  { key: 'beaches', icon: '🏖️', label: 'Beach' },
   { key: 'nightlife', icon: '🌙', label: 'Nightlife' },
-  { key: 'cuisine',   icon: '🍜', label: 'Cuisine'   },
-  { key: 'wellness',  icon: '🧘', label: 'Wellness'  },
-  { key: 'urban',     icon: '🏙️', label: 'Urban'    },
+  { key: 'cuisine', icon: '🍜', label: 'Cuisine' },
+  { key: 'wellness', icon: '🧘', label: 'Wellness' },
+  { key: 'urban', icon: '🏙️', label: 'Urban' },
   { key: 'seclusion', icon: '🌄', label: 'Seclusion' },
 ]
 
@@ -87,9 +87,9 @@ const MONTH_NAMES = [
 
 // ── City image component ─────────────────────────────────────
 function CityImage({ city, country, className = '' }: { city: string; country: string; className?: string }) {
-  const [src, setSrc]         = useState<string | null>(null)
+  const [src, setSrc] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [failed, setFailed]   = useState(false)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -140,7 +140,7 @@ function CityImage({ city, country, className = '' }: { city: string; country: s
 
 // ── Destination card ─────────────────────────────────────────
 function DestCard({ dest, rank }: { dest: Destination; rank: number }) {
-  const topTags  = getTopTags(dest)
+  const topTags = getTopTags(dest)
   const hasScore = typeof dest.match_score === 'number'
 
   return (
@@ -231,9 +231,9 @@ type SortKey = 'match' | 'az' | 'budget_asc' | 'budget_desc'
 function sortDestinations(dests: Destination[], sort: SortKey): Destination[] {
   const copy = [...dests]
   const budgetOrder: Record<string, number> = { Budget: 0, 'Mid-range': 1, Luxury: 2 }
-  if (sort === 'match')       return copy.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
-  if (sort === 'az')          return copy.sort((a, b) => a.city.localeCompare(b.city))
-  if (sort === 'budget_asc')  return copy.sort((a, b) => (budgetOrder[a.budget_level ?? ''] ?? 1) - (budgetOrder[b.budget_level ?? ''] ?? 1))
+  if (sort === 'match') return copy.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
+  if (sort === 'az') return copy.sort((a, b) => a.city.localeCompare(b.city))
+  if (sort === 'budget_asc') return copy.sort((a, b) => (budgetOrder[a.budget_level ?? ''] ?? 1) - (budgetOrder[b.budget_level ?? ''] ?? 1))
   if (sort === 'budget_desc') return copy.sort((a, b) => (budgetOrder[b.budget_level ?? ''] ?? 1) - (budgetOrder[a.budget_level ?? ''] ?? 1))
   return copy
 }
@@ -244,17 +244,17 @@ function DestinationsInner() {
   const fromQuiz = searchParams.get('from') === 'quiz'
 
   const [destinations, setDestinations] = useState<Destination[]>([])
-  const [tripMeta, setTripMeta]         = useState<TripMeta | null>(null)
-  const [sort, setSort]                 = useState<SortKey>('match')
-  const [search, setSearch]             = useState('')
+  const [tripMeta, setTripMeta] = useState<TripMeta | null>(null)
+  const [sort, setSort] = useState<SortKey>('match')
+  const [search, setSearch] = useState('')
   const [budgetFilter, setBudgetFilter] = useState<string>('All')
 
   useEffect(() => {
     if (fromQuiz) {
       try {
-        const raw  = sessionStorage.getItem('quiz_results')
+        const raw = sessionStorage.getItem('quiz_results')
         const meta = sessionStorage.getItem('quiz_trip_meta')
-        if (raw)  setDestinations(JSON.parse(raw))
+        if (raw) setDestinations(JSON.parse(raw))
         if (meta) setTripMeta(JSON.parse(meta))
       } catch { /* ignore */ }
     }
@@ -330,11 +330,10 @@ function DestinationsInner() {
                 <button
                   key={b}
                   onClick={() => setBudgetFilter(b)}
-                  className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors ${
-                    budgetFilter === b
+                  className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors ${budgetFilter === b
                       ? 'bg-charcoal text-warmwhite border-charcoal'
                       : 'bg-white text-secondary border-border hover:border-amber'
-                  }`}
+                    }`}
                 >
                   {b}
                 </button>
@@ -345,10 +344,10 @@ function DestinationsInner() {
               onChange={e => setSort(e.target.value as SortKey)}
               className="input-base max-w-[180px]"
             >
-              <option value="match">Sort: Best match</option>
-              <option value="az">Sort: A–Z</option>
-              <option value="budget_asc">Sort: Budget ↑</option>
-              <option value="budget_desc">Sort: Luxury ↑</option>
+              <option value="match">Best Match</option>
+              <option value="az">Name (A-Z)</option>
+              <option value="budget_asc">Price (Low to high)</option>
+              <option value="budget_desc">Price (High to low)</option>
             </select>
             <span className="text-xs font-body text-tertiary ml-auto">
               {filtered.length} result{filtered.length !== 1 ? 's' : ''}
