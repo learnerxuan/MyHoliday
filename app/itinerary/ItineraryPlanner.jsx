@@ -88,6 +88,7 @@ export default function ItineraryPlanner() {
   const searchParams = useSearchParams()
   const router       = useRouter()
   const cityId       = searchParams.get('city')
+  const sessionParam = searchParams.get('session')
 
   // ── State ──────────────────────────────────────────────────
   const [destination,   setDestination]   = useState(null)
@@ -157,15 +158,20 @@ export default function ItineraryPlanner() {
         }
       } catch { /* ignore */ }
 
-      const { data: session } = await supabase
+      const sessionQuery = supabase
         .from('chat_sessions')
         .select('id, planner_state')
         .eq('user_id', user.id)
         .eq('destination_id', cityId)
         .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+
+      if (sessionParam) {
+        sessionQuery.eq('id', sessionParam)
+      } else {
+        sessionQuery.order('created_at', { ascending: false }).limit(1)
+      }
+
+      const { data: session } = await sessionQuery.maybeSingle()
 
       if (session) {
         setSessionId(session.id)
@@ -183,6 +189,13 @@ export default function ItineraryPlanner() {
           }
           
           setMessages(history)
+        }
+
+        // Restore itinerary from DB state if available
+        if (session.planner_state?.itinerary) {
+          setItinerary(session.planner_state.itinerary)
+          // Mark as history so we don't clear it later by mistake
+          hasSessionHistory = true
         }
       }
 
@@ -205,13 +218,31 @@ export default function ItineraryPlanner() {
     init()
   }, [cityId, router])
 
-  // ── Persist itinerary to localStorage on every change ────────
+  // ── Persist itinerary to database (Auto-Save) ────────────────
   useEffect(() => {
-    if (!userId || !cityId || Object.keys(itinerary).length === 0) return
-    try {
-      localStorage.setItem(`itinerary-${userId}-${cityId}`, JSON.stringify(itinerary))
-    } catch { /* storage full or unavailable */ }
-  }, [itinerary, userId, cityId])
+    if (!userId || !cityId || !sessionId || Object.keys(itinerary).length === 0) return
+
+    const timer = setTimeout(async () => {
+      // Fetch current session state to merge
+      const { data: current } = await supabase
+        .from('chat_sessions')
+        .select('planner_state')
+        .eq('id', sessionId)
+        .single()
+      
+      const nextState = { ...(current?.planner_state || {}), itinerary }
+
+      await supabase
+        .from('chat_sessions')
+        .update({ planner_state: nextState })
+        .eq('id', sessionId)
+      
+      // Also backup to localStorage
+      try { localStorage.setItem(`itinerary-${userId}-${cityId}`, JSON.stringify(itinerary)) } catch {}
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [itinerary, userId, cityId, sessionId])
 
   // ── Auto-send opening message on fresh session ───────────────
   useEffect(() => {
@@ -389,26 +420,20 @@ export default function ItineraryPlanner() {
       handleSend(msg)
     }
   }, [autoMessage, pageReady, isLoading, handleSend])
-  // ── Save & Exit ─────────────────────────────────────────────
-  async function handleSaveAndExit() {
-    if (sessionId) {
-      await supabase
-        .from('chat_sessions')
-        .update({ status: 'completed' })
-        .eq('id', sessionId)
-    }
-    // Clear persisted itinerary — session is done
-    try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
-    router.push(`/destinations/${cityId}`)
-  }
+  // Note: handleSaveAndExit removed in favor of Auto-save. 
+  // We now use direct router.push for navigation.
 
   // ── Reset Chat ──────────────────────────────────────────────
   async function handleResetChat() {
     if (!confirm('Are you sure you want to start over? This will clear your current plan.')) return
 
     if (sessionId) {
-      // Archive current session
-      await supabase.from('chat_sessions').update({ status: 'archived' }).eq('id', sessionId)
+      // 1. Unlink any exported plans from this session to avoid foreign key constraints
+      await supabase.from('itineraries').update({ session_id: null }).eq('session_id', sessionId)
+      
+      // 2. Hard Delete messages and session
+      await supabase.from('chat_messages').delete().eq('session_id', sessionId)
+      await supabase.from('chat_sessions').delete().eq('id', sessionId)
     }
 
     setMessages([])
@@ -436,18 +461,28 @@ export default function ItineraryPlanner() {
   async function confirmExport() {
     if (!userId || !cityId) return
     setExportSaving(true)
+    // 1. Create the permanent itinerary record
     const { error } = await supabase.from('itineraries').insert({
       user_id:        userId,
       destination_id: cityId,
       session_id:     sessionId,
       title:          exportTitle || `${destination?.city} Trip`,
       content:        itinerary,
+      trip_metadata:  tripContext,
     })
+
+    // 2. Mark session as finalized (using 'completed' to match DB constraint)
+    if (!error) {
+      await supabase
+        .from('chat_sessions')
+        .update({ status: 'completed' })
+        .eq('id', sessionId)
+    }
+
     setExportSaving(false)
     if (!error) {
       setExportModal(false)
-      setExportDone(true)
-      setTimeout(() => setExportDone(false), 4000)
+      router.push('/itineraries')
     }
   }
 
@@ -467,13 +502,25 @@ export default function ItineraryPlanner() {
     <div className="w-full flex flex-col bg-warmwhite overflow-hidden" style={{ height: 'calc(100dvh - 96px)' }}>
 
       {/* ── Header bar ── */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-white shrink-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-base md:text-xl font-display truncate">
-              <span className="text-secondary font-medium mr-1.5 opacity-60">Planning:</span> 
-              <span className="font-extrabold text-charcoal">{destination?.city}</span>, 
-              <span className="font-semibold text-secondary ml-1">{destination?.country}</span>
-            </h1>
+      <header className="flex items-center justify-between pl-4 pr-5 py-3 border-b border-border bg-white shrink-0">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => router.back()}
+              className="p-2 hover:bg-black/5 rounded-full transition-colors text-charcoal/60 hover:text-charcoal"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-charcoal tracking-tight font-display">
+                Planning: <span className="text-amber">{destination?.city || 'Your Trip'}</span>, {destination?.country}
+              </h1>
+              <p className="text-[10px] text-tertiary font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                Live Planning Session
+              </p>
+            </div>
           </div>
 
         <div className="flex items-center gap-3 shrink-0">
@@ -488,35 +535,41 @@ export default function ItineraryPlanner() {
           >
             Reset Chat
           </button>
-          <button
-            onClick={handleSaveAndExit}
-            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md bg-charcoal text-warmwhite hover:bg-amber transition-colors ml-2"
-          >
-            Save &amp; Exit
-          </button>
         </div>
       </header>
 
       {/* ── Trip context bar (full-width) ── */}
       {tripContext && (
-        <div className="px-5 py-2 border-b border-border/60 bg-white/70 backdrop-blur-sm shrink-0 flex items-center gap-5 text-xs font-body text-charcoal font-medium">
+        <div className="pl-4 pr-5 py-1.5 border-b border-border/60 bg-white/70 backdrop-blur-sm shrink-0 flex items-center gap-6 text-xs font-body text-charcoal font-medium">
           {tripContext.travel_date_start && tripContext.travel_date_end && (
-            <span className="flex items-center gap-1.5"><span className="opacity-70">🗓</span> {new Date(tripContext.travel_date_start).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} - {new Date(tripContext.travel_date_end).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
+            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
+              <span className="opacity-70 text-sm">🗓</span> {new Date(tripContext.travel_date_start).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} - {new Date(tripContext.travel_date_end).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+            </span>
           )}
           {tripContext.trip_days && (
-            <span className="flex items-center gap-1.5"><span className="opacity-70">⏱</span> {tripContext.trip_days} Days</span>
+            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
+              <span className="opacity-70 text-sm">⏱</span> {tripContext.trip_days} Days
+            </span>
           )}
           {tripContext.budget && (
-            <span className="flex items-center gap-1.5"><span className="opacity-70">💰</span> {tripContext.budget}</span>
+            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
+              <span className="opacity-70 text-sm">💰</span> {tripContext.budget}
+            </span>
           )}
           {tripContext.pace && (
-            <span className="flex items-center gap-1.5"><span className="opacity-70">🏃</span> {tripContext.pace}</span>
+            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
+              <span className="opacity-70 text-sm">🏃</span> {tripContext.pace}
+            </span>
           )}
           {tripContext.group_size && (
-            <span className="flex items-center gap-1.5"><span className="opacity-70">🙋</span> {tripContext.group_size}</span>
+            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
+              <span className="opacity-70 text-sm">🙋</span> {tripContext.group_size}
+            </span>
           )}
           {tripContext.dietary && (
-            <span className="flex items-center gap-1.5 bg-red-100 text-red-700 px-2 rounded-full font-bold ml-2">🍽 {tripContext.dietary}</span>
+            <span className="flex items-center gap-2 bg-red-100 text-red-700 px-3 py-0.5 rounded-full font-bold shadow-sm">
+              🍽 {tripContext.dietary}
+            </span>
           )}
         </div>
       )}
@@ -538,7 +591,7 @@ export default function ItineraryPlanner() {
         <div className="w-1/2 flex flex-col min-h-0">
 
           {/* Tab switcher */}
-          <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-white shrink-0">
+          <div className="flex items-center gap-1 pl-4 pr-4 py-2 border-b border-border bg-white shrink-0">
             {TABS.map(tab => (
               <button
                 key={tab.id}

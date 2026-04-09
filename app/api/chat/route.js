@@ -32,12 +32,12 @@ function deepMergePlannerState(base, patch) {
 }
 
 const PHASE_COERCE = {
-  intake:           'setup',
+  intake: 'setup',
   anchor_selection: 'planning',
-  drafting:         'planning',
-  day_planning:     'planning',
-  review:           'planning',
-  complete:         'planning',
+  drafting: 'planning',
+  day_planning: 'planning',
+  review: 'planning',
+  complete: 'planning',
 }
 
 function normalisePlannerState(rawState, profile) {
@@ -102,7 +102,7 @@ function normaliseOption(opt) {
   const resolvedPrice = opt.price ?? opt.price_estimate ?? 'Price not available'
   return {
     ...opt,
-    type:  opt.type  ?? 'attraction',
+    type: opt.type ?? 'attraction',
     price: resolvedPrice,
     notes: opt.notes ?? ([resolvedPrice, opt.rating ? `${opt.rating}/5` : null].filter(Boolean).join(' · ') || ''),
   }
@@ -126,24 +126,37 @@ function buildInitMessage(destination, profile, known = null) {
   return lines.join('\n')
 }
 
-async function geocodeItem(item, city) {
+async function geocodeItem(item, city, biasLat = null, biasLng = null) {
   // Only attempt geocode if it doesn't have coordinates already
   if (item.lat && item.lng) return
 
   // Safety Catch: If the AI mis-tagged a generic item, or the name is vague, skip pinning and coerce to generic types.
+  const nameLower = item.name?.toLowerCase() || ''
   const genericKeywords = ['local', 'authentic', 'nearby', 'suggested', 'recommendation', 'lunch at a', 'dinner at a', 'breakfast at a', 'brunch at a']
-  const isGeneric = genericKeywords.some(kw => item.name?.toLowerCase().includes(kw))
-  
-  if (isGeneric) {
-    if (item.type === 'restaurant') item.type = 'food_recommendation'
-    if (item.type === 'attraction') item.type = 'note'
-    return
+  const logisticKeywords = ['arrival', 'departure', 'check-in', 'check-out']
+
+  const isGeneric = genericKeywords.some(kw => nameLower.includes(kw))
+  const isLogistics = logisticKeywords.some(kw => nameLower.includes(kw))
+
+  if (isGeneric || isLogistics) {
+    if (isLogistics) {
+      item.type = 'note'
+    } else {
+      if (item.type === 'restaurant') item.type = 'food_recommendation'
+      if (item.type === 'attraction') item.type = 'note'
+      return
+    }
   }
 
   // If we reach here, it's a specific name. Attempt geocoding.
   const query = encodeURIComponent(`${item.name} ${city || ''}`)
-  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=geometry&key=${process.env.GOOGLE_PLACES_API_KEY}`
+  let url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=geometry&key=${process.env.GOOGLE_PLACES_API_KEY}`
   
+  // Add location bias if coordinates are available to prevent global/IP-based skew (the "Malaysia" fix)
+  if (biasLat && biasLng) {
+    url += `&locationbias=point:${biasLat},${biasLng}`
+  }
+
   try {
     const res = await fetch(url)
     const data = await res.json()
@@ -178,11 +191,11 @@ function extractJSON(raw) {
   let depth = 0, inStr = false, esc = false
   for (let i = start; i < stripped.length; i++) {
     const c = stripped[i]
-    if (esc)            { esc = false; continue }
-    if (c === '\\' && inStr) { esc = true;  continue }
-    if (c === '"')      { inStr = !inStr; continue }
-    if (inStr)          continue
-    if (c === '{')      depth++
+    if (esc) { esc = false; continue }
+    if (c === '\\' && inStr) { esc = true; continue }
+    if (c === '"') { inStr = !inStr; continue }
+    if (inStr) continue
+    if (c === '{') depth++
     if (c === '}') {
       depth--
       if (depth === 0) {
@@ -253,25 +266,41 @@ export async function POST(request) {
         let currentPlannerState = null
 
         if (!currentSessionId) {
-          const { data: newSession, error: sessionError } = await supabase
+          // [Singleton Enforcement] Check for existing active session first
+          const { data: existing } = await supabase
             .from('chat_sessions')
-            .insert({
-              user_id: userId,
-              destination_id: destinationId,
-              status: 'active',
-              planner_state: {},
-            })
             .select('id, planner_state')
-            .single()
+            .eq('user_id', userId)
+            .eq('destination_id', destinationId)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
-          if (sessionError) {
-            send(controller, { type: 'error', message: 'Failed to create session' })
-            controller.close()
-            return
+          if (existing) {
+            currentSessionId = existing.id
+            currentPlannerState = normalisePlannerState(existing.planner_state, profile)
+          } else {
+            const { data: newSession, error: sessionError } = await supabase
+              .from('chat_sessions')
+              .insert({
+                user_id: userId,
+                destination_id: destinationId,
+                status: 'active',
+                planner_state: {},
+              })
+              .select('id, planner_state')
+              .single()
+
+            if (sessionError) {
+              send(controller, { type: 'error', message: 'Failed to create session' })
+              controller.close()
+              return
+            }
+
+            currentSessionId = newSession.id
+            currentPlannerState = normalisePlannerState(newSession.planner_state, profile)
           }
-
-          currentSessionId = newSession.id
-          currentPlannerState = normalisePlannerState(newSession.planner_state, profile)
 
           // Pre-fill plannerState from quiz answers before sending the session ID.
           // deepMergePlannerState is sufficient — currentPlannerState is already fully normalised.
@@ -280,13 +309,13 @@ export async function POST(request) {
               ? quizContext.budget.toLowerCase()   // "Mid-range" → "mid-range"
               : null
             currentPlannerState = deepMergePlannerState(currentPlannerState, {
-              trip_days:         quizContext.trip_days         ?? null,
-              budget_profile:    normalisedBudget              ?? currentPlannerState.budget_profile,
-              pace:              quizContext.pace              ?? null,
+              trip_days: quizContext.trip_days ?? null,
+              budget_profile: normalisedBudget ?? currentPlannerState.budget_profile,
+              pace: quizContext.pace ?? null,
               travel_date_start: quizContext.travel_date_start ?? null,
-              travel_date_end:   quizContext.travel_date_end   ?? null,
-              group_size:        quizContext.group_size        ?? null,
-              preferred_styles:  quizContext.preferred_styles  ?? [],
+              travel_date_end: quizContext.travel_date_end ?? null,
+              group_size: quizContext.group_size ?? null,
+              preferred_styles: quizContext.preferred_styles ?? [],
             })
           }
 
@@ -314,10 +343,10 @@ export async function POST(request) {
 
         if (isInit) {
           // Determine which values are already known from the quiz
-          const knownDays   = currentPlannerState.trip_days ?? null
+          const knownDays = currentPlannerState.trip_days ?? null
           const knownBudget = currentPlannerState.budget_profile !== 'unknown'
-                                ? currentPlannerState.budget_profile
-                                : null
+            ? currentPlannerState.budget_profile
+            : null
 
           // known is non-null only when both values came from quiz context
           const known = (knownDays && knownBudget)
@@ -459,7 +488,7 @@ export async function POST(request) {
           ...(parsed.itinerary_updates ?? []),
           ...collectedUpdates,
         ]
-        
+
         // If the AI generated a full itinerary, attach it so frontend can overwrite state
         if (generatedItinerary) {
           parsed.overwrite_itinerary = generatedItinerary
@@ -472,7 +501,7 @@ export async function POST(request) {
           ? `${destination.city}, ${destination.country}`
           : destination?.city || ''
         const itemsToGeocode = []
-        
+
         if (parsed.itinerary_updates) {
           itemsToGeocode.push(...parsed.itinerary_updates.filter(u => u.action === 'add' || u.action === 'update'))
         }
@@ -481,8 +510,8 @@ export async function POST(request) {
             if (day.items) itemsToGeocode.push(...day.items)
           }
         }
-        
-        await Promise.all(itemsToGeocode.map(item => geocodeItem(item, cityContext)))
+
+        await Promise.all(itemsToGeocode.map(item => geocodeItem(item, cityContext, destination.latitude, destination.longitude)))
         // -----------------------------------------
         parsed.options = (parsed.options ?? []).map(normaliseOption)
         parsed.planner_state_patch = extractPlannerStatePatch(parsed.planner_state_patch)

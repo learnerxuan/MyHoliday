@@ -1,6 +1,7 @@
 'use client'
 
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
+import { useEffect } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -48,6 +49,10 @@ function guessMinutes(timeStr) {
   if (s.includes('lunch') || s.includes('noon')) return 12 * 60 + offset
   if (s.includes('evening')) return 18 * 60 + offset
   if (s.includes('night') || s.includes('dinner')) return 20 * 60 + offset
+
+  // Prioritise "All Day" or untimed activities at the very top
+  if (s.includes('all day') || s.includes('anytime')) return -1
+
   return 9999
 }
 
@@ -76,7 +81,7 @@ function makeDivIcon(type, numberStr) {
 
 // ── Main component ────────────────────────────────────────────
 
-export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityLat, cityLng }) {
+export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityLat, cityLng, hideDayTabs = false, focusedLocation }) {
   const dayKeys = Object.keys(itinerary)
     .filter(k => Array.isArray(itinerary[k]) && itinerary[k].length > 0)
     .sort()
@@ -114,33 +119,35 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityL
     <div className="flex flex-col h-full">
 
       {/* Day filter bar */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border overflow-x-auto flex-shrink-0">
-        <button
-          onClick={() => onDayChange('all')}
-          className={`text-xs font-semibold font-body px-3 py-1 rounded-md whitespace-nowrap transition-colors
-            ${activeDay === 'all'
-              ? 'bg-charcoal text-warmwhite'
-              : 'bg-muted text-secondary hover:bg-border'}`}
-        >
-          All
-        </button>
+      {!hideDayTabs && (
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border overflow-x-auto flex-shrink-0">
+          <button
+            onClick={() => onDayChange('all')}
+            className={`text-xs font-semibold font-body px-3 py-1 rounded-md whitespace-nowrap transition-colors
+              ${activeDay === 'all'
+                ? 'bg-charcoal text-warmwhite'
+                : 'bg-muted text-secondary hover:bg-border'}`}
+          >
+            All
+          </button>
 
-        {dayKeys.map(key => {
-          const num = parseInt(key.replace('day', ''), 10)
-          return (
-            <button
-              key={key}
-              onClick={() => onDayChange(num)}
-              className={`text-xs font-semibold font-body px-3 py-1 rounded-md whitespace-nowrap transition-colors
-                ${activeDay === num
-                  ? 'bg-charcoal text-warmwhite'
-                  : 'bg-muted text-secondary hover:bg-border'}`}
-            >
-              Day {num}
-            </button>
-          )
-        })}
-      </div>
+          {dayKeys.map(key => {
+            const num = parseInt(key.replace('day', ''), 10)
+            return (
+              <button
+                key={key}
+                onClick={() => onDayChange(num)}
+                className={`text-xs font-semibold font-body px-3 py-1 rounded-md whitespace-nowrap transition-colors
+                  ${activeDay === num
+                    ? 'bg-charcoal text-warmwhite'
+                    : 'bg-muted text-secondary hover:bg-border'}`}
+              >
+                Day {num}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Map area */}
       <div className="flex-1 relative min-h-0">
@@ -156,6 +163,8 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityL
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
+
+            <MapUpdater focusedLocation={focusedLocation} />
 
             {pins.map((item, idx) => (
               <Marker
@@ -212,4 +221,18 @@ export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityL
       </div>
     </div>
   )
+}
+function MapUpdater({ focusedLocation }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (focusedLocation?.lat && focusedLocation?.lng) {
+      map.flyTo([focusedLocation.lat, focusedLocation.lng], 15, {
+        animate: true,
+        duration: 1.5
+      })
+    }
+  }, [focusedLocation, map])
+
+  return null
 }

@@ -277,12 +277,33 @@ function DestinationsInner() {
     <div className="min-h-screen bg-warmwhite flex flex-col">
 
       {/* Page header */}
-      <div className="bg-charcoal text-warmwhite pt-12 sm:pt-16 pb-8 sm:pb-10 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-xs font-semibold font-body text-amber uppercase tracking-widest mb-2">
+      <div 
+        className="text-warmwhite relative overflow-hidden pt-12 sm:pt-16 pb-8 sm:pb-10 px-4 sm:px-6"
+        style={{ background: '#0f0f0f' }}
+      >
+        {/* Ambient amber glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(196,135,74,0.22) 0%, transparent 70%),' +
+              'radial-gradient(ellipse 40% 40% at 20% 80%, rgba(196,135,74,0.10) 0%, transparent 65%)',
+          }}
+        />
+        {/* Subtle dot grid */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+          }}
+        />
+
+        <div className="relative max-w-5xl mx-auto">
+          <div className="inline-flex items-center gap-2 bg-white/10 text-amber text-xs font-semibold px-3 py-1 rounded-full border border-amber/20 mb-2 uppercase tracking-widest">
             {hasResults ? 'Your personalised results' : 'Browse destinations'}
-          </p>
-          <h1 className="text-2xl sm:text-4xl font-extrabold font-display mb-2">
+          </div>
+          <h1 className="text-2xl sm:text-4xl font-extrabold font-display mb-2 text-warmwhite">
             {hasResults ? 'Your best matches' : 'Explore the world'}
           </h1>
           <p className="text-sm font-body text-disabled">

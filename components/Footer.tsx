@@ -6,7 +6,7 @@ export default function Footer() {
   const pathname = usePathname()
   
   // Hide the footer on immersive full-screen views
-  if (pathname?.startsWith('/itinerary')) {
+  if (pathname?.startsWith('/itinerary') || pathname?.startsWith('/saved-itinerary')) {
     return null
   }
 

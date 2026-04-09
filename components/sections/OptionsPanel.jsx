@@ -201,7 +201,7 @@ function OptionCard({ option, index, isAdded, onSelect, quizContext, city }) {
               rel="noopener noreferrer"
               className="px-3 py-2 border border-border rounded-lg text-xs font-semibold text-secondary hover:border-amber hover:text-amber transition-colors flex items-center justify-center text-center"
             >
-              {option.type === 'hotel' ? 'Book\u00A0Hotel' : 'View'}
+              {option.type === 'hotel' ? 'Book\u00A0Hotel' : 'Google Maps'}
             </a>
           )}
         </div>

@@ -71,6 +71,7 @@ export default function Navbar() {
             {role === 'admin' && <NavLink href="/admin">Admin</NavLink>}
             {(role === 'traveller' || !role) && <NavLink href="/quiz">Plan a Trip</NavLink>}
             <NavLink href="/destinations">Destinations</NavLink>
+            <NavLink href="/itineraries">Itineraries</NavLink>
             <NavLink href="/marketplace">Marketplace</NavLink>
             <NavLink href="/about">About</NavLink>
           </nav>
@@ -145,6 +146,7 @@ export default function Navbar() {
             {role === 'admin' && <MobileNavLink href="/admin" onClick={close}>Admin</MobileNavLink>}
             {(role === 'traveller' || !role) && <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>}
             <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
+            <MobileNavLink href="/itineraries" onClick={close}>Itineraries</MobileNavLink>
             <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
             <MobileNavLink href="/about" onClick={close}>About</MobileNavLink>
 

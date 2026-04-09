@@ -100,6 +100,10 @@ CREATE POLICY "user: own chat sessions update"
     ON public.chat_sessions FOR UPDATE
     USING (auth.uid() = user_id);
 
+CREATE POLICY "user: own chat sessions delete"
+    ON public.chat_sessions FOR DELETE
+    USING (auth.uid() = user_id);
+
 
 -- ============================================================
 -- RLS POLICIES — chat_messages
@@ -118,6 +122,16 @@ CREATE POLICY "user: own chat messages select"
 CREATE POLICY "user: own chat messages insert"
     ON public.chat_messages FOR INSERT
     WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.chat_sessions
+            WHERE chat_sessions.id = chat_messages.session_id
+              AND chat_sessions.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "user: own chat messages delete"
+    ON public.chat_messages FOR DELETE
+    USING (
         EXISTS (
             SELECT 1 FROM public.chat_sessions
             WHERE chat_sessions.id = chat_messages.session_id
