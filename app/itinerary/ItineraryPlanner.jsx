@@ -462,14 +462,14 @@ export default function ItineraryPlanner() {
     if (!userId || !cityId) return
     setExportSaving(true)
     // 1. Create the permanent itinerary record
-    const { error } = await supabase.from('itineraries').insert({
+    const { data, error } = await supabase.from('itineraries').insert({
       user_id:        userId,
       destination_id: cityId,
       session_id:     sessionId,
       title:          exportTitle || `${destination?.city} Trip`,
       content:        itinerary,
       trip_metadata:  tripContext,
-    })
+    }).select()
 
     // 2. Mark session as finalized (using 'completed' to match DB constraint)
     if (!error) {
@@ -480,9 +480,9 @@ export default function ItineraryPlanner() {
     }
 
     setExportSaving(false)
-    if (!error) {
+    if (!error && data?.[0]) {
       setExportModal(false)
-      router.push('/itineraries')
+      router.push(`/saved-itinerary/${data[0].id}`)
     }
   }
 

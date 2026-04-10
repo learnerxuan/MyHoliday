@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase/client'
@@ -28,6 +28,21 @@ export default function SavedItineraryViewer() {
   const [focusedLocation, setFocusedLocation] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveDone, setSaveDone] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const [isReverting, setIsReverting] = useState(false)
+  const [revertError, setRevertError] = useState(null)
+  const [sessionId, setSessionId] = useState(null)
+  const itineraryRef = useRef(itinerary)
+  const isDirtyRef = useRef(false)
+
+  // Sync refs with state so they are available in effects/back button
+  useEffect(() => {
+    itineraryRef.current = itinerary
+  }, [itinerary])
+
+  useEffect(() => {
+    isDirtyRef.current = isDirty
+  }, [isDirty])
 
   useEffect(() => {
     async function fetchItinerary() {
@@ -49,6 +64,7 @@ export default function SavedItineraryViewer() {
       setDestination(data.destinations)
       setTripMetadata(data.trip_metadata || null)
       setTitle(data.title || '')
+      setSessionId(data.session_id)
       setLoading(false)
     }
 
@@ -104,24 +120,104 @@ export default function SavedItineraryViewer() {
   }
 
   const handleUpdateItem = useCallback((updates) => {
-    setItinerary(prev => applyUpdates(prev, updates))
+    setItinerary(prev => {
+      const updated = applyUpdates(prev, updates)
+      setIsDirty(true)
+      return updated
+    })
   }, [])
 
   const handleDeleteItem = useCallback((dayKey, itemName) => {
     handleUpdateItem([{ action: 'remove', day: parseInt(dayKey.replace('day', '')), name: itemName }])
   }, [handleUpdateItem])
 
-  const handleSaveToDB = async () => {
+  const handleSaveToDB = async (customContent = null) => {
+    const contentToSave = customContent || itineraryRef.current
+    if (!contentToSave || Object.keys(contentToSave).length === 0) return
+
     setIsSaving(true)
     const { error } = await supabase
       .from('itineraries')
-      .update({ content: itinerary })
+      .update({ content: contentToSave })
       .eq('id', id)
 
     setIsSaving(false)
     if (!error) {
+      setIsDirty(false)
       setSaveDone(true)
       setTimeout(() => setSaveDone(false), 3000)
+    }
+    return !error
+  }
+
+  // Auto-save on navigate/leave
+  useEffect(() => {
+    const handleUnload = () => {
+      if (isDirtyRef.current) {
+        // We can't await here, but we can trigger the fetch
+        // For standard unload, we use navigator.sendBeacon or a synchronous fetch
+        // But for Next.js internal nav, this cleanup runs
+        handleSaveToDB(itineraryRef.current)
+      }
+    }
+
+    return () => handleUnload()
+  }, [])
+
+  const handleBack = async () => {
+    if (isDirty) {
+      await handleSaveToDB()
+    }
+    router.push('/itineraries')
+  }
+
+  const handleRevertToChat = async () => {
+    if (!sessionId || !destination?.id) return
+    setRevertError(null)
+    setIsReverting(true)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      // 1. Check for conflicts: Any other ACTIVE session for this user/city?
+      const { data: conflict } = await supabase
+        .from('chat_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('destination_id', destination.id)
+        .eq('status', 'active')
+        .neq('id', sessionId) // Other than THIS session
+        .maybeSingle()
+
+      if (conflict) {
+        setRevertError('There is already an active chat session for this destination. Please complete or delete it before reverting this plan.')
+        setIsReverting(false)
+        return
+      }
+
+      // 2. Perform Revert: Re-activate session
+      const { error: sessionError } = await supabase
+        .from('chat_sessions')
+        .update({ status: 'active' })
+        .eq('id', sessionId)
+      
+      if (sessionError) throw sessionError
+
+      // 3. Delete this saved itinerary record
+      const { error: deleteError } = await supabase
+        .from('itineraries')
+        .delete()
+        .eq('id', id)
+      
+      if (deleteError) throw deleteError
+
+      // 4. Redirect to Planner
+      router.push(`/itinerary?city=${destination.id}&session=${sessionId}`)
+    } catch (err) {
+      console.error('Revert failed:', err)
+      setRevertError('Failed to revert to chat. Please try again.')
+      setIsReverting(false)
     }
   }
 
@@ -147,7 +243,7 @@ export default function SavedItineraryViewer() {
       <header className="flex items-center justify-between pl-4 pr-6 py-4 border-b border-border bg-white shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push('/itineraries')}
+            onClick={handleBack}
             className="p-2 hover:bg-black/5 rounded-full transition-colors text-charcoal/60 hover:text-charcoal"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -165,10 +261,27 @@ export default function SavedItineraryViewer() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {revertError && (
+            <div className="bg-red-50 text-red-600 text-xs font-bold px-4 py-2 rounded-lg border border-red-100 animate-in fade-in slide-in-from-right-2 duration-300 max-w-sm">
+              {revertError}
+            </div>
+          )}
+          
+          <button
+            onClick={handleRevertToChat}
+            disabled={isReverting || !sessionId}
+            className="text-xs font-bold text-secondary hover:text-charcoal px-3 py-2 rounded-lg border border-border hover:border-charcoal transition-all flex items-center gap-2 disabled:opacity-40"
+            title="Move this plan back to AI Chat to continue dreaming"
+          >
+            {isReverting ? '...' : '↩ Go back to AI Chat'}
+          </button>
+
+          <div className="h-4 w-px bg-border mx-1" />
+
           {saveDone && <span className="text-xs font-bold text-success bg-success-bg px-3 py-1.5 rounded-full animate-in fade-in duration-300">✓ Changes Saved</span>}
           <button
-            onClick={handleSaveToDB}
+            onClick={() => handleSaveToDB()}
             disabled={isSaving}
             className="bg-charcoal text-warmwhite px-6 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-black transition-all active:scale-[0.98] disabled:opacity-50"
           >
@@ -245,6 +358,13 @@ export default function SavedItineraryViewer() {
               hideExport={true}
               hideDayTabs={true}
               onFocusLocation={setFocusedLocation}
+              allowFullEdit={true}
+              cityContext={{
+                name: destination?.city,
+                country: destination?.country,
+                lat: destination?.latitude,
+                lng: destination?.longitude
+              }}
             />
           </div>
         </div>
