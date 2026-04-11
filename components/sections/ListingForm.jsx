@@ -39,9 +39,9 @@ export default function ListingForm({ itineraries, initialItineraryId, onSubmit,
     if (!itineraryId || !desiredBudget || !destinationId) return
     
     onSubmit({
-      itinerary_id: itineraryId,
-      destination_id: destinationId,
-      desired_budget: parseFloat(desiredBudget)
+      itinerary_id: selectedItineraryId,
+      destination_id: selectedDestinationId,
+      desired_budget: Number(desiredBudget)
     })
   }
 

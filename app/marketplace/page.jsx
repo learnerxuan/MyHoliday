@@ -35,9 +35,10 @@ export default function MarketplacePage() {
           .select(`
             id, user_id, desired_budget, status, created_at,
             destinations ( city, country ),
-            itineraries ( content ),
+            itineraries ( content, title ),
             marketplace_offers ( id, status, guide_id )
           `)
+          .eq('user_id', currentUser.id)
           .order('created_at', { ascending: false })
           
         const formattedListings = (listingsData || []).map(l => {
@@ -78,6 +79,7 @@ export default function MarketplacePage() {
 
           return {
             ...l,
+            title: l.itineraries?.title || 'Untitled Itinerary',
             city_name: l.destinations?.city || 'Unknown',
             country_name: l.destinations?.country || 'Destination',
             days,
@@ -199,7 +201,8 @@ export default function MarketplacePage() {
       {/* Listing Grid */}
       {filteredListings.length === 0 ? (
         <div className="text-center py-24 bg-[#FAF9F7] border border-border/60 rounded-2xl">
-          <p className="text-secondary/60 font-medium">No empty listings found for this filter.</p>
+          <p className="text-secondary/60 font-medium">You haven't posted any listings yet for this filter.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

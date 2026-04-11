@@ -58,7 +58,7 @@ export default function ListingDetailPage() {
         setUser({ 
           id: currentUser.id, 
           email: currentUser.email,
-          role: currentUser.user_metadata?.role || 'traveller'
+          role: currentUser.user_metadata?.role || 'traveler'
         })
 
         // 2. Fetch Listing
@@ -202,6 +202,7 @@ export default function ListingDetailPage() {
   // --- CHAT ACTIONS ---
   const handleSendMessage = async () => {
     if (!chatMessage.trim()) return
+    if (!user) return
     setIsSendingMsg(true)
     try {
       await fetch('/api/marketplace/messages', {
@@ -259,7 +260,7 @@ export default function ListingDetailPage() {
       {listing.status === 'confirmed' && (
         <div className="bg-success-bg border border-success/20 p-6 rounded-xl mb-8">
           <h3 className="font-display font-extrabold text-success text-xl mb-2">Booking Confirmed!</h3>
-          <p className="text-success/80 text-sm mb-4">Payment reference: {crypto.randomUUID().split('-')[0].toUpperCase()}</p>
+          <p className="text-success/80 text-sm mb-4"> Payment reference: Saved in transaction record</p>
           <p className="text-xs text-secondary mt-4">Disclaimer: Payment is simulated — no real transaction occurs.</p>
         </div>
       )}
