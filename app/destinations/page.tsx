@@ -66,7 +66,6 @@ function getTopTags(dest: Destination, n = 2) {
     .slice(0, n)
 }
 
-// Title-case and replace underscores (e.g. north_america → North America)
 function formatRegion(s: string | null | undefined): string {
   if (!s) return ''
   return s
@@ -141,11 +140,20 @@ function CityImage({ city, country, className = '' }: { city: string; country: s
 // ── Destination card ─────────────────────────────────────────
 function DestCard({ dest, rank }: { dest: Destination; rank: number }) {
   const topTags = getTopTags(dest)
-  const hasScore = typeof dest.match_score === 'number'
+  const matchScore = dest.match_score
 
   return (
     <Link
       href={`/destinations/${dest.id}`}
+      onClick={() => {
+        if (typeof window !== 'undefined') {
+          // Trigger interaction tracking in the background
+          fetch('/api/interactions', {
+            method: 'POST',
+            body: JSON.stringify({ destinationId: dest.id })
+          }).catch(() => {/* ignore silenty */})
+        }
+      }}
       className="group block bg-white border border-border rounded-2xl overflow-hidden hover:border-amber hover:shadow-md transition-all"
     >
       {/* City image */}
@@ -156,9 +164,9 @@ function DestCard({ dest, rank }: { dest: Destination; rank: number }) {
           #{rank}
         </span>
         {/* Match score badge */}
-        {hasScore && (
-          <span className={`absolute top-2 right-2 border font-extrabold font-display text-sm px-2.5 py-1 rounded-xl backdrop-blur-sm ${scoreColour(dest.match_score!)}`}>
-            {dest.match_score}%
+        {typeof matchScore === 'number' && (
+          <span className={`absolute top-2 right-2 border font-extrabold font-display text-sm px-2.5 py-1 rounded-xl backdrop-blur-sm ${scoreColour(matchScore)}`}>
+            {matchScore}%
           </span>
         )}
       </div>
@@ -245,9 +253,16 @@ function DestinationsInner() {
 
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [tripMeta, setTripMeta] = useState<TripMeta | null>(null)
+  
   const [sort, setSort] = useState<SortKey>('match')
   const [search, setSearch] = useState('')
   const [budgetFilter, setBudgetFilter] = useState<string>('All')
+  const [regionFilter, setRegionFilter] = useState<string>('All')
+
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [discoveryLoading, setDiscoveryLoading] = useState(false)
 
   useEffect(() => {
     if (fromQuiz) {
@@ -257,19 +272,69 @@ function DestinationsInner() {
         if (raw) setDestinations(JSON.parse(raw))
         if (meta) setTripMeta(JSON.parse(meta))
       } catch { /* ignore */ }
+    } else {
+      // Discovery Mode: Load initial page + recommendations
+      loadDiscovery()
     }
   }, [fromQuiz])
 
-  const filtered = sortDestinations(
-    destinations.filter(d => {
-      const matchSearch = search === '' ||
-        d.city.toLowerCase().includes(search.toLowerCase()) ||
-        d.country.toLowerCase().includes(search.toLowerCase())
-      const matchBudget = budgetFilter === 'All' || d.budget_level === budgetFilter
-      return matchSearch && matchBudget
-    }),
-    sort
-  )
+  // Reload catalog when filters change (only in discovery mode)
+  useEffect(() => {
+    if (!fromQuiz) {
+      setPage(1)
+      fetchCatalog(1, true)
+    }
+  }, [search, budgetFilter, regionFilter])
+
+  async function loadDiscovery() {
+    setDiscoveryLoading(true)
+    try {
+      // Fetch first page of all destinations (scored by relevance backend-side)
+      await fetchCatalog(1, true)
+    } catch { /* ignore */ }
+    finally { setDiscoveryLoading(false) }
+  }
+
+  async function fetchCatalog(pageNum: number, clear = false) {
+    setLoadingMore(true)
+    try {
+      const params = new URLSearchParams({
+        page: pageNum.toString(),
+        limit: '12',
+        search,
+        budget: budgetFilter,
+        region: regionFilter
+      })
+      const res = await fetch(`/api/destinations?${params}`)
+      const data = await res.json()
+      
+      if (data.destinations) {
+        setDestinations(prev => clear ? data.destinations : [...prev, ...data.destinations])
+        setHasMore(data.hasMore)
+      }
+    } catch { /* ignore */ }
+    finally { setLoadingMore(false) }
+  }
+
+  function handleLoadMore() {
+    const nextPage = page + 1
+    setPage(nextPage)
+    fetchCatalog(nextPage)
+  }
+
+  const filtered = fromQuiz 
+    ? sortDestinations(
+        destinations.filter(d => {
+          const matchSearch = search === '' ||
+            d.city.toLowerCase().includes(search.toLowerCase()) ||
+            d.country.toLowerCase().includes(search.toLowerCase())
+          const matchBudget = budgetFilter === 'All' || d.budget_level === budgetFilter
+          const matchRegion = regionFilter === 'All' || d.region === regionFilter
+          return matchSearch && matchBudget && matchRegion
+        }),
+        sort
+      )
+    : destinations // In discovery mode, sorting and filtering happen server-side for pagination consistency
 
   const hasResults = destinations.length > 0
 
@@ -301,15 +366,15 @@ function DestinationsInner() {
 
         <div className="relative max-w-5xl mx-auto">
           <div className="inline-flex items-center gap-2 bg-white/10 text-amber text-xs font-semibold px-3 py-1 rounded-full border border-amber/20 mb-2 uppercase tracking-widest">
-            {hasResults ? 'Your personalised results' : 'Browse destinations'}
+            {fromQuiz ? 'Your personalised results' : 'Discover Destinations'}
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold font-display mb-2 text-warmwhite">
-            {hasResults ? 'Your best matches' : 'Explore the world'}
+            {fromQuiz ? 'Your best matches' : 'Explore the World'}
           </h1>
           <p className="text-sm font-body text-disabled">
-            {hasResults
+            {fromQuiz
               ? `${destinations.length} destinations ranked by how well they match your preferences.`
-              : 'Take the quiz to get personalised recommendations, or browse all 560+ destinations.'}
+              : 'Browse our full catalog or check out our personalized picks for you.'}
           </p>
         </div>
       </div>
@@ -318,48 +383,58 @@ function DestinationsInner() {
 
         {tripMeta && <TripMetaBanner meta={tripMeta} />}
 
-        {!hasResults && (
-          <div className="text-center py-16 border border-dashed border-border rounded-2xl mb-10">
-            <p className="text-4xl mb-4">🧭</p>
-            <h2 className="text-xl font-extrabold font-display text-charcoal mb-2">
-              No personalised results yet
-            </h2>
-            <p className="text-sm font-body text-secondary mb-6">
-              Take the 2-minute quiz and we&apos;ll rank destinations specifically for your travel style.
-            </p>
-            <Link
-              href="/quiz"
-              className="inline-block bg-amber text-warmwhite font-semibold font-body text-sm py-3 px-8 rounded-md hover:bg-amberdark transition-colors"
-            >
-              Start the Quiz ✨
-            </Link>
-          </div>
-        )}
-
         {/* Controls */}
-        {hasResults && (
-          <div className="flex flex-wrap gap-3 mb-6 items-center">
+        <div className="flex flex-wrap gap-3 mb-6 items-center">
+          <div className="relative flex-1 min-w-[240px]">
             <input
               type="text"
               placeholder="Search city or country…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="input-base max-w-xs"
+              className="input-base pr-10"
             />
-            <div className="flex gap-1.5">
-              {['All', 'Budget', 'Mid-range', 'Luxury'].map(b => (
-                <button
-                  key={b}
-                  onClick={() => setBudgetFilter(b)}
-                  className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors ${budgetFilter === b
-                      ? 'bg-charcoal text-warmwhite border-charcoal'
-                      : 'bg-white text-secondary border-border hover:border-amber'
-                    }`}
-                >
-                  {b}
-                </button>
-              ))}
-            </div>
+            {discoveryLoading && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-border border-t-amber rounded-full animate-spin" />
+            )}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {['All', 'Budget', 'Mid-range', 'Luxury'].map(b => (
+              <button
+                key={b}
+                onClick={() => setBudgetFilter(b)}
+                className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${budgetFilter === b
+                    ? 'bg-charcoal text-warmwhite border-charcoal'
+                    : 'bg-white text-secondary border-border hover:border-amber'
+                  }`}
+              >
+                {b}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 border-l border-border pl-3">
+            <button
+              onClick={() => setRegionFilter('All')}
+              className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${regionFilter === 'All'
+                  ? 'bg-charcoal text-warmwhite border-charcoal'
+                  : 'bg-white text-secondary border-border hover:border-amber'
+                }`}
+            >
+              All Regions
+            </button>
+            {['africa', 'asia', 'europe', 'middle_east', 'north_america', 'oceania', 'south_america'].map(r => (
+              <button
+                key={r}
+                onClick={() => setRegionFilter(r)}
+                className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${regionFilter === r
+                    ? 'bg-charcoal text-warmwhite border-charcoal'
+                    : 'bg-white text-secondary border-border hover:border-amber'
+                  }`}
+              >
+                {formatRegion(r)}
+              </button>
+            ))}
+          </div>
+          {fromQuiz && (
             <select
               value={sort}
               onChange={e => setSort(e.target.value as SortKey)}
@@ -370,11 +445,8 @@ function DestinationsInner() {
               <option value="budget_asc">Price (Low to high)</option>
               <option value="budget_desc">Price (High to low)</option>
             </select>
-            <span className="text-xs font-body text-tertiary ml-auto">
-              {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-        )}
+          )}
+        </div>
 
         {hasResults && filtered.length === 0 && (
           <p className="text-sm font-body text-secondary text-center py-12">
@@ -384,9 +456,29 @@ function DestinationsInner() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map((dest, i) => (
-            <DestCard key={dest.id} dest={dest} rank={i + 1} />
+            <DestCard key={dest.id + (fromQuiz ? '' : i)} dest={dest} rank={i + 1} />
           ))}
         </div>
+
+        {/* Load more logic */}
+        {!fromQuiz && hasMore && (
+          <div className="mt-12 flex justify-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="bg-charcoal text-warmwhite font-semibold font-body text-sm py-3 px-10 rounded-full hover:bg-amber transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+            >
+              {loadingMore && <span className="w-4 h-4 border-2 border-warmwhite/30 border-t-warmwhite rounded-full animate-spin" />}
+              {loadingMore ? 'Loading more destinations…' : 'Load More'}
+            </button>
+          </div>
+        )}
+
+        {hasResults && filtered.length === 0 && (
+          <p className="text-sm font-body text-secondary text-center py-12">
+            No destinations match your filters.
+          </p>
+        )}
 
       </div>
 

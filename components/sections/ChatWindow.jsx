@@ -68,23 +68,28 @@ export default function ChatWindow({ messages = [], isLoading = false, toolStatu
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-border px-4 py-3 flex gap-2 items-end">
-        <textarea
-          className="flex-1 resize-none input-base text-sm leading-relaxed"
-          rows={1}
-          placeholder="Type a message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isLoading}
-        />
-        <button
-          onClick={handleSend}
-          disabled={isLoading || !input.trim()}
-          className="shrink-0 bg-amber text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-amberdark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Send
-        </button>
+      <div className="border-t border-border px-4 pt-3 pb-2 bg-white">
+        <div className="flex gap-2 items-end">
+          <textarea
+            className="flex-1 resize-none input-base text-sm leading-relaxed min-h-[42px]"
+            rows={1}
+            placeholder="Type a message..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+          />
+          <button
+            onClick={handleSend}
+            disabled={isLoading || !input.trim()}
+            className="shrink-0 bg-amber text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-amberdark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Send
+          </button>
+        </div>
+        <p className="text-[10px] text-center text-tertiary font-medium mt-1.5 uppercase tracking-wider">
+          AI can make mistakes. Verify important info.
+        </p>
       </div>
     </div>
   )

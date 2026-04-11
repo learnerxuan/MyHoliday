@@ -30,6 +30,7 @@ const CLIMATE_RANGES: Record<string, { min: number; max: number }> = {
 // ── Types ────────────────────────────────────────────────────
 interface UserPreferences {
   styles: string[]        // e.g. ['Adventure', 'Food & Cuisine']
+  regions: string[]       // e.g. ['Asia', 'Europe']
   budget: string          // e.g. 'Mid-range'
   climate: string         // e.g. 'Tropical'
   groupSize: string       // e.g. 'Couple' — passed to AI, not scored
@@ -259,13 +260,14 @@ export async function POST(req: Request) {
     // Validate required fields
     if (
       !prefs?.styles?.length ||
+      !prefs?.regions?.length ||
       !prefs?.budget ||
       !prefs?.climate ||
       !prefs?.travelDateStart ||
       !prefs?.travelDateEnd
     ) {
       return Response.json(
-        { error: 'Missing required preferences: styles, budget, climate, travelDateStart, travelDateEnd' },
+        { error: 'Missing required preferences: styles, regions, budget, climate, travelDateStart, travelDateEnd' },
         { status: 400 }
       )
     }
@@ -292,7 +294,12 @@ export async function POST(req: Request) {
       throw new Error(dbError?.message || 'Failed to fetch destinations')
     }
 
-    const destinations: Destination[] = destinationsArray
+    // Filter by selected regions
+    const filteredDestinations = destinationsArray.filter(d => 
+      prefs.regions.includes(d.region)
+    )
+
+    const destinations: Destination[] = filteredDestinations
 
     // Build user vector
     const userVector = buildUserVector(prefs, durationEncoded)
