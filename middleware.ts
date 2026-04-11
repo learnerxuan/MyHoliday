@@ -25,7 +25,7 @@ const ADMIN_ONLY = ['/admin']
 // Public routes — skip auth check entirely
 const PUBLIC_PREFIXES = ['/', '/auth', '/destinations', '/_next', '/favicon']
 
-export async function -middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow public routes through
@@ -47,8 +47,8 @@ export async function -middleware(request: NextRequest) {
         getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value)
-            response.cookies.set(name, value, options)
+            request.cookies.set({ name, value, ...options })
+            response.cookies.set({ name, value, ...options })
           })
         },
       },
