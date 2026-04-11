@@ -16,6 +16,7 @@ type Pace      = 'Relaxed' | 'Balanced' | 'Packed'
 
 interface Preferences {
   styles:          StyleOption[]
+  regions:         string[]
   budget:          Budget | ''
   climate:         Climate | ''
   pace:            Pace | ''
@@ -63,8 +64,18 @@ const PACES: { value: Pace; icon: string; desc: string }[] = [
   { value: 'Packed',   icon: '🏃', desc: 'Action-packed, see as much as possible' },
 ]
 
+const REGIONS = [
+  { value: 'africa',        label: 'Africa',        icon: '🌍' },
+  { value: 'asia',          label: 'Asia',          icon: '🌏' },
+  { value: 'europe',        label: 'Europe',        icon: '🇪🇺' },
+  { value: 'middle_east',   label: 'Middle East',   icon: '🕌' },
+  { value: 'north_america', label: 'North America', icon: '🏔️' },
+  { value: 'oceania',       label: 'Oceania',       icon: '🏝️' },
+  { value: 'south_america', label: 'South America', icon: '🏜️' },
+]
+
 // ── Step indicator ───────────────────────────────────────────
-const STEPS = ['Travel Style', 'Budget', 'Climate', 'Pace', 'Group & Dates']
+const STEPS = ['Travel Style', 'Region', 'Budget', 'Climate', 'Pace', 'Group & Dates']
 
 // ── Page ─────────────────────────────────────────────────────
 export default function QuizPage() {
@@ -75,6 +86,7 @@ export default function QuizPage() {
 
   const [prefs, setPrefs] = useState<Preferences>({
     styles:          [],
+    regions:         REGIONS.map(r => r.value), // Default to All
     budget:          '',
     climate:         '',
     pace:            '',
@@ -92,12 +104,27 @@ export default function QuizPage() {
         : [...p.styles, s],
     }))
 
+  const toggleRegion = (r: string) =>
+    setPrefs(p => ({
+      ...p,
+      regions: p.regions.includes(r)
+        ? p.regions.filter(x => x !== r)
+        : [...p.regions, r],
+    }))
+
+  const toggleAllRegions = () =>
+    setPrefs(p => ({
+      ...p,
+      regions: p.regions.length === REGIONS.length ? [] : REGIONS.map(r => r.value),
+    }))
+
   const canAdvance = () => {
     if (step === 0) return prefs.styles.length > 0
-    if (step === 1) return prefs.budget !== ''
-    if (step === 2) return prefs.climate !== ''
-    if (step === 3) return prefs.pace !== ''
-    if (step === 4) return (
+    if (step === 1) return prefs.regions.length > 0
+    if (step === 2) return prefs.budget !== ''
+    if (step === 3) return prefs.climate !== ''
+    if (step === 4) return prefs.pace !== ''
+    if (step === 5) return (
       prefs.groupSize !== '' &&
       prefs.travelDateStart !== '' &&
       prefs.travelDateEnd !== '' &&
@@ -200,8 +227,59 @@ export default function QuizPage() {
             </div>
           )}
 
-          {/* ── Step 1: Budget ── */}
+          {/* ── Step 1: Region ── */}
           {step === 1 && (
+            <div>
+              <h1 className="text-3xl font-extrabold font-display text-charcoal mb-2">
+                Where do you want to go?
+              </h1>
+              <p className="text-sm font-body text-secondary mb-6">
+                Limit your search to specific continents or explore the world.
+              </p>
+              
+              <button
+                onClick={toggleAllRegions}
+                className="flex items-center gap-3 mb-6 px-4 py-3 rounded-xl border border-border bg-white hover:border-amber/50 transition-all w-full sm:w-max group"
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                  prefs.regions.length === REGIONS.length ? 'bg-amber border-amber' : 'border-border group-hover:border-amber/50'
+                }`}>
+                  {prefs.regions.length === REGIONS.length && <span className="text-white text-xs">✓</span>}
+                </div>
+                <span className="text-sm font-bold font-body text-charcoal">
+                  {prefs.regions.length === REGIONS.length ? 'Deselect All' : '(Select All)'}
+                </span>
+              </button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {REGIONS.map(r => {
+                  const selected = prefs.regions.includes(r.value)
+                  return (
+                    <button
+                      key={r.value}
+                      onClick={() => toggleRegion(r.value)}
+                      className={`flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${
+                        selected
+                          ? 'border-amber bg-amber/10 shadow-sm'
+                          : 'border-border bg-white hover:border-amber/50'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                        selected ? 'bg-amber border-amber' : 'border-border'
+                      }`}>
+                        {selected && <span className="text-white text-xs">✓</span>}
+                      </div>
+                      <span className="text-xl">{r.icon}</span>
+                      <span className="text-sm font-semibold font-body text-charcoal">{r.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 2: Budget ── */}
+          {step === 2 && (
             <div>
               <h1 className="text-3xl font-extrabold font-display text-charcoal mb-2">
                 What&apos;s your budget style?
@@ -235,8 +313,8 @@ export default function QuizPage() {
             </div>
           )}
 
-          {/* ── Step 2: Climate ── */}
-          {step === 2 && (
+          {/* ── Step 3: Climate ── */}
+          {step === 3 && (
             <div>
               <h1 className="text-3xl font-extrabold font-display text-charcoal mb-2">
                 What weather do you prefer?
@@ -267,8 +345,8 @@ export default function QuizPage() {
             </div>
           )}
 
-          {/* ── Step 3: Pace ── */}
-          {step === 3 && (
+          {/* ── Step 4: Pace ── */}
+          {step === 4 && (
             <div>
               <h1 className="text-3xl font-extrabold font-display text-charcoal mb-2">
                 What pace suits you?
@@ -302,8 +380,8 @@ export default function QuizPage() {
             </div>
           )}
 
-          {/* ── Step 4: Group & Dates ── */}
-          {step === 4 && (
+          {/* ── Step 5: Group & Dates ── */}
+          {step === 5 && (
             <div>
               <h1 className="text-3xl font-extrabold font-display text-charcoal mb-2">
                 Who&apos;s going, and when?

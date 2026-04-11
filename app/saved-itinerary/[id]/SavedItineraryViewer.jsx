@@ -32,6 +32,7 @@ export default function SavedItineraryViewer() {
   const [isReverting, setIsReverting] = useState(false)
   const [revertError, setRevertError] = useState(null)
   const [sessionId, setSessionId] = useState(null)
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false)
   const itineraryRef = useRef(itinerary)
   const isDirtyRef = useRef(false)
 
@@ -221,6 +222,180 @@ export default function SavedItineraryViewer() {
     }
   }
 
+  const handleDownloadJSON = () => {
+    const data = JSON.stringify({ 
+      title, 
+      destination: { city: destination?.city, country: destination?.country },
+      itinerary, 
+      trip_metadata: tripMetadata 
+    }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `TripTo_${destination?.city || 'MyTrip'}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShowDownloadMenu(false);
+  }
+
+  const handleDownloadPDF = () => {
+    setShowDownloadMenu(false);
+    
+    // Sort days numerically
+    const dayKeys = Object.keys(itinerary).sort((a, b) => {
+      const numA = parseInt(a.replace('day', ''));
+      const numB = parseInt(b.replace('day', ''));
+      return numA - numB;
+    });
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to download the PDF.');
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title || 'Itinerary'}</title>
+          <style>
+            body { 
+              font-family: Arial, Helvetica, sans-serif; 
+              line-height: 1.3; 
+              padding: 0; 
+              color: black; 
+              background: white;
+              font-size: 10pt;
+            }
+            @page {
+              margin: 1in;
+              margin-top: 0.5in;
+            }
+            h1 { 
+              font-size: 18pt; 
+              margin-bottom: 8pt; 
+              border-bottom: 1.5pt solid black;
+              padding-bottom: 2pt;
+              font-weight: bold;
+            }
+            .meta { 
+              font-size: 9pt; 
+              margin-bottom: 15pt; 
+              font-style: italic;
+            }
+            .two-col {
+              display: grid;
+              grid-template-columns: 85pt 1fr;
+              column-gap: 20pt;
+              align-items: baseline;
+            }
+            .day-row {
+              margin-top: 18pt;
+              margin-bottom: 6pt;
+              border-bottom: 0.5pt solid #eee;
+              padding-bottom: 2pt;
+            }
+            .day-label {
+              font-size: 11pt;
+              font-weight: bold;
+              text-decoration: underline;
+            }
+            .day-date {
+              font-size: 11pt;
+              font-weight: bold;
+            }
+            .item-row {
+              margin-bottom: 8pt;
+              page-break-inside: avoid;
+            }
+            .item-time {
+              font-weight: bold;
+              color: black;
+            }
+            .item-title {
+              font-weight: bold;
+              font-size: 10.5pt;
+            }
+            .item-category {
+              font-size: 8.5pt;
+              font-weight: normal;
+              margin-left: 5pt;
+              color: #444;
+            }
+            .item-desc {
+              font-size: 9.5pt;
+              margin-top: 1pt;
+              white-space: pre-wrap;
+            }
+            .item-note {
+              font-size: 9pt;
+              margin-top: 2pt;
+              font-style: italic;
+              color: #333;
+            }
+            @media print {
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${title || (destination?.city + ' Trip')}</h1>
+          <div class="meta">
+            Location: ${destination?.city}, ${destination?.country}<br/>
+            ${tripMetadata ? `
+              Duration: ${tripMetadata.trip_days} Days / 
+              Budget: ${tripMetadata.budget} / 
+              Pace: ${tripMetadata.pace} / 
+              Group Size: ${tripMetadata.group_size}<br/>
+              ${tripMetadata.travel_date_start ? `
+                Dates: ${new Date(tripMetadata.travel_date_start).toLocaleDateString(undefined, {month: 'long', day: 'numeric'})} - ${new Date(tripMetadata.travel_date_end).toLocaleDateString(undefined, {month: 'long', day: 'numeric', year: 'numeric'})}
+              ` : ''}
+            ` : ''}
+          </div>
+
+          ${dayKeys.map(dayKey => {
+            const dayNum = parseInt(dayKey.replace('day', ''));
+            let dateStr = '';
+            if (tripMetadata?.travel_date_start) {
+              const d = new Date(tripMetadata.travel_date_start);
+              d.setDate(d.getDate() + dayNum - 1);
+              dateStr = d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+            }
+            return `
+              <div class="two-col day-row">
+                <span class="day-label">DAY ${dayNum}</span>
+                <span class="day-date">${dateStr || ''}</span>
+              </div>
+              ${itinerary[dayKey].map(item => `
+                <div class="two-col item-row">
+                  <div class="item-time">
+                    ${item.time || '--:--'}
+                  </div>
+                  <div>
+                    <div class="item-title">
+                      ${item.name}
+                      ${item.category ? `<span class="item-category">(${item.category})</span>` : ''}
+                    </div>
+                    ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+                    ${item.notes ? `<div class="item-note">${item.notes}</div>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            `;
+          }).join('')}
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
@@ -240,7 +415,7 @@ export default function SavedItineraryViewer() {
     <div className="w-full flex flex-col bg-warmwhite overflow-hidden" style={{ height: 'calc(100dvh - 96px)' }}>
 
       {/* Header */}
-      <header className="flex items-center justify-between pl-4 pr-6 py-4 border-b border-border bg-white shrink-0 shadow-sm z-10">
+      <header className="flex items-center justify-between pl-4 pr-6 py-4 border-b border-border bg-white shrink-0 shadow-sm z-30">
         <div className="flex items-center gap-3">
           <button
             onClick={handleBack}
@@ -269,6 +444,16 @@ export default function SavedItineraryViewer() {
           )}
           
           <button
+            onClick={() => router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`)}
+            className="text-xs font-bold text-amber hover:text-amberdark px-3 py-2 rounded-lg border border-amber/30 hover:border-amber bg-amber/5 transition-all flex items-center gap-2"
+            title="Post this itinerary to the marketplace to find a local tour guide"
+          >
+            🔍 Find a Tour Guide
+          </button>
+
+          <div className="h-4 w-px bg-border mx-1" />
+
+          <button
             onClick={handleRevertToChat}
             disabled={isReverting || !sessionId}
             className="text-xs font-bold text-secondary hover:text-charcoal px-3 py-2 rounded-lg border border-border hover:border-charcoal transition-all flex items-center gap-2 disabled:opacity-40"
@@ -276,6 +461,39 @@ export default function SavedItineraryViewer() {
           >
             {isReverting ? '...' : '↩ Go back to AI Chat'}
           </button>
+
+          <div className="h-4 w-px bg-border mx-1" />
+
+          <div className="relative">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              className="text-xs font-bold text-charcoal px-3 py-2 rounded-lg border border-border hover:border-charcoal transition-all flex items-center gap-2 bg-white"
+            >
+              📩 Download
+            </button>
+            {showDownloadMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowDownloadMenu(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-border rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-200">
+                  <button
+                    onClick={handleDownloadPDF}
+                    className="w-full text-left px-4 py-2 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
+                  >
+                    📃 Portable PDF
+                  </button>
+                  <button
+                    onClick={handleDownloadJSON}
+                    className="w-full text-left px-4 py-2 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
+                  >
+                    📦 Data Backup (JSON)
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="h-4 w-px bg-border mx-1" />
 
