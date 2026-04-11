@@ -68,12 +68,23 @@ export default function Navbar() {
               scrolled ? 'gap-6 px-2 bg-transparent' : 'gap-6 bg-black/5 px-7 py-2.5'
             }`}
           >
-            {role === 'admin' && <NavLink href="/admin">Admin</NavLink>}
-            {(role === 'traveller' || !role) && <NavLink href="/quiz">Plan a Trip</NavLink>}
-            <NavLink href="/destinations">Destinations</NavLink>
-            <NavLink href="/itineraries">Itineraries</NavLink>
-            <NavLink href="/marketplace">Marketplace</NavLink>
-            <NavLink href="/about">About</NavLink>
+            {role === 'admin' ? (
+              <>
+                <NavLink href="/admin">Dashboard</NavLink>
+                <NavLink href="/admin/users">Users</NavLink>
+                <NavLink href="/admin/tour-guides">Tour Guide</NavLink>
+                <NavLink href="/admin/marketplace">Marketplace</NavLink>
+                <NavLink href="/admin/reports">Reports</NavLink>
+              </>
+            ) : (
+              <>
+                {(role === 'traveller' || !role) && <NavLink href="/quiz">Plan a Trip</NavLink>}
+                <NavLink href="/destinations">Destinations</NavLink>
+                <NavLink href="/itineraries">Itineraries</NavLink>
+                <NavLink href="/marketplace">Marketplace</NavLink>
+                <NavLink href="/about">About</NavLink>
+              </>
+            )}
           </nav>
 
           {/* ── Desktop Right Auth ── */}
@@ -143,12 +154,23 @@ export default function Navbar() {
           }`}
         >
           <div className="flex flex-col space-y-1">
-            {role === 'admin' && <MobileNavLink href="/admin" onClick={close}>Admin</MobileNavLink>}
-            {(role === 'traveller' || !role) && <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>}
-            <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
-            <MobileNavLink href="/itineraries" onClick={close}>Itineraries</MobileNavLink>
-            <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
-            <MobileNavLink href="/about" onClick={close}>About</MobileNavLink>
+            {role === 'admin' ? (
+              <>
+                <MobileNavLink href="/admin" onClick={close}>Dashboard</MobileNavLink>
+                <MobileNavLink href="/admin/users" onClick={close}>Users</MobileNavLink>
+                <MobileNavLink href="/admin/tour-guides" onClick={close}>Tour Guide</MobileNavLink>
+                <MobileNavLink href="/admin/marketplace" onClick={close}>Marketplace</MobileNavLink>
+                <MobileNavLink href="/admin/reports" onClick={close}>Reports</MobileNavLink>
+              </>
+            ) : (
+              <>
+                {(role === 'traveller' || !role) && <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>}
+                <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
+                <MobileNavLink href="/itineraries" onClick={close}>Itineraries</MobileNavLink>
+                <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
+                <MobileNavLink href="/about" onClick={close}>About</MobileNavLink>
+              </>
+            )}
 
             <div className="pt-3 mt-2 border-t border-black/5 space-y-2">
               {user ? (

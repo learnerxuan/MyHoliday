@@ -33,7 +33,7 @@ export default function LoginPage() {
     // Redirect by role — mirrors the callback page logic
     const role = data.user?.user_metadata?.role
     if (role === 'admin')     { router.replace('/admin'); return }
-    if (role === 'guide')     { router.replace('/guide/marketplace'); return }
+    if (role === 'guide')     { router.replace('/guide'); return }
     if (role === 'traveller') { router.replace('/'); return }
 
     // No role yet (first-time email user if email confirmation was disabled)

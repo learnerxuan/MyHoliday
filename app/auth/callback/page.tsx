@@ -23,7 +23,7 @@ function CallbackHandler() {
 
           // Returning user — redirect by role
           if (role === 'admin')      { router.replace('/admin'); return }
-          if (role === 'guide')      { router.replace('/guide/marketplace'); return }
+          if (role === 'guide')      { router.replace('/guide'); return }
           if (role === 'traveller')  { router.replace('/'); return }
 
           // First-time user — onboarding

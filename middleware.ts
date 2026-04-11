@@ -25,7 +25,7 @@ const ADMIN_ONLY = ['/admin']
 // Public routes — skip auth check entirely
 const PUBLIC_PREFIXES = ['/', '/auth', '/destinations', '/_next', '/favicon']
 
-export async function middleware(request: NextRequest) {
+export async function -middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow public routes through
