@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 
 interface CarouselDestination {
   id: string
@@ -47,9 +48,10 @@ export default function HeroCarousel({ destinations }: { destinations: CarouselD
       {validDestinations.map((dest, index) => {
         const initial = dest.city.charAt(0).toUpperCase()
         return (
-          <div
+          <Link
             key={dest.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+            href={`/destinations/${dest.id}`}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out cursor-pointer ${index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
           >
             {dest.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -64,18 +66,18 @@ export default function HeroCarousel({ destinations }: { destinations: CarouselD
                </div>
             )}
             {/* Gradient overlay for text legibility */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-black/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-black/40 to-transparent transition-opacity group-hover:via-black/20" />
             
             <div className="absolute bottom-8 left-8 right-8">
               <p className="text-amber text-xs font-semibold uppercase tracking-widest mb-2 drop-shadow-md">Recommended</p>
-              <h3 className="text-3xl sm:text-4xl font-extrabold font-display text-white drop-shadow-md leading-none break-words">
+              <h3 className="text-3xl sm:text-4xl font-extrabold font-display text-white drop-shadow-md leading-none break-words group-hover:text-amber transition-colors">
                 {dest.city}
               </h3>
               <p className="font-medium font-body text-white/80 text-xl sm:text-2xl drop-shadow-md mt-0.5">
                 {formatCountry(dest.country)}
               </p>
             </div>
-          </div>
+          </Link>
         )
       })}
 
