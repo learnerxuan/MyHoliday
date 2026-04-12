@@ -329,8 +329,15 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
     setIsPinning(true)
     const updates = { ...editForm }
     
-    // Auto-pinning logic (Saved view only, non-note types)
-    if (allowFullEdit && updates.name !== item.name && updates.type !== 'note' && updates.type !== 'food_recommendation') {
+    // Check if we need to auto-pin (geocode)
+    const nameChanged = updates.name !== item.name;
+    const typeChangedToMapType = (item.type === 'note' || item.type === 'food_recommendation') && 
+                                 (updates.type !== 'note' && updates.type !== 'food_recommendation');
+    const missingCoords = !item.lat || !item.lng;
+    const isMapType = updates.type !== 'note' && updates.type !== 'food_recommendation';
+
+    // Auto-pinning logic (Saved view only)
+    if (allowFullEdit && (nameChanged || typeChangedToMapType || (missingCoords && isMapType))) {
       try {
         const res = await fetch(`/api/geocode?name=${encodeURIComponent(updates.name)}&city=${encodeURIComponent(cityContext?.name || '')}&lat=${cityContext?.lat || ''}&lng=${cityContext?.lng || ''}`)
         const data = await res.json()
