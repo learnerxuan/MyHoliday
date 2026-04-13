@@ -339,122 +339,89 @@ function DestinationsInner() {
   const hasResults = destinations.length > 0
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col">
-
-      {/* Page header */}
-      <div 
-        className="text-warmwhite relative overflow-hidden pt-12 sm:pt-16 pb-8 sm:pb-10 px-4 sm:px-6"
-        style={{ background: '#0f0f0f' }}
-      >
-        {/* Ambient amber glow */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(196,135,74,0.22) 0%, transparent 70%),' +
-              'radial-gradient(ellipse 40% 40% at 20% 80%, rgba(196,135,74,0.10) 0%, transparent 65%)',
-          }}
-        />
-        {/* Subtle dot grid */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
-
-        <div className="relative max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-white/10 text-amber text-xs font-semibold px-3 py-1 rounded-full border border-amber/20 mb-2 uppercase tracking-widest">
-            {fromQuiz ? 'Your personalised results' : 'Discover Destinations'}
-          </div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold font-display mb-2 text-warmwhite">
-            {fromQuiz ? 'Your best matches' : 'Explore the World'}
-          </h1>
-          <p className="text-sm font-body text-disabled">
-            {fromQuiz
-              ? `${destinations.length} destinations ranked by how well they match your preferences.`
-              : 'Browse our full catalog or check out our personalized picks for you.'}
-          </p>
+    <div className="w-full bg-[#F5F2EE] min-h-screen pb-24 pt-8 sm:pt-12 px-4 sm:px-6 lg:px-8 font-body">
+      <div className="max-w-[1100px] mx-auto p-6 lg:p-12 bg-white rounded-[24px] shadow-sm border border-border/50">
+        
+        {/* Header Section */}
+        <div className="mb-8">
+           <div className="inline-block bg-[#EAF3DE] text-[#3B6D11] px-3 py-1.5 rounded-md text-[11px] font-bold tracking-[0.15em] uppercase mb-3 text-center sm:text-left">
+             {fromQuiz ? 'Your tailored matches' : 'Explore the World'}
+           </div>
+           <h1 className="font-display font-extrabold text-[32px] sm:text-[36px] text-charcoal m-0 leading-tight text-center sm:text-left">
+             {fromQuiz ? 'Your personalised itinerary recommendations' : 'Browse Destinations'}
+           </h1>
+           <p className="text-secondary text-[15px] mt-3 text-center sm:text-left">
+             {fromQuiz ? `${destinations.length} destinations ranked by how well they match your preferences.` : 'Discover curated cities matched precisely to your unique travel algorithm.'}
+           </p>
         </div>
-      </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        {/* Smart Search Bar */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6 relative">
+           <div className="flex-1 relative flex items-center">
+              <span className="absolute left-5 text-[18px]">🔍</span>
+              <input type="text" placeholder="Search cities, countries, or regions..." value={search} onChange={e => setSearch(e.target.value)} className="w-full py-4 pr-4 pl-[50px] border-2 border-[#EBEBEB] rounded-xl outline-none text-[14px] bg-[#FDFCFB] text-charcoal font-medium focus:border-charcoal transition-colors" />
+              {discoveryLoading && (
+                <div className="absolute right-4 w-5 h-5 border-2 border-border border-t-amber rounded-full animate-spin" />
+              )}
+           </div>
+           <button className="px-8 bg-[#1A1A1A] hover:bg-black text-white rounded-xl cursor-pointer font-bold text-[14px] transition-colors py-[15px] sm:py-0 shrink-0">Search</button>
+        </div>
 
-        {tripMeta && <TripMetaBanner meta={tripMeta} />}
+        {/* Comprehensive Dynamic Filters */}
+        <div className="bg-[#FAF9F7] border border-[#E5E0DA] rounded-[16px] p-5 sm:p-6 mb-10">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
+             {/* Region Filter */}
+             <div>
+                <div className="text-[11px] font-bold text-[#888] uppercase tracking-[1px] mb-3">Primary Region</div>
+                <div className="flex gap-2 flex-wrap">
+                  {['All', 'africa', 'asia', 'europe', 'middle_east', 'north_america', 'oceania', 'south_america'].map((r) => (
+                    <button key={r} onClick={() => setRegionFilter(r)} className={`px-4 py-2 text-[12px] rounded-lg border-2 transition-colors cursor-pointer ${regionFilter === r ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] font-bold' : 'bg-transparent text-secondary border-[#E5E0DA] hover:border-[#1A1A1A] font-medium'}`}>
+                       {r === 'All' ? 'All Regions' : formatRegion(r)}
+                    </button>
+                  ))}
+                </div>
+             </div>
 
-        {/* Controls */}
-        <div className="flex flex-wrap gap-3 mb-6 items-center">
-          <div className="relative flex-1 min-w-[240px]">
-            <input
-              type="text"
-              placeholder="Search city or country…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="input-base pr-10"
-            />
-            {discoveryLoading && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-border border-t-amber rounded-full animate-spin" />
-            )}
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {['All', 'Budget', 'Mid-range', 'Luxury'].map(b => (
-              <button
-                key={b}
-                onClick={() => setBudgetFilter(b)}
-                className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${budgetFilter === b
-                    ? 'bg-charcoal text-warmwhite border-charcoal'
-                    : 'bg-white text-secondary border-border hover:border-amber'
-                  }`}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 border-l border-border pl-3">
-            <button
-              onClick={() => setRegionFilter('All')}
-              className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${regionFilter === 'All'
-                  ? 'bg-charcoal text-warmwhite border-charcoal'
-                  : 'bg-white text-secondary border-border hover:border-amber'
-                }`}
-            >
-              All Regions
-            </button>
-            {['africa', 'asia', 'europe', 'middle_east', 'north_america', 'oceania', 'south_america'].map(r => (
-              <button
-                key={r}
-                onClick={() => setRegionFilter(r)}
-                className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${regionFilter === r
-                    ? 'bg-charcoal text-warmwhite border-charcoal'
-                    : 'bg-white text-secondary border-border hover:border-amber'
-                  }`}
-              >
-                {formatRegion(r)}
-              </button>
-            ))}
-          </div>
-          {fromQuiz && (
-            <select
-              value={sort}
-              onChange={e => setSort(e.target.value as SortKey)}
-              className="input-base max-w-[180px]"
-            >
-              <option value="match">Best Match</option>
-              <option value="az">Name (A-Z)</option>
-              <option value="budget_asc">Price (Low to high)</option>
-              <option value="budget_desc">Price (High to low)</option>
-            </select>
-          )}
+             {/* Budget Filter */}
+             <div>
+                <div className="text-[11px] font-bold text-[#888] uppercase tracking-[1px] mb-3">Estimated Cost</div>
+                <div className="flex gap-2 flex-wrap">
+                  {['All', 'Budget', 'Mid-range', 'Luxury'].map((b) => (
+                    <button key={b} onClick={() => setBudgetFilter(b)} className={`px-4 py-2 text-[12px] rounded-lg border-2 transition-colors cursor-pointer ${budgetFilter === b ? 'bg-[#EAF3DE] text-[#3B6D11] border-[#3B6D11] font-bold' : 'bg-transparent text-secondary border-[#E5E0DA] hover:border-[#3B6D11] font-medium'}`}>
+                       {b}
+                    </button>
+                  ))}
+                </div>
+             </div>
+           </div>
+        </div>
+
+        {tripMeta && <div className="mb-8"><TripMetaBanner meta={tripMeta} /></div>}
+
+        {/* Listing Header */}
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-4 pt-2 border-t border-[#F0EDE9]">
+           <div className="text-[16px] font-bold text-[#1A1A1A]">{filtered.length} Destinations Found</div>
+           
+           {fromQuiz && (
+             <div className="flex items-center gap-2">
+                <div className="text-[13px] text-[#888] font-bold uppercase tracking-wider">Sort by:</div>
+                <select value={sort} onChange={e => setSort(e.target.value as SortKey)} className="text-[13px] font-bold text-[#1A1A1A] bg-transparent border-none outline-none cursor-pointer">
+                  <option value="match">Match Score (Highest) ↓</option>
+                  <option value="az">Name (A-Z)</option>
+                  <option value="budget_asc">Price (Low to high)</option>
+                  <option value="budget_desc">Price (High to low)</option>
+                </select>
+             </div>
+           )}
         </div>
 
         {hasResults && filtered.length === 0 && (
-          <p className="text-sm font-body text-secondary text-center py-12">
-            No destinations match your filters.
+          <p className="text-[14px] text-secondary text-center py-16 bg-[#FDFCFB] rounded-[16px] border border-[#EBEBEB]">
+            No destinations match your filters. Try widening your search!
           </p>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((dest, i) => (
             <DestCard key={dest.id + (fromQuiz ? '' : i)} dest={dest} rank={i + 1} />
           ))}
@@ -466,22 +433,14 @@ function DestinationsInner() {
             <button
               onClick={handleLoadMore}
               disabled={loadingMore}
-              className="bg-charcoal text-warmwhite font-semibold font-body text-sm py-3 px-10 rounded-full hover:bg-amber transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              className="px-8 py-3.5 bg-[#1A1A1A] hover:bg-black text-white text-[14px] font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2 relative overflow-hidden"
             >
-              {loadingMore && <span className="w-4 h-4 border-2 border-warmwhite/30 border-t-warmwhite rounded-full animate-spin" />}
-              {loadingMore ? 'Loading more destinations…' : 'Load More'}
+              {loadingMore && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {loadingMore ? 'Loading more…' : 'Load More'}
             </button>
           </div>
         )}
-
-        {hasResults && filtered.length === 0 && (
-          <p className="text-sm font-body text-secondary text-center py-12">
-            No destinations match your filters.
-          </p>
-        )}
-
       </div>
-
     </div>
   )
 }

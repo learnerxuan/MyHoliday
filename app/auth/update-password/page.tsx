@@ -2,12 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createBrowserClient } from '@supabase/ssr'
-
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { supabase } from '@/lib/supabase/client'
 
 // This page is reached when a user clicks the password-reset link in their email.
 // Supabase sends the user here with a recovery token in the URL hash.
@@ -15,13 +10,13 @@ const supabase = createBrowserClient(
 // which is our signal that the token is valid and we can allow the password update.
 
 export default function UpdatePasswordPage() {
-  const router  = useRouter()
-  const [ready, setReady]         = useState(false)   // true once PASSWORD_RECOVERY fires
-  const [password, setPassword]   = useState('')
-  const [confirm, setConfirm]     = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState('')
-  const [success, setSuccess]     = useState(false)
+  const router = useRouter()
+  const [ready, setReady] = useState(false)   // true once PASSWORD_RECOVERY fires
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -39,7 +34,7 @@ export default function UpdatePasswordPage() {
       subscription.unsubscribe()
       clearTimeout(fallback)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
