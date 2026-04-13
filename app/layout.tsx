@@ -3,7 +3,6 @@ import { Funnel_Display, Noto_Serif } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
-import { PageTransitionProvider } from '@/components/providers/PageTransitionProvider'
 
 const funnelDisplay = Funnel_Display({
   variable: '--font-display',
@@ -30,13 +29,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${funnelDisplay.variable} ${notoSerif.variable} antialiased min-h-screen flex flex-col bg-warmwhite`}>
-        <PageTransitionProvider>
-          <Navbar />
-          <main className="flex-1 flex flex-col pt-24 pt-safe">
-            {children}
-          </main>
-          <Footer />
-        </PageTransitionProvider>
+        <Navbar />
+        <main className="flex-1 flex flex-col pt-24 pt-safe">
+          {children}
+        </main>
+        <Footer />
       </body>
     </html>
   )
