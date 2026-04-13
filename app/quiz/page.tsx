@@ -165,33 +165,27 @@ export default function QuizPage() {
   return (
     <div className="min-h-screen bg-warmwhite flex flex-col">
 
-      {/* Progress bar */}
-      <div className="h-1 bg-border">
-        <div
-          className="h-full bg-amber transition-all duration-500"
-          style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-        />
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-start px-4 py-12">
-
-        {/* Step labels */}
-        <div className="flex gap-2 mb-10 flex-wrap justify-center">
+      {/* Progress Bar Container */}
+      <div className="max-w-[800px] mx-auto mb-8">
+        <div className="flex gap-2 sm:gap-3">
           {STEPS.map((label, i) => (
-            <span
-              key={label}
-              className={`text-xs font-semibold font-body px-3 py-1 rounded-full transition-colors ${
-                i === step
-                  ? 'bg-charcoal text-warmwhite'
-                  : i < step
-                  ? 'bg-muted text-amber'
-                  : 'bg-muted text-tertiary'
-              }`}
-            >
-              {i < step ? '✓ ' : ''}{label}
-            </span>
+            <div key={label} className="flex flex-col items-center gap-2 flex-1">
+              <div className={`w-full h-1.5 rounded-full transition-colors ${i <= step ? 'bg-[#C4874A]' : 'bg-[#E5E0DA]'}`} />
+              {/* Show full list on Desktop */}
+              <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-center hidden sm:block ${i <= step ? 'text-[#1A1A1A]' : 'text-secondary'}`}>
+                 {i + 1}. {label}
+              </span>
+              {/* Show only active step on Mobile */}
+              <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-center block sm:hidden ${i === step ? 'text-[#1A1A1A]' : 'hidden'}`}>
+                 {i + 1}. {label}
+              </span>
+            </div>
           ))}
         </div>
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-start px-4">
+
 
         <div className="w-full max-w-2xl">
 
