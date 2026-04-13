@@ -2,7 +2,6 @@
 
 import { supabase } from '@/lib/supabase/client'
 
-
 // ── Google OAuth ─────────────────────────────────────────────
 
 export async function signInWithGoogle(intent?: 'guide') {

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 
-
 const NATIONALITIES = [
   'Malaysian', 'Indonesian', 'Singaporean', 'Thai', 'Filipino',
   'Vietnamese', 'Chinese', 'Japanese', 'Korean', 'Indian',
@@ -34,6 +33,7 @@ export default function ProfilePage() {
     accessibility_needs: false,
     preferred_language: 'English',
   })
+  const [tFormOg, setTFormOg] = useState(tForm)
 
   // Guide state (read-only + doc upload)
   const [guide, setGuide] = useState<any>(null)
@@ -55,14 +55,17 @@ export default function ProfilePage() {
           .eq('user_id', user.id)
           .maybeSingle()
         if (data) {
-          setTForm({
-            full_name: data.full_name ?? '',
+          const oauthName = user.user_metadata?.full_name || user.user_metadata?.name || ''
+          const loadedData = {
+            full_name: data.full_name || oauthName,
             age: data.age?.toString() ?? '',
             nationality: data.nationality ?? '',
             dietary_restrictions: data.dietary_restrictions ?? 'None',
             accessibility_needs: data.accessibility_needs ?? false,
             preferred_language: data.preferred_language ?? 'English',
-          })
+          }
+          setTForm(loadedData)
+          setTFormOg(loadedData)
         }
       }
 
@@ -87,7 +90,8 @@ export default function ProfilePage() {
 
     const { error: err } = await supabase
       .from('traveller_profiles')
-      .update({
+      .upsert({
+        user_id: user.id,
         full_name: tForm.full_name,
         age: tForm.age ? parseInt(tForm.age) : null,
         nationality: tForm.nationality,
@@ -95,10 +99,10 @@ export default function ProfilePage() {
         accessibility_needs: tForm.accessibility_needs,
         preferred_language: tForm.preferred_language,
       })
-      .eq('user_id', user.id)
 
     setSaving(false)
     if (err) { setError(err.message); return }
+    setTFormOg(tForm)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
@@ -137,152 +141,202 @@ export default function ProfilePage() {
   if (!user) return null
 
   const avatarUrl = user.user_metadata?.avatar_url
+  const oauthName = user.user_metadata?.full_name || user.user_metadata?.name || ''
 
   return (
-    <main className="min-h-screen bg-warmwhite py-8 sm:py-12 px-4">
-      <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8">
-
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          {avatarUrl && (
-            <img
-              src={avatarUrl}
-              alt="Profile photo"
-              className="h-16 w-16 rounded-full object-cover border-2 border-border"
-            />
-          )}
-          <div>
-            <h1 className="text-3xl font-extrabold font-display text-charcoal">
-              My Profile
-            </h1>
-            <p className="text-sm font-body text-secondary capitalize">{role}</p>
+    <div className="w-full bg-warmwhite min-h-screen font-body pb-24 pt-8 sm:pt-12 px-4 sm:px-6 lg:px-8">
+      <section className="max-w-5xl mx-auto p-6 lg:p-12 bg-white rounded-[24px] shadow-sm border border-border/50">
+        
+        {/* Profile Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-8 mb-10">
+          <div className="flex shrink-0 w-24 h-24 rounded-full bg-gradient-to-br from-[#C4874A] to-[#8B6A3E] border-4 border-white shadow-[0_4px_10px_rgba(0,0,0,0.1)] overflow-hidden items-center justify-center">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white text-3xl font-bold font-display">{user?.email?.charAt(0).toUpperCase()}</span>
+            )}
           </div>
+          <div className="flex-1">
+             <div className="inline-flex items-center gap-2 bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-bold px-3 py-1.5 rounded-md mb-2 uppercase tracking-[0.2em] leading-none">
+               {role === 'guide' ? '💼 Verified Guide' : '🌎 Verified Traveller'}
+             </div>
+             <h1 className="font-display font-extrabold text-[32px] text-charcoal leading-none">
+                {role === 'traveller' ? (tForm.full_name || oauthName || 'Traveller') : (guide?.full_name || oauthName || 'Tour Guide')}
+             </h1>
+             <p className="text-[13px] text-secondary mt-2 uppercase tracking-widest font-semibold">
+                Joined: {new Date(user?.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+             </p>
+          </div>
+          {role === 'traveller' && (
+            <div className="flex gap-3 w-full sm:w-auto mt-4 sm:mt-0 flex-col sm:flex-row">
+              <button
+                 onClick={() => setTForm(tFormOg)}
+                 disabled={saving || JSON.stringify(tForm) === JSON.stringify(tFormOg)}
+                 className="px-6 py-3.5 bg-white border border-[#E5E0DA] hover:bg-[#F0EDE9] text-charcoal text-[14px] font-bold rounded-xl transition-colors disabled:opacity-50"
+              >
+                 Cancel
+              </button>
+              <button
+                 onClick={saveTraveller as any}
+                 disabled={saving || JSON.stringify(tForm) === JSON.stringify(tFormOg)}
+                 className="px-8 py-3.5 bg-[#1A1A1A] hover:bg-black text-white text-[14px] font-bold rounded-xl transition-colors shadow-lg shadow-black/10 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                 {saving && <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                 {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* ── ERROR & SUCCESS BANNER ── */}
+        {error && <div className="mb-8 p-4 bg-error-bg border border-error/20 rounded-xl text-error text-sm font-medium">{error}</div>}
+        {saved && <div className="mb-8 p-4 bg-[#ECFDF5] border border-[#059669]/20 rounded-xl text-[#059669] text-sm font-medium">{role === 'guide' ? 'Document updated successfully!' : 'Changes saved successfully!'}</div>}
 
         {/* ── TRAVELLER VIEW ── */}
         {role === 'traveller' && (
-          <form onSubmit={saveTraveller} className="bg-white rounded-2xl shadow-md border border-border px-4 sm:px-8 py-6 sm:py-8 space-y-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left Card: Personal Info */}
+            <div className="bg-[#FDFCFB] border border-border rounded-[16px] p-6 lg:p-8">
+               <h2 className="text-[16px] font-bold text-charcoal mb-6 font-body">Personal Information</h2>
+               
+               <Field label="Full Name">
+                 <input type="text" value={tForm.full_name} onChange={e => setTForm({...tForm, full_name: e.target.value})} className="input-base bg-white" placeholder="Enter your full name" />
+               </Field>
 
-            <h2 className="text-lg font-extrabold font-display text-charcoal">Personal Details</h2>
+               <Field label="Nationality">
+                 <select value={tForm.nationality} onChange={e => setTForm({...tForm, nationality: e.target.value})} className="input-base bg-white cursor-pointer">
+                    <option value="" disabled>Select nationality</option>
+                    {NATIONALITIES.map(n => <option key={n} value={n}>{n}</option>)}
+                 </select>
+               </Field>
 
-            <Field label="Full Name">
-              <input type="text" required value={tForm.full_name}
-                onChange={e => setTForm(f => ({ ...f, full_name: e.target.value }))}
-                className="input-base" />
-            </Field>
+               <div className="grid grid-cols-2 gap-4">
+                  <Field label="Age">
+                    <input type="number" value={tForm.age} onChange={e => setTForm({...tForm, age: e.target.value})} className="input-base bg-white" placeholder="e.g. 28" min={10} max={120} />
+                  </Field>
+                  <Field label="Language">
+                     <select value={tForm.preferred_language} onChange={e => setTForm({...tForm, preferred_language: e.target.value})} className="input-base bg-white cursor-pointer">
+                        {LANGUAGES.map(n => <option key={n} value={n}>{n}</option>)}
+                     </select>
+                  </Field>
+               </div>
+            </div>
 
-            <Field label="Age (optional)">
-              <input type="number" min={10} max={120} value={tForm.age}
-                onChange={e => setTForm(f => ({ ...f, age: e.target.value }))}
-                className="input-base" />
-            </Field>
+            {/* Right Side Stack */}
+            <div className="flex flex-col gap-6">
+              {/* Travel Preferences Card */}
+              <div className="bg-[#FDFCFB] border border-border rounded-[16px] p-6 lg:p-8 flex flex-col">
+                 <h2 className="text-[16px] font-bold text-charcoal mb-6 font-body">Travel Preferences</h2>
+                 
+                 <Field label="Dietary Restrictions">
+                   <select value={tForm.dietary_restrictions} onChange={e => setTForm({...tForm, dietary_restrictions: e.target.value})} className={`input-base cursor-pointer font-semibold ${tForm.dietary_restrictions !== 'None' ? 'bg-[#F0EBE3] !border-transparent text-[#8B6A3E]' : 'bg-white'}`}>
+                      {DIETS.map(n => <option key={n} value={n}>{n}</option>)}
+                   </select>
+                 </Field>
 
-            <Field label="Nationality">
-              <select required value={tForm.nationality}
-                onChange={e => setTForm(f => ({ ...f, nationality: e.target.value }))}
-                className="input-base bg-white">
-                <option value="" disabled>Select nationality</option>
-                {NATIONALITIES.map(n => <option key={n}>{n}</option>)}
-              </select>
-            </Field>
+                 <div className="space-y-1.5">
+                    <label className="text-[11px] text-[#888] font-bold uppercase tracking-wider mb-1 block">Accessibility Needs</label>
+                    <div className="input-base bg-white flex items-center justify-between cursor-pointer border border-[#E5E0DA]" onClick={() => setTForm({...tForm, accessibility_needs: !tForm.accessibility_needs})}>
+                       <span className="text-charcoal font-medium text-[14px]">{tForm.accessibility_needs ? 'Yes, I require accommodations' : 'None required'}</span>
+                       <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${tForm.accessibility_needs ? 'bg-[#C4874A] border-[#C4874A]' : 'bg-[#FAF9F7] border-[#D0CCC7]'}`}>
+                         {tForm.accessibility_needs && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                       </div>
+                    </div>
+                 </div>
+              </div>
 
-            <Field label="Dietary Restrictions">
-              <select value={tForm.dietary_restrictions}
-                onChange={e => setTForm(f => ({ ...f, dietary_restrictions: e.target.value }))}
-                className="input-base bg-white">
-                {DIETS.map(d => <option key={d}>{d}</option>)}
-              </select>
-            </Field>
-
-            <Field label="Preferred Language">
-              <select value={tForm.preferred_language}
-                onChange={e => setTForm(f => ({ ...f, preferred_language: e.target.value }))}
-                className="input-base bg-white">
-                {LANGUAGES.map(l => <option key={l}>{l}</option>)}
-              </select>
-            </Field>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={tForm.accessibility_needs}
-                onChange={e => setTForm(f => ({ ...f, accessibility_needs: e.target.checked }))}
-                className="h-4 w-4 accent-amber" />
-              <span className="text-sm font-body text-charcoal">I have accessibility needs</span>
-            </label>
-
-            {error && <p className="text-sm font-body text-error bg-error-bg rounded-xl px-4 py-3">{error}</p>}
-            {saved && <p className="text-sm font-body text-green-700 bg-green-50 rounded-xl px-4 py-3">Changes saved!</p>}
-
-            <button type="submit" disabled={saving}
-              className="w-full py-2.5 px-5 rounded-xl bg-amber hover:bg-amberdark transition-colors text-sm font-semibold font-body text-white disabled:opacity-50 flex items-center justify-center gap-2">
-              {saving && <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
-          </form>
+              {/* Apply as Guide Banner */}
+              <div className="bg-[#FDFCFB] border border-border rounded-[16px] p-6 shadow-sm">
+                 <div className="flex flex-col sm:flex-row items-center gap-4 justify-between text-center sm:text-left">
+                    <div>
+                      <h3 className="text-[14px] font-bold text-charcoal">Are you a local expert?</h3>
+                      <p className="text-[12px] text-secondary leading-relaxed mt-1">
+                        Ready to upgrade your account to offer local tours in your home country?
+                      </p>
+                    </div>
+                    <button onClick={() => router.push('/marketplace')} className="shrink-0 w-full sm:w-auto py-2 px-5 bg-transparent border border-[#E5E0DA] hover:bg-[#F0EDE9] rounded-lg text-charcoal font-semibold text-[13px] transition-colors flex items-center justify-center">
+                      Apply as Tour Guide
+                    </button>
+                 </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── GUIDE VIEW ── */}
         {role === 'guide' && guide && (
-          <div className="bg-white rounded-2xl shadow-md border border-border px-4 sm:px-8 py-6 sm:py-8 space-y-5">
-
-            <h2 className="text-lg font-extrabold font-display text-charcoal">Guide Profile</h2>
-
-            <InfoRow label="Full Name" value={guide.full_name} />
-            <InfoRow
-              label="Assigned City"
-              value={guide.destinations ? `${guide.destinations.city}, ${guide.destinations.country}` : '—'}
-            />
-
-            <div className="space-y-1">
-              <p className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider">Verification Status</p>
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_STYLES[guide.verification_status] ?? ''}`}>
-                {guide.verification_status}
-              </span>
-            </div>
-
-            {/* Document replacement */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider">Replace Document</p>
-              <div className="border-2 border-dashed border-border rounded-xl p-5 text-center hover:border-amber transition-colors">
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" id="doc-replace" className="hidden"
-                  onChange={e => setNewDoc(e.target.files?.[0] ?? null)} />
-                <label htmlFor="doc-replace" className="cursor-pointer">
-                  {newDoc
-                    ? <p className="text-sm font-body text-charcoal">📄 {newDoc.name}</p>
-                    : <p className="text-sm font-semibold font-body text-amber">Click to upload new document</p>}
-                </label>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Left Card: Guide Info */}
+            <div className="bg-[#FDFCFB] border border-border rounded-[16px] p-6 lg:p-8">
+              <h2 className="text-[16px] font-bold text-charcoal mb-6 font-body">Professional Information</h2>
+              <div className="space-y-5">
+                 <GuideField label="Full Name" value={guide.full_name} />
+                 <GuideField label="Assigned City" value={guide.destinations ? `${guide.destinations.city}, ${guide.destinations.country}` : '—'} />
+                 <div>
+                    <label className="text-[11px] text-[#888] font-bold uppercase tracking-wider mb-1 block">Verification Status</label>
+                    <span className={`inline-block px-3 py-1 rounded w-fit text-[12px] font-bold capitalize ${STATUS_STYLES[guide.verification_status] ?? ''}`}>
+                       {guide.verification_status}
+                    </span>
+                 </div>
               </div>
-              {newDoc && (
-                <button onClick={replaceDocument} disabled={uploadingDoc}
-                  className="w-full py-2.5 px-5 rounded-xl bg-amber hover:bg-amberdark transition-colors text-sm font-semibold font-body text-white disabled:opacity-50 flex items-center justify-center gap-2">
-                  {uploadingDoc && <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                  {uploadingDoc ? 'Uploading…' : 'Upload & Replace'}
-                </button>
-              )}
             </div>
 
-            {error && <p className="text-sm font-body text-error bg-error-bg rounded-xl px-4 py-3">{error}</p>}
-            {saved && <p className="text-sm font-body text-green-700 bg-green-50 rounded-xl px-4 py-3">Document updated!</p>}
+            {/* Right Card: Documentation */}
+            <div className="bg-[#FDFCFB] border border-border rounded-[16px] p-6 lg:p-8 flex flex-col">
+              <h2 className="text-[16px] font-bold text-charcoal mb-6 font-body">Documentation</h2>
+              <div className="space-y-4 flex-1 flex flex-col">
+                 <p className="text-[13px] text-secondary leading-relaxed">
+                   Upload proof of your tour guide certification or local ID to manage your validation status.
+                 </p>
+                 <div className="flex-1 min-h-[160px] border-2 border-dashed border-[#D0CCC7] rounded-xl p-6 flex flex-col items-center justify-center hover:bg-white hover:border-[#C4874A] transition-all cursor-pointer relative group bg-[#FAF9F7]">
+                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" id="doc-replace" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-[0px]" onChange={e => setNewDoc(e.target.files?.[0] ?? null)} />
+                   {newDoc ? (
+                     <div className="flex flex-col items-center pointer-events-none">
+                        <span className="text-[24px] mb-2">📄</span>
+                        <p className="text-[14px] font-bold text-charcoal text-center line-clamp-1 px-4">{newDoc.name}</p>
+                     </div>
+                   ) : (
+                     <div className="flex flex-col items-center pointer-events-none">
+                        <span className="text-[24px] mb-2">📤</span>
+                        <p className="text-[13px] font-bold text-[#C4874A]">Select a file to upload</p>
+                        <p className="text-[11px] text-tertiary mt-1">.PDF, .JPG, .PNG</p>
+                     </div>
+                   )}
+                 </div>
+                 
+                 {newDoc && (
+                   <button onClick={replaceDocument} disabled={uploadingDoc}
+                     className="w-full mt-4 py-3 px-5 rounded-xl bg-[#C4874A] hover:bg-[#8B6A3E] transition-colors text-[13px] font-semibold font-body text-white disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
+                     {uploadingDoc && <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                     {uploadingDoc ? 'Uploading Document…' : 'Upload & Replace'}
+                   </button>
+                 )}
+              </div>
+            </div>
           </div>
         )}
-      </div>
-    </main>
+      </section>
+    </div>
   )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <label className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider">{label}</label>
+    <div className="mb-5 space-y-1.5 flex flex-col">
+      <label className="text-[11px] text-[#888] font-bold uppercase tracking-wider block">{label}</label>
       {children}
     </div>
   )
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function GuideField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1">
-      <p className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider">{label}</p>
-      <p className="text-sm font-body text-charcoal">{value}</p>
+    <div className="mb-5 space-y-1.5 flex flex-col">
+       <label className="text-[11px] text-[#888] font-bold uppercase tracking-wider block">{label}</label>
+       <div className="input-base bg-white font-semibold text-charcoal opacity-90 cursor-not-allowed border border-[#E5E0DA]">
+         {value}
+       </div>
     </div>
   )
 }
