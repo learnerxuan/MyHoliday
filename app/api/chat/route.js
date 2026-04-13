@@ -5,6 +5,7 @@ import { TOOL_DEFINITIONS, getToolStatus, executeTool } from '@/lib/ai/tools/ind
 import { checkGuardrails } from '@/lib/ai/guardrails'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4.1-mini'
 
 const encoder = new TextEncoder()
 
@@ -411,7 +412,7 @@ export async function POST(request) {
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: CHAT_MODEL,
             messages: loopMessages,
             tools: TOOL_DEFINITIONS,
             tool_choice: 'auto',
