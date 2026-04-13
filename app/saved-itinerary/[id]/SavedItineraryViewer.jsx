@@ -349,7 +349,13 @@ export default function SavedItineraryViewer() {
               Pace: ${tripMetadata.pace} / 
               Group Size: ${tripMetadata.group_size}<br/>
               ${tripMetadata.travel_date_start ? `
-                Dates: ${new Date(tripMetadata.travel_date_start).toLocaleDateString(undefined, {month: 'long', day: 'numeric'})} - ${new Date(tripMetadata.travel_date_end).toLocaleDateString(undefined, {month: 'long', day: 'numeric', year: 'numeric'})}
+                Dates: ${(() => {
+                  const [y, m, d] = tripMetadata.travel_date_start.split('-').map(Number);
+                  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+                })()} - ${(() => {
+                  const [y, m, d] = tripMetadata.travel_date_end.split('-').map(Number);
+                  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+                })()}
               ` : ''}
             ` : ''}
           </div>
@@ -358,9 +364,10 @@ export default function SavedItineraryViewer() {
             const dayNum = parseInt(dayKey.replace('day', ''));
             let dateStr = '';
             if (tripMetadata?.travel_date_start) {
-              const d = new Date(tripMetadata.travel_date_start);
+              const [y, m, pD] = tripMetadata.travel_date_start.split('-').map(Number);
+              const d = new Date(y, m - 1, pD);
               d.setDate(d.getDate() + dayNum - 1);
-              dateStr = d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+              dateStr = d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
             }
             return `
               <div class="two-col day-row">
@@ -512,7 +519,15 @@ export default function SavedItineraryViewer() {
       {tripMetadata && (
         <div className="pl-4 pr-6 py-1.5 border-b border-border/60 bg-white/70 backdrop-blur-sm shrink-0 flex items-center gap-6 text-xs font-body text-charcoal font-medium z-10">
           {tripMetadata.travel_date_start && tripMetadata.travel_date_end && (
-            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm"><span className="opacity-70 text-sm">🗓</span> {new Date(tripMetadata.travel_date_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {new Date(tripMetadata.travel_date_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
+              <span className="opacity-70 text-sm">🗓</span> {(() => {
+                const [y, m, d] = tripMetadata.travel_date_start.split('-').map(Number);
+                return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+              })()} - {(() => {
+                const [y, m, d] = tripMetadata.travel_date_end.split('-').map(Number);
+                return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+              })()}
+            </span>
           )}
           {tripMetadata.trip_days && (
             <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm"><span className="opacity-70 text-sm">⏱</span> {tripMetadata.trip_days} Days</span>
@@ -543,7 +558,11 @@ export default function SavedItineraryViewer() {
         >
           All Days
         </button>
-        {Object.keys(itinerary).sort().map(dayKey => {
+        {Object.keys(itinerary).sort((a, b) => {
+          const numA = parseInt(a.replace('day', ''), 10);
+          const numB = parseInt(b.replace('day', ''), 10);
+          return numA - numB;
+        }).map(dayKey => {
           const num = parseInt(dayKey.replace('day', ''), 10)
           return (
             <button

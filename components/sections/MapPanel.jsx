@@ -84,7 +84,11 @@ function makeDivIcon(type, numberStr) {
 export default function MapPanel({ itinerary = {}, activeDay, onDayChange, cityLat, cityLng, hideDayTabs = false, focusedLocation }) {
   const dayKeys = Object.keys(itinerary)
     .filter(k => Array.isArray(itinerary[k]) && itinerary[k].length > 0)
-    .sort()
+    .sort((a, b) => {
+      const numA = parseInt(a.replace('day', ''), 10);
+      const numB = parseInt(b.replace('day', ''), 10);
+      return numA - numB;
+    })
 
   const getSortedItems = (k) => [...(itinerary[k] ?? [])].sort((a, b) => guessMinutes(a.time) - guessMinutes(b.time))
 

@@ -71,7 +71,11 @@ function guessMinutes(timeStr) {
 // ── Main export ───────────────────────────────────────────────
 
 export default function ItineraryPanel({ itinerary = {}, onExport, onDelete, onUpdate, city, tripContext, hideExport = false, hideDayTabs = false, selectedDay, onFocusLocation, allowFullEdit = false, cityContext = null }) {
-  const allDays = Object.keys(itinerary).sort()
+  const allDays = Object.keys(itinerary).sort((a, b) => {
+    const numA = parseInt(a.replace('day', ''), 10);
+    const numB = parseInt(b.replace('day', ''), 10);
+    return numA - numB;
+  })
   const daysWithContent = allDays.filter(d => itinerary[d]?.length > 0)
   const hasContent = daysWithContent.length > 0
 
