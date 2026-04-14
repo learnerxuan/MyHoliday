@@ -68,3 +68,18 @@ body {
 .leaflet-routing-container {
   display: none !important;
 }
+
+.leaflet-container {
+  z-index: 1 !important;
+}
+
+.leaflet-pane {
+  z-index: 10 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control,
+.leaflet-popup {
+  z-index: 20 !important;
+}

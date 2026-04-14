@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { buildSystemPrompt, buildItineraryContext } from '@/lib/ai/system-prompt'
 import { TOOL_DEFINITIONS, getToolStatus, executeTool } from '@/lib/ai/tools/index'
 import { checkGuardrails } from '@/lib/ai/guardrails'
+import { enrichItineraryDays, enrichLooseItems } from '@/lib/ai/tools/enrich_itinerary_items'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4.1-mini'
@@ -15,6 +16,20 @@ function send(controller, obj) {
 
 function isPlainObject(value) {
   return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function sanitiseCoords(item) {
+  let { lat, lng } = item
+  if (lat == null || lng == null) return item
+
+  lat = Number(lat)
+  lng = Number(lng)
+
+  if (lat === 0 && lng === 0) return { ...item, lat: null, lng: null }
+  if (Math.abs(lat) > 90) [lat, lng] = [lng, lat]
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ...item, lat: null, lng: null }
+
+  return { ...item, lat, lng }
 }
 
 function deepMergePlannerState(base, patch) {
@@ -85,17 +100,97 @@ function extractQuickReplies(value) {
     .map((item) => ({ label: item.label, value: item.value }))
 }
 
-function quickReply(label, value = label) {
-  return { label, value }
+function isShortAffirmation(message) {
+  const normalized = String(message || '').trim().toLowerCase()
+  return [
+    'yes',
+    'y',
+    'yeah',
+    'yep',
+    'sure',
+    'ok',
+    'okay',
+    'go ahead',
+    'please do',
+    'do it',
+    'sounds good',
+  ].includes(normalized)
 }
 
-function toTitleCase(value) {
-  if (!value) return ''
-  return value
-    .split(/[\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
+function expandImplicitReply(message, history = []) {
+  if (!isShortAffirmation(message)) return message
+
+  const lastAssistant = [...history].reverse().find((item) => item.role === 'assistant' && item.content)
+  if (!lastAssistant?.content) return message
+
+  return [
+    `The user replied "${message}" to your immediately previous suggestion.`,
+    'Treat that as approval and carry out the last concrete option you proposed.',
+    'Do not repeat the same question.',
+    `Previous assistant message: ${lastAssistant.content}`,
+  ].join(' ')
+}
+
+function applyItineraryUpdates(prev, updates) {
+  if (!updates?.length) return prev
+
+  const next = { ...prev }
+  for (const rawUpdate of updates) {
+    const update = sanitiseCoords(rawUpdate)
+    const key = `day${update.day}`
+    if (!next[key]) next[key] = []
+
+    if (update.action === 'add') {
+      const exists = next[key].some((item) => item.name === update.name)
+      if (!exists) next[key] = [...next[key], update]
+      continue
+    }
+
+    if (update.action === 'remove') {
+      next[key] = next[key].filter((item) => item.name !== update.name)
+      continue
+    }
+
+    if (update.action === 'update') {
+      const exists = next[key].some((item) => item.name === update.name)
+      if (!exists) {
+        next[key] = [...next[key], update]
+        continue
+      }
+
+      next[key] = next[key].map((item) => {
+        if (item.name !== update.name) return item
+        const merged = { ...item, ...update }
+        if (update.new_name) merged.name = update.new_name
+        return merged
+      })
+    }
+  }
+
+  for (const key of Object.keys(next)) {
+    if (Array.isArray(next[key]) && next[key].length === 0) {
+      delete next[key]
+    }
+  }
+
+  return next
+}
+
+function itineraryObjectToDays(itineraryObject = {}) {
+  return Object.keys(itineraryObject)
+    .sort((a, b) => parseInt(a.replace('day', ''), 10) - parseInt(b.replace('day', ''), 10))
+    .map((key) => ({
+      day: parseInt(key.replace('day', ''), 10),
+      items: itineraryObject[key],
+    }))
+}
+
+function itineraryDaysToObject(itineraryDays = []) {
+  const result = {}
+  for (const day of itineraryDays) {
+    result[`day${day.day}`] = day.items ?? []
+  }
+  return result
 }
 
 function normaliseOption(opt) {
@@ -107,15 +202,6 @@ function normaliseOption(opt) {
     price: resolvedPrice,
     notes: opt.notes ?? ([resolvedPrice, opt.rating ? `${opt.rating}/5` : null].filter(Boolean).join(' · ') || ''),
   }
-}
-
-function formatTimeLabel(time24) {
-  if (!time24) return null
-  const [hourText, minute] = time24.split(':')
-  let hour = Number(hourText)
-  const period = hour >= 12 ? 'PM' : 'AM'
-  hour = hour % 12 || 12
-  return `${hour}:${minute} ${period}`
 }
 
 function buildInitMessage(destination, profile, known = null) {
@@ -131,7 +217,7 @@ async function geocodeItem(item, city, biasLat = null, biasLng = null) {
   // Only attempt geocode if it doesn't have coordinates already
   if (item.lat && item.lng) return
 
-  // Safety Catch: If the AI mis-tagged a generic item, or the name is vague, skip pinning and coerce to generic types.
+  // Safety catch: skip pinning vague itinerary items rather than forcing them into the wrong type.
   const nameLower = item.name?.toLowerCase() || ''
   const genericKeywords = ['local', 'authentic', 'nearby', 'suggested', 'recommendation', 'lunch at a', 'dinner at a', 'breakfast at a', 'brunch at a']
   const logisticKeywords = ['arrival', 'departure', 'check-in', 'check-out']
@@ -142,11 +228,8 @@ async function geocodeItem(item, city, biasLat = null, biasLng = null) {
   if (isGeneric || isLogistics) {
     if (isLogistics) {
       item.type = 'note'
-    } else {
-      if (item.type === 'restaurant') item.type = 'food_recommendation'
-      if (item.type === 'attraction') item.type = 'note'
-      return
     }
+    return
   }
 
   // If we reach here, it's a specific name. Attempt geocoding.
@@ -208,7 +291,7 @@ function extractJSON(raw) {
 }
 
 export async function POST(request) {
-  let { message, sessionId, destinationId, userId, itinerary, quizContext } = await request.json()
+  let { message, sessionId, destinationId, userId, itinerary, quizContext, silentUserMessage = false } = await request.json()
 
   if (!message || !destinationId || !userId) {
     return Response.json({ error: 'Missing required fields' }, { status: 400 })
@@ -398,10 +481,12 @@ export async function POST(request) {
           ? `${systemPrompt}\n${itineraryContext}`
           : systemPrompt
 
+        const resolvedUserMessage = expandImplicitReply(message, dbHistory)
+
         const messages = [
           { role: 'system', content: fullSystemPrompt },
           ...dbHistory,
-          { role: 'user', content: message },
+          { role: 'user', content: resolvedUserMessage },
         ]
 
         let finalContent = null
@@ -409,6 +494,7 @@ export async function POST(request) {
         const MAX_TOOL_ROUNDS = 5
         const collectedUpdates = [] // accumulate modify_itinerary tool call args
         let generatedItinerary = null // capture generate_itinerary payload
+        const collectedOptions = []
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           const response = await openai.chat.completions.create({
@@ -454,6 +540,10 @@ export async function POST(request) {
               toolResult = { error: err.message }
             }
 
+            if (toolName === 'search_nearby_places' && toolResult?.results?.length) {
+              collectedOptions.push(...toolResult.results)
+            }
+
             loopMessages.push({
               role: 'tool',
               tool_call_id: toolCall.id,
@@ -489,6 +579,10 @@ export async function POST(request) {
           ...(parsed.itinerary_updates ?? []),
           ...collectedUpdates,
         ]
+        parsed.options = [
+          ...(parsed.options ?? []),
+          ...collectedOptions,
+        ]
 
         // If the AI generated a full itinerary, attach it so frontend can overwrite state
         if (generatedItinerary) {
@@ -514,7 +608,48 @@ export async function POST(request) {
 
         await Promise.all(itemsToGeocode.map(item => geocodeItem(item, cityContext, destination.latitude, destination.longitude)))
         // -----------------------------------------
+        if (parsed.itinerary_updates?.length) {
+          parsed.itinerary_updates = await enrichLooseItems(parsed.itinerary_updates, {
+            city: destination.city,
+            country: destination.country,
+            bias_lat: destination.latitude,
+            bias_lng: destination.longitude,
+          })
+        }
+
+        if (!parsed.overwrite_itinerary?.length && parsed.itinerary_updates?.length) {
+          const mergedItinerary = applyItineraryUpdates(itinerary ?? {}, parsed.itinerary_updates)
+          parsed.overwrite_itinerary = itineraryObjectToDays(mergedItinerary)
+        }
+
+        if (
+          parsed.overwrite_itinerary?.length &&
+          !isInit &&
+          itinerary &&
+          Object.keys(itinerary).length > parsed.overwrite_itinerary.length
+        ) {
+          parsed.overwrite_itinerary = itineraryObjectToDays({
+            ...itinerary,
+            ...itineraryDaysToObject(parsed.overwrite_itinerary),
+          })
+        }
+
+        if (parsed.overwrite_itinerary?.length) {
+          parsed.overwrite_itinerary = await enrichItineraryDays(parsed.overwrite_itinerary, {
+            city: destination.city,
+            country: destination.country,
+            bias_lat: destination.latitude,
+            bias_lng: destination.longitude,
+          })
+        }
+
         parsed.options = (parsed.options ?? []).map(normaliseOption)
+        parsed.options = parsed.options.map(option => ({
+          ...option,
+          image_url: option.image_url ?? null,
+          distance_label: option.distance_label ?? null,
+          notes: option.notes ?? option.summary ?? null,
+        }))
         parsed.planner_state_patch = extractPlannerStatePatch(parsed.planner_state_patch)
         parsed.quick_replies = extractQuickReplies(parsed.quick_replies)
           .filter(qr => {
@@ -534,7 +669,7 @@ export async function POST(request) {
           .eq('id', currentSessionId)
 
         const messagesToInsert = []
-        if (!isInit) {
+        if (!isInit && !silentUserMessage) {
           messagesToInsert.push({ session_id: currentSessionId, role: 'user', content: message })
         }
         messagesToInsert.push({ session_id: currentSessionId, role: 'assistant', content: parsed.message ?? finalContent })

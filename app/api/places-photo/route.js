@@ -5,13 +5,14 @@
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const ref = searchParams.get('ref')
+  const maxWidth = searchParams.get('maxwidth') || '400'
 
   if (!ref) {
     return new Response('Missing ref', { status: 400 })
   }
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY
-  const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${ref}&key=${apiKey}`
+  const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${encodeURIComponent(maxWidth)}&photo_reference=${ref}&key=${apiKey}`
 
   const res = await fetch(url)
 

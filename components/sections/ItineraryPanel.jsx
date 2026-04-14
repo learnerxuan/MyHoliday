@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-// ── Time slot options for the edit dropdown ───────────────────
 const TIME_SLOTS = [
   '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM',
   '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM',
   '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-  '12:00 PM (Noon)', '12:30 PM',
+  '12:00 PM', '12:30 PM',
   '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
   '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM',
   '5:00 PM', '5:30 PM', '6:00 PM', '6:30 PM',
@@ -15,448 +14,485 @@ const TIME_SLOTS = [
   '9:00 PM', '9:30 PM', '10:00 PM',
 ]
 
-const TYPE_ICON = {
-  hotel: '🏨',
-  restaurant: '🍽️',
-  attraction: '🎯',
-  transport: '✈️',
-  note: '📝',
-  food_recommendation: '🍜',
+const TYPE_META = {
+  hotel: {
+    label: 'Hotel',
+    marker: 'H',
+    border: 'border-l-amber',
+    chip: 'bg-amber/10 text-amberdark border-amber/20',
+    markerBg: 'bg-amber/15 text-amberdark',
+  },
+  restaurant: {
+    label: 'Food',
+    marker: 'F',
+    border: 'border-l-red-400',
+    chip: 'bg-red-50 text-red-600 border-red-100',
+    markerBg: 'bg-red-50 text-red-600',
+  },
+  attraction: {
+    label: 'Activity',
+    marker: 'A',
+    border: 'border-l-blue-400',
+    chip: 'bg-blue-50 text-blue-700 border-blue-100',
+    markerBg: 'bg-blue-50 text-blue-700',
+  },
+  transport: {
+    label: 'Transport',
+    marker: 'T',
+    border: 'border-l-slate-400',
+    chip: 'bg-slate-100 text-slate-600 border-slate-200',
+    markerBg: 'bg-slate-100 text-slate-600',
+  },
+  note: {
+    label: 'Note',
+    marker: 'N',
+    border: 'border-l-yellow-400',
+    chip: 'bg-yellow-50 text-yellow-700 border-yellow-100',
+    markerBg: 'bg-yellow-50 text-yellow-700',
+  },
+  food_recommendation: {
+    label: 'Food',
+    marker: 'F',
+    border: 'border-l-red-400',
+    chip: 'bg-red-50 text-red-600 border-red-100',
+    markerBg: 'bg-red-50 text-red-600',
+  },
 }
-
-const TYPE_BORDER = {
-  hotel: 'border-l-amber',
-  restaurant: 'border-l-red-400',
-  attraction: 'border-l-blue-400',
-  transport: 'border-l-gray-400',
-  note: 'border-l-yellow-400',
-  food_recommendation: 'border-l-pink-400',
-}
-
-// ── Time sorting helper ──────────────────────────────────────────────
 
 function guessMinutes(timeStr) {
   if (!timeStr) return 9999
-  const s = timeStr.toLowerCase()
+  const value = timeStr.toLowerCase()
+  const match = value.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
+  if (match) {
+    let hour = parseInt(match[1], 10)
+    const minute = parseInt(match[2] || '0', 10)
+    const suffix = match[3]
 
-  // Try matching HH:MM AM/PM or H AM/PM
-  const timeMatch = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
-  if (timeMatch) {
-    let h = parseInt(timeMatch[1], 10)
-    const m = parseInt(timeMatch[2] || '0', 10)
-    const ampm = timeMatch[3]
-
-    if (ampm === 'pm' && h < 12) h += 12
-    if (ampm === 'am' && h === 12) h = 0
-    return h * 60 + m
+    if (suffix === 'pm' && hour < 12) hour += 12
+    if (suffix === 'am' && hour === 12) hour = 0
+    return hour * 60 + minute
   }
 
-  let offset = 0
-  if (s.includes('early')) offset = -60
-  if (s.includes('late')) offset = 60
-
-  // Keyword fallbacks
-  if (s.includes('morning')) return 8 * 60 + offset
-  if (s.includes('afternoon')) return 14 * 60 + offset
-  if (s.includes('lunch') || s.includes('noon') || s.includes('midday')) return 12 * 60 + offset
-  if (s.includes('evening')) return 18 * 60 + offset
-  if (s.includes('night') || s.includes('dinner')) return 20 * 60 + offset
-
-  // Prioritise "All Day" or untimed activities at the very top
-  if (s.includes('all day') || s.includes('anytime')) return -1
+  if (value.includes('all day') || value.includes('anytime')) return -1
+  if (value.includes('morning')) return 8 * 60
+  if (value.includes('noon') || value.includes('lunch')) return 12 * 60
+  if (value.includes('afternoon')) return 14 * 60
+  if (value.includes('evening')) return 18 * 60
+  if (value.includes('night') || value.includes('dinner')) return 20 * 60
 
   return 9999
 }
 
-// ── Main export ───────────────────────────────────────────────
+function getDayNumber(dayKey) {
+  return parseInt(dayKey.replace('day', ''), 10)
+}
 
-export default function ItineraryPanel({ itinerary = {}, onExport, onDelete, onUpdate, city, tripContext, hideExport = false, hideDayTabs = false, selectedDay, onFocusLocation, allowFullEdit = false, cityContext = null }) {
-  const allDays = Object.keys(itinerary).sort((a, b) => {
-    const numA = parseInt(a.replace('day', ''), 10);
-    const numB = parseInt(b.replace('day', ''), 10);
-    return numA - numB;
-  })
-  const daysWithContent = allDays.filter(d => itinerary[d]?.length > 0)
-  const hasContent = daysWithContent.length > 0
+function sortItems(items = []) {
+  return [...items].sort((a, b) => guessMinutes(a.time) - guessMinutes(b.time))
+}
+
+function resolveType(item) {
+  if (!item) return 'attraction'
+
+  const name = item.name?.toLowerCase?.() ?? ''
+  if (item.type === 'hotel' || name.includes('hotel') || name.includes('check-in') || name.includes('check in')) {
+    return 'hotel'
+  }
+  if (item.type === 'transport' || name.includes('airport') || name.includes('flight') || name.includes('departure') || name.includes('arrival')) {
+    return 'transport'
+  }
+
+  return item.type || 'attraction'
+}
+
+function isGenericTitle(name = '') {
+  const lowered = name.toLowerCase()
+  return [
+    'breakfast at',
+    'lunch at',
+    'dinner at',
+    'brunch at',
+    'local restaurant',
+    'local cafe',
+    'near hotel',
+    'nearby restaurant',
+    'breakfast near',
+    'dinner near',
+    'explore nearby',
+    'relax at the hotel',
+  ].some((token) => lowered.includes(token))
+}
+
+function shouldShowOriginalName(originalName, displayName) {
+  if (!originalName) return false
+  return originalName.trim().toLowerCase() !== String(displayName ?? '').trim().toLowerCase()
+}
+
+function routeModeLabel(mode) {
+  if (mode === 'walking') return 'Walk'
+  if (mode === 'driving') return 'Drive'
+  if (mode === 'transit') return 'Transit'
+  return 'Transfer'
+}
+
+function bookingDateParams(iso, prefix) {
+  if (!iso) return ''
+  const [year, month, day] = iso.split('-')
+  if (!year || !month || !day) return ''
+  return `&${prefix}_year=${year}&${prefix}_month=${parseInt(month, 10)}&${prefix}_monthday=${parseInt(day, 10)}`
+}
+
+function buildEditForm(item, effectiveType) {
+  return {
+    name: item.name || '',
+    type: item.type || effectiveType,
+    time: item.time || '',
+    notes: item.notes || '',
+    price_estimate: item.price_estimate || '',
+    booking_url: item.booking_url || '',
+    google_map_url: item.google_map_url || '',
+    lat: item.lat ?? null,
+    lng: item.lng ?? null,
+  }
+}
+
+export default function ItineraryPanel({
+  itinerary = {},
+  onExport,
+  onDelete,
+  onUpdate,
+  city,
+  tripContext,
+  hideExport = false,
+  hideDayTabs = false,
+  selectedDay,
+  onFocusLocation,
+  allowFullEdit = false,
+  cityContext = null,
+}) {
+  const allDays = Object.keys(itinerary).sort((a, b) => getDayNumber(a) - getDayNumber(b))
+  const configuredDays = Number(tripContext?.trip_days ?? 0)
+  const availableDayKeys = configuredDays > 0
+    ? Array.from({ length: configuredDays }, (_, index) => `day${index + 1}`)
+    : allDays
+  const hasAnyItems = allDays.some((dayKey) => itinerary[dayKey]?.length > 0)
 
   const [activeDay, setActiveDay] = useState(null)
-  const [showAddForm, setShowAddForm] = useState(false)
+  const scrollRef = useRef(null)
 
-  // Default to first day with content when itinerary first populates
+  const effectiveDay = typeof selectedDay === 'number' ? `day${selectedDay}` : selectedDay
+  const currentDayKey = effectiveDay ?? (activeDay && availableDayKeys.includes(activeDay) ? activeDay : availableDayKeys[0] ?? null)
+
   useEffect(() => {
-    if (daysWithContent.length > 0 && (activeDay === null || !daysWithContent.includes(activeDay))) {
-      setActiveDay(daysWithContent[0])
-    }
-  }, [daysWithContent.join(',')])
+    const element = scrollRef.current
+    if (!element) return
+    element.scrollTo({ top: 0, behavior: 'auto' })
+  }, [currentDayKey, selectedDay])
 
-  // Sync selectedDay prop to string key if provided
-  let effectiveDay = selectedDay
-  if (typeof selectedDay === 'number') effectiveDay = `day${selectedDay}`
+  function renderDay(dayKey) {
+    const dayNumber = getDayNumber(dayKey)
+    const items = sortItems(itinerary[dayKey] ?? [])
 
-  const currentDayKey = effectiveDay ?? activeDay ?? daysWithContent[0] ?? null
-  const rawItems = currentDayKey ? (itinerary[currentDayKey] ?? []) : []
-  // Filter out AI-generated 'note' items if they aren't lunch breaks (lunch is ok)
-  const filteredItems = rawItems
-  const items = [...filteredItems].sort((a, b) => guessMinutes(a.time) - guessMinutes(b.time))
+    return (
+      <div key={dayKey} className="space-y-3">
+        {(selectedDay === 'all' || hideDayTabs) && (
+          <div className="flex items-center gap-3">
+            <span className="px-3 py-1 bg-charcoal text-warmwhite text-[10px] font-bold uppercase tracking-widest rounded-md">
+              Day {dayNumber}
+            </span>
+            <div className="h-px flex-1 bg-border/60" />
+          </div>
+        )}
+
+        <div className="space-y-0">
+          {items.map((item, index) => (
+            <div key={`${dayKey}-${index}`}>
+              {index > 0 && (
+                item.route_from_previous?.duration_min
+                  ? <RouteSeparator segment={item.route_from_previous} />
+                  : <div className="h-4" />
+              )}
+
+              <ActivityCard
+                item={item}
+                city={city}
+                tripContext={tripContext}
+                allowFullEdit={allowFullEdit}
+                cityContext={cityContext}
+                onFocus={onFocusLocation && item.lat && item.lng
+                  ? () => onFocusLocation({ lat: item.lat, lng: item.lng, id: `${dayKey}-${index}` })
+                  : null}
+                onDelete={onDelete ? () => onDelete(dayKey, item.name) : null}
+                onUpdate={onUpdate ? (updates) => onUpdate([{
+                  action: 'update',
+                  day: dayNumber,
+                  name: item.name,
+                  ...updates,
+                }]) : null}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">
-
-      {/* Day tabs */}
-      {hasContent && !hideDayTabs && (
+      {availableDayKeys.length > 0 && !hideDayTabs && selectedDay !== 'all' && (
         <div className="flex overflow-x-auto gap-1 px-3 py-2 border-b border-border bg-white shrink-0 scrollbar-none">
-          {daysWithContent.map(dayKey => {
-            const dayNum = parseInt(dayKey.replace('day', ''), 10)
+          {availableDayKeys.map((dayKey) => {
             const isActive = currentDayKey === dayKey
             return (
               <button
                 key={dayKey}
                 onClick={() => setActiveDay(dayKey)}
-                className={`shrink-0 text-xs font-semibold font-body px-3 py-1.5 rounded-md transition-colors
-                  ${isActive
-                    ? 'bg-charcoal text-warmwhite'
-                    : 'text-secondary hover:text-charcoal hover:bg-muted'}`}
+                className={`shrink-0 text-xs font-semibold font-body px-3 py-1.5 rounded-md transition-colors ${
+                  isActive ? 'bg-charcoal text-warmwhite' : 'text-secondary hover:text-charcoal hover:bg-muted'
+                }`}
               >
-                Day {dayNum}
+                Day {getDayNumber(dayKey)}
               </button>
             )
           })}
         </div>
       )}
 
-      {/* Content area */}
-      <div className="flex-1 overflow-y-auto pl-4 pr-4 py-4">
-
-        {!hasContent && (
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+        {!hasAnyItems && (
           <div className="flex flex-col items-center justify-center h-full text-center py-16 gap-3">
-            <span className="text-4xl">🗺</span>
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted text-lg font-semibold text-secondary">
+              Plan
+            </span>
             <p className="text-sm font-body text-secondary">
-              Your itinerary will appear here as you chat.
+              Your itinerary will appear here as you chat with the planner.
             </p>
             <p className="text-xs text-tertiary">
-              Ask for a quick draft or guided planning and the timeline will build up here.
+              Ask the AI to build or revise the trip and it will update this timeline.
             </p>
           </div>
         )}
 
-        {hasContent && (selectedDay === 'all' ? (
+        {hasAnyItems && selectedDay === 'all' && (
           <div className="space-y-8">
-            {daysWithContent.map(dayKey => (
-              <div key={dayKey} className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 bg-charcoal text-warmwhite text-[10px] font-bold uppercase tracking-widest rounded-md">
-                    Day {dayKey.replace('day', '')}
-                  </span>
-                  <div className="h-px flex-1 bg-border/50" />
-                </div>
-                <div className="space-y-1">
-                  {[...(itinerary[dayKey] || [])].sort((a, b) => guessMinutes(a.time) - guessMinutes(b.time)).map((item, idx, arr) => (
-                    <div key={idx}>
-                      <ActivityCard
-                        index={idx}
-                        item={item}
-                        isConflict={false}
-                        onDelete={() => onDelete && onDelete(dayKey, item.name)}
-                        onUpdate={(updates) => onUpdate && onUpdate([{ action: 'update', day: parseInt(dayKey.replace('day', ''), 10), name: item.name, ...updates }])}
-                        city={city}
-                        tripContext={tripContext}
-                        onFocus={onFocusLocation ? () => item.lat && item.lng && onFocusLocation({ lat: item.lat, lng: item.lng, id: `${dayKey}-${idx}` }) : null}
-                        allowFullEdit={allowFullEdit}
-                        cityContext={cityContext}
-                      />
-                      {idx < arr.length - 1 && (
-                        <div className="flex justify-center">
-                          <div className="w-px h-2 bg-border" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            {availableDayKeys.map(renderDay)}
           </div>
-        ) : currentDayKey && (
-          <div className="space-y-1">
-            {/* Add Activity Button (Top) */}
-            {allowFullEdit && currentDayKey && !showAddForm && (
-              <div className="mb-4">
-                <button 
-                  onClick={() => setShowAddForm(true)}
-                  className="px-3 py-1.5 bg-muted/50 hover:bg-muted text-secondary hover:text-charcoal rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all border border-border/40 hover:border-border"
-                >
-                  <span className="text-sm leading-none">+</span> Add Activity
-                </button>
-              </div>
-            )}
+        )}
 
-            {/* New Activity Form */}
-            {showAddForm && (
-              <div className="mb-6">
-                <NewActivityCard 
-                  day={parseInt(currentDayKey.replace('day', ''), 10)}
-                  onSave={(update) => {
-                    onUpdate && onUpdate([update])
-                    setShowAddForm(false)
-                  }}
-                  onCancel={() => setShowAddForm(false)}
-                  cityContext={cityContext}
-                  city={city}
-                />
-              </div>
-            )}
-
-            {items.map((item, idx, arr) => (
-              <div key={idx}>
-                <ActivityCard
-                  index={idx}
-                  item={item}
-                  isConflict={false}
-                  onDelete={() => onDelete && onDelete(currentDayKey, item.name)}
-                  onUpdate={(updates) => onUpdate && onUpdate([{ action: 'update', day: parseInt(currentDayKey.replace('day', ''), 10), name: item.name, ...updates }])}
-                  city={city}
-                  tripContext={tripContext}
-                  onFocus={onFocusLocation ? () => item.lat && item.lng && onFocusLocation({ lat: item.lat, lng: item.lng, id: `${currentDayKey}-${idx}` }) : null}
-                  allowFullEdit={allowFullEdit}
-                  cityContext={cityContext}
-                />
-                {idx < items.length - 1 && (
-                  <div className="flex justify-center">
-                    <div className="w-px h-2 bg-border" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ))}
-
+        {selectedDay !== 'all' && currentDayKey && renderDay(currentDayKey)}
       </div>
 
-      {/* Export */}
       {!hideExport && (
         <div className="border-t border-border px-4 py-3">
           <button
+            type="button"
             onClick={onExport}
-            disabled={!hasContent}
+            disabled={!hasAnyItems}
             className="w-full bg-amber text-warmwhite text-sm font-semibold font-body py-2.5 rounded-lg hover:bg-amberdark transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Export to My Plans
           </button>
         </div>
       )}
-
     </div>
   )
 }
 
-function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripContext, onFocus, allowFullEdit, cityContext }) {
+function RouteSeparator({ segment }) {
+  const modeLabel = routeModeLabel(segment.mode)
+  const distanceLabel = segment.distance_km ? `${segment.distance_km} km` : null
+  const durationLabel = segment.duration_min ? `${segment.duration_min} min` : null
+  const summary = [modeLabel, durationLabel, distanceLabel].filter(Boolean).join(' | ')
+
+  return (
+    <div className="py-2">
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-border/70" />
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/70 px-3 py-1 text-[11px] font-semibold text-secondary">
+          <span>{summary}</span>
+        </div>
+        <div className="h-px flex-1 bg-border/70" />
+      </div>
+      {segment.note && (
+        <p className="mt-1 text-center text-[11px] text-tertiary">
+          {segment.note}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ActivityCard({ item, onDelete, onUpdate, city, tripContext, onFocus, allowFullEdit, cityContext }) {
+  const effectiveType = resolveType(item)
+  const meta = TYPE_META[effectiveType] ?? TYPE_META.attraction
   const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({
-    name: item.name || '',
-    type: item.type || '',
-    time: item.time || '',
-    notes: item.notes || '',
-    price_estimate: item.price_estimate || '',
-    lat: item.lat || null,
-    lng: item.lng || null,
-    booking_url: item.booking_url || '',
-    google_map_url: item.google_map_url || ''
-  })
-  const [isPinning, setIsPinning] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [editForm, setEditForm] = useState(() => buildEditForm(item, effectiveType))
 
-  // Sync edit form if item changes from backend
-  useEffect(() => {
-    setEditForm({ 
-      name: item.name || '',
-      type: item.type || '',
-      time: item.time || '', 
-      notes: item.notes || '', 
-      price_estimate: item.price_estimate || '',
-      lat: item.lat || null,
-      lng: item.lng || null,
-      booking_url: item.booking_url || '',
-      google_map_url: item.google_map_url || ''
-    })
-  }, [item])
+  const isConfirmed = item.status === 'confirmed'
+  const timeLabel = item.time || 'Flexible'
+  const isGeneric = isGenericTitle(item.name)
+  const query = encodeURIComponent(`${item.name} ${city || ''}`.trim())
+  const mapUrl = !isGeneric && (item.google_map_url || (effectiveType !== 'note'
+    ? `https://www.google.com/maps/search/?api=1&query=${query}`
+    : null))
+  const ticketUrl = !isGeneric && (item.booking_url || (item.requires_ticket
+    ? `https://www.google.com/search?q=${encodeURIComponent(`${item.name} ${city || ''} tickets booking`)}`
+    : null))
 
-  async function handleRepin() {
-    if (!editForm.name || !cityContext?.name) return
-    setIsPinning(true)
-    try {
-      const res = await fetch(`/api/geocode?name=${encodeURIComponent(editForm.name)}&city=${encodeURIComponent(cityContext.name)}&lat=${cityContext.lat || ''}&lng=${cityContext.lng || ''}`)
-      const data = await res.json()
-      if (data.lat && data.lng) {
-        setEditForm(f => ({ ...f, lat: data.lat, lng: data.lng }))
-      } else {
-        alert('Location not found. Try a more specific name.')
-      }
-    } catch {
-      alert('Error searching for location.')
-    } finally {
-      setIsPinning(false)
-    }
-  }
-
-  const timeLabel = item.time
-  const isNote = item.type === 'note'
-  const isHotel = (item.type === 'hotel' || item.name.toLowerCase().includes('hotel') || item.name.toLowerCase().includes('check in') || item.name.toLowerCase().includes('check-in')) && !isNote
-  const isTransport = (item.type === 'transport' || item.name.toLowerCase().includes('arrival') || item.name.toLowerCase().includes('departure') || item.name.toLowerCase().includes('flight') || item.name.toLowerCase().includes('airport')) && !isNote
-
-  const effectiveType = isHotel ? 'hotel' : isTransport ? 'transport' : (item.type || 'attraction')
-  const icon = TYPE_ICON[effectiveType] ?? '📌'
-  const borderColor = TYPE_BORDER[effectiveType] ?? 'border-l-gray-300'
-  const typeLabel = isHotel ? 'Hotel' : isTransport ? 'Transport' : (item.type === 'food_recommendation' ? 'Food Recommendation' : (effectiveType.charAt(0).toUpperCase() + effectiveType.slice(1)))
-
-  const confirmed = item.status === 'confirmed'
-
-  // Links
-  const query = encodeURIComponent(`${item.name} ${city || ''}`)
-  // Only show auto-map link if NOT a note or food recommendation
-  const showAutoMap = !isNote && item.type !== 'food_recommendation'
-  const mapUrl = item.google_map_url || (showAutoMap ? `https://www.google.com/maps/search/?api=1&query=${query}` : null)
-
-  const canBeBooked = item.requires_ticket === true && !isNote
-  const bookUrl = item.booking_url || (canBeBooked ? `https://www.google.com/search?q=${encodeURIComponent(`${item.name} ${city || ''} tickets booking`)}` : null)
-
-  // Build Booking.com URL with dates pre-filled
-  function bookingDateParams(iso, prefix) {
-    if (!iso) return ''
-    const [y, m, d] = iso.split('-')
-    if (!y || !m || !d) return ''
-    return `&${prefix}_year=${y}&${prefix}_month=${parseInt(m, 10)}&${prefix}_monthday=${parseInt(d, 10)}`
-  }
   const pax = tripContext?.group_size ? `&group_adults=${encodeURIComponent(tripContext.group_size)}` : ''
-  const hotelUrl = item.booking_url || (isHotel
-    ? `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city || item.name)}${bookingDateParams(tripContext?.travel_date_start, 'checkin')}${bookingDateParams(tripContext?.travel_date_end, 'checkout')}${pax}&no_rooms=1`
-    : null)
+  const hotelUrl = !isGeneric && effectiveType === 'hotel'
+    ? item.booking_url || `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(item.name || city || '')}${bookingDateParams(tripContext?.travel_date_start, 'checkin')}${bookingDateParams(tripContext?.travel_date_end, 'checkout')}${pax}&no_rooms=1`
+    : null
+
+  const description = item.description && item.description !== item.notes ? item.description : null
 
   async function handleSave() {
-    setIsPinning(true)
-    const updates = { ...editForm }
-    
-    // Check if we need to auto-pin (geocode)
-    const nameChanged = updates.name !== item.name;
-    const typeChangedToMapType = (item.type === 'note' || item.type === 'food_recommendation') && 
-                                 (updates.type !== 'note' && updates.type !== 'food_recommendation');
-    const missingCoords = !item.lat || !item.lng;
-    const isMapType = updates.type !== 'note' && updates.type !== 'food_recommendation';
+    if (!onUpdate) return
 
-    // Auto-pinning logic (Saved view only)
-    if (allowFullEdit && (nameChanged || typeChangedToMapType || (missingCoords && isMapType))) {
+    const updates = { ...editForm }
+    const mapType = !['note', 'transport', 'food_recommendation'].includes(updates.type)
+    const shouldGeocode = allowFullEdit && mapType && cityContext?.name && (
+      updates.name !== item.name || item.lat == null || item.lng == null
+    )
+
+    setIsSaving(true)
+
+    if (shouldGeocode) {
       try {
-        const res = await fetch(`/api/geocode?name=${encodeURIComponent(updates.name)}&city=${encodeURIComponent(cityContext?.name || '')}&lat=${cityContext?.lat || ''}&lng=${cityContext?.lng || ''}`)
+        const params = new URLSearchParams({
+          name: updates.name,
+          city: cityContext.name,
+        })
+        if (cityContext.lat != null) params.set('lat', String(cityContext.lat))
+        if (cityContext.lng != null) params.set('lng', String(cityContext.lng))
+
+        const res = await fetch(`/api/geocode?${params.toString()}`)
         const data = await res.json()
-        if (data.lat && data.lng) {
+        if (data.lat != null && data.lng != null) {
           updates.lat = data.lat
           updates.lng = data.lng
         }
-      } catch (err) {
-        console.error('Auto-pinning failed:', err)
+      } catch (error) {
+        console.error('Auto-pinning failed:', error)
       }
     }
 
-    // Prepare update payload - ensure original name is preserved for search, new name is passed as update
-    const finalUpdate = { ...updates }
-    if (updates.name !== item.name) {
-      finalUpdate.new_name = updates.name // backend/state uses new_name to handle renaming
-      finalUpdate.name = item.name // Keep original name to FIND the item in the array
-    }
+    const finalUpdate = updates.name !== item.name
+      ? { ...updates, name: item.name, new_name: updates.name }
+      : updates
 
-    onUpdate && onUpdate(finalUpdate)
-    setIsPinning(false)
+    onUpdate(finalUpdate)
+    setIsSaving(false)
     setIsEditing(false)
   }
 
   if (isEditing) {
     return (
-      <div className={`relative rounded-xl border border-border border-l-4 px-3 py-3 bg-white shadow-sm flex flex-col gap-3 ${borderColor}`}>
-        {allowFullEdit && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Activity Title</label>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={editForm.name} 
-                  onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                  className="flex-1 text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none"
-                  placeholder="e.g. Eiffel Tower"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Category</label>
-              <select
-                value={editForm.type}
-                onChange={e => setEditForm(f => ({ ...f, type: e.target.value }))}
-                className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none bg-white appearance-none cursor-pointer"
-              >
-                {Object.keys(TYPE_ICON).map(t => (
-                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ')}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Start Time</label>
-              <select
-                value={editForm.time}
-                onChange={e => setEditForm(f => ({ ...f, time: e.target.value }))}
-                className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none bg-white appearance-none cursor-pointer"
-              >
-                <option value="">— pick a time —</option>
-                {TIME_SLOTS.map(slot => (
-                  <option key={slot} value={slot}>{slot}</option>
-                ))}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Booking Link (URL)</label>
-              <input 
-                type="text" 
-                value={editForm.booking_url} 
-                onChange={e => setEditForm(f => ({ ...f, booking_url: e.target.value }))}
-                className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none"
-                placeholder="Paste reservation or ticket link..."
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Google Maps Link (URL)</label>
-              <input 
-                type="text" 
-                value={editForm.google_map_url} 
-                onChange={e => setEditForm(f => ({ ...f, google_map_url: e.target.value }))}
-                className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none"
-                placeholder="Override default map link..."
-              />
-            </div>
+      <div className={`rounded-2xl border border-border border-l-4 bg-white px-4 py-4 shadow-sm ${meta.border}`}>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-secondary">Place</label>
+            <input
+              type="text"
+              value={editForm.name}
+              onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-amber focus:outline-none"
+              placeholder="Specific venue name"
+            />
           </div>
-        )}
 
-        {!allowFullEdit && (
           <div>
-            <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Start Time</label>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-secondary">Category</label>
             <select
-              value={editForm.time}
-              onChange={e => setEditForm(f => ({ ...f, time: e.target.value }))}
-              className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none bg-white appearance-none cursor-pointer"
+              value={editForm.type}
+              onChange={(event) => setEditForm((current) => ({ ...current, type: event.target.value }))}
+              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:border-amber focus:outline-none"
             >
-              <option value="">— pick a time —</option>
-              {TIME_SLOTS.map(slot => (
-                <option key={slot} value={slot}>{slot}</option>
+              {Object.keys(TYPE_META).map((type) => (
+                <option key={type} value={type}>
+                  {TYPE_META[type].label}
+                </option>
               ))}
             </select>
           </div>
-        )}
-        <div>
-          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Notes</label>
-          <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none resize-none" rows={2} />
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-secondary">Start time</label>
+            <select
+              value={editForm.time}
+              onChange={(event) => setEditForm((current) => ({ ...current, time: event.target.value }))}
+              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:border-amber focus:outline-none"
+            >
+              <option value="">Pick a time</option>
+              {TIME_SLOTS.map((slot) => (
+                <option key={slot} value={slot}>
+                  {slot}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="col-span-2">
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-secondary">Notes</label>
+            <textarea
+              rows={3}
+              value={editForm.notes}
+              onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))}
+              className="w-full resize-none rounded-md border border-border px-3 py-2 text-sm focus:border-amber focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-secondary">Price</label>
+            <input
+              type="text"
+              value={editForm.price_estimate}
+              onChange={(event) => setEditForm((current) => ({ ...current, price_estimate: event.target.value }))}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-amber focus:outline-none"
+              placeholder="e.g. RM 45"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-secondary">Booking link</label>
+            <input
+              type="text"
+              value={editForm.booking_url}
+              onChange={(event) => setEditForm((current) => ({ ...current, booking_url: event.target.value }))}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-amber focus:outline-none"
+              placeholder="Optional URL"
+            />
+          </div>
+
+          <div className="col-span-2">
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-secondary">Map link</label>
+            <input
+              type="text"
+              value={editForm.google_map_url}
+              onChange={(event) => setEditForm((current) => ({ ...current, google_map_url: event.target.value }))}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-amber focus:outline-none"
+              placeholder="Optional Google Maps URL"
+            />
+          </div>
         </div>
-        <div>
-          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Price Estimate</label>
-          <input type="text" value={editForm.price_estimate} onChange={e => setEditForm(f => ({ ...f, price_estimate: e.target.value }))} className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none" placeholder="e.g. Free, $15" />
-        </div>
-        <div className="flex justify-end gap-2 mt-1">
-          <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 text-xs font-semibold text-secondary hover:bg-muted rounded-md transition-colors">Cancel</button>
-          <button onClick={handleSave} className="px-3 py-1.5 text-xs font-semibold bg-amber text-white hover:bg-amberdark rounded-md transition-colors">Save</button>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEditing(false)}
+            className="rounded-md px-3 py-1.5 text-xs font-semibold text-secondary hover:bg-muted"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="rounded-md bg-amber px-3 py-1.5 text-xs font-semibold text-warmwhite hover:bg-amberdark disabled:opacity-60"
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
     )
@@ -464,215 +500,151 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
 
   return (
     <div
-      onClick={() => onFocus && onFocus()}
-      className={`relative rounded-xl border border-border border-l-4 px-3 py-2.5 bg-white shadow-sm hover:shadow-md transition-all group
-        ${borderColor}
-        ${(onFocus && item.lat && item.lng) ? 'cursor-pointer hover:border-amber' : ''}
-        ${isConflict ? 'bg-red-50 border-red-200' : confirmed ? 'bg-success-bg border-success/20' : ''}`}
+      onClick={() => onFocus?.()}
+      className={`group relative rounded-2xl border border-border border-l-4 bg-white px-4 py-4 shadow-sm transition-all hover:shadow-md ${
+        meta.border
+      } ${
+        onFocus && item.lat != null && item.lng != null ? 'cursor-pointer hover:border-amber' : ''
+      } ${
+        isConfirmed ? 'bg-success-bg border-success/20' : ''
+      }`}
     >
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-full flex items-center shadow-sm border border-border/50">
+      <div className="absolute right-3 top-3 flex rounded-full border border-border/60 bg-white/90 opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
         {onUpdate && (
-          <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="p-1.5 text-secondary hover:text-amber transition-colors" title="Edit item">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              setEditForm(buildEditForm(item, effectiveType))
+              setIsEditing(true)
+            }}
+            className="p-1.5 text-secondary transition-colors hover:text-amber"
+            title="Edit item"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
           </button>
         )}
         {onDelete && (
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 text-secondary hover:text-red-500 transition-colors" title="Remove item">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onDelete()
+            }}
+            className="p-1.5 text-secondary transition-colors hover:text-red-500"
+            title="Remove item"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         )}
       </div>
 
-      <div className="flex items-center justify-between mb-1 pr-6">
-        {timeLabel ? (
-          <span className="text-[11px] font-semibold font-body px-2 py-0.5 rounded-full bg-muted text-secondary">
+      <div className="mb-3 flex items-center justify-between gap-3 pr-14">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-secondary">
             {timeLabel}
           </span>
-        ) : (
-          <span className="text-[11px] text-tertiary font-body">flexible time</span>
-        )}
-        {confirmed && (
-          <span className="flex items-center gap-1 text-[10px] font-semibold text-success">
-            <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
+          <span className={`rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${meta.chip}`}>
+            {meta.label}
+          </span>
+        </div>
+        {isConfirmed && (
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-success">
             Confirmed
           </span>
         )}
       </div>
 
-      <div className="flex items-start gap-2 pr-12 mt-1">
-        <span className="text-base leading-snug mt-0.5">{icon}</span>
-        <div className="flex flex-col">
-          <a href={`https://www.google.com/search?q=${query}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={`font-bold text-sm leading-snug hover:underline ${isConflict ? 'text-red-700' : 'text-charcoal'}`}>
+      {item.image_url && (
+        <div className="mb-4 overflow-hidden rounded-xl border border-border/70 bg-muted">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={item.image_url} alt={item.name} className="h-44 w-full object-cover" />
+        </div>
+      )}
+
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="block text-base font-bold leading-snug text-charcoal">
             {item.name}
-          </a>
-          {typeLabel && (
-            <span className="inline-block px-1.5 py-0.5 mt-1 text-[9px] uppercase font-bold tracking-widest border border-border text-secondary rounded bg-white w-max">
-              {typeLabel}
-            </span>
+          </h3>
+          {shouldShowOriginalName(item.original_name, item.name) && (
+            <p className="mt-1 text-sm font-medium leading-snug text-secondary">
+              ({item.original_name})
+            </p>
           )}
-          {item.notes && <p className="text-[11px] text-secondary font-body mt-1 leading-normal italic">{item.notes}</p>}
+
+          {description && (
+            <p className="mt-2 text-sm leading-relaxed text-secondary">
+              {description}
+            </p>
+          )}
+
+          {item.notes && (
+            <p className="mt-2 text-sm leading-relaxed text-tertiary">
+              {item.notes}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {item.opening_hours_text && (
+              <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                {item.opening_hours_text}
+              </span>
+            )}
+            {item.price_estimate && (
+              <span className="rounded-full border border-green-100 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                {item.price_estimate}
+              </span>
+            )}
+            {item.rating && (
+              <span className="rounded-full border border-amber/20 bg-amber/10 px-2.5 py-1 text-xs font-semibold text-amberdark">
+                Rated {item.rating}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {mapUrl && (
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(event) => event.stopPropagation()}
+                className="text-xs font-semibold text-blue-600 transition-colors hover:text-blue-800"
+              >
+                Open in Maps
+              </a>
+            )}
+
+            {ticketUrl && effectiveType !== 'hotel' && (
+              <a
+                href={ticketUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(event) => event.stopPropagation()}
+                className="text-xs font-semibold text-amber transition-colors hover:text-amberdark"
+              >
+                Find tickets
+              </a>
+            )}
+
+            {hotelUrl && (
+              <a
+                href={hotelUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(event) => event.stopPropagation()}
+                className="rounded-full bg-amber px-3 py-1.5 text-xs font-semibold text-warmwhite transition-colors hover:bg-amberdark"
+              >
+                Book hotel
+              </a>
+            )}
+          </div>
         </div>
-      </div>
-
-      <div className="flex items-center gap-3 mt-3 pl-6 flex-wrap">
-        {item.price_estimate && (
-          <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">{item.price_estimate}</span>
-        )}
-
-        {mapUrl && (
-          <a
-            href={mapUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-xs font-semibold text-blue-500 hover:text-blue-700 transition-colors"
-          >
-            Google Maps ↗
-          </a>
-        )}
-
-        {bookUrl && (
-          <a
-            href={bookUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-xs font-semibold text-amber hover:text-amberdark transition-colors"
-          >
-            Find Tickets ↗
-          </a>
-        )}
-
-        {hotelUrl && (
-          <a
-            href={hotelUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-xs font-bold text-white bg-amber hover:bg-amberdark px-2 py-0.5 rounded transition-colors"
-          >
-            Book Hotel ↗
-          </a>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Item Creation (New activity) ─────────────────────────────
-
-function NewActivityCard({ day, onSave, onCancel, city, cityContext }) {
-  const [editForm, setEditForm] = useState({
-    name: '',
-    type: 'attraction',
-    time: '',
-    notes: '',
-    price_estimate: '',
-    lat: null,
-    lng: null,
-    booking_url: '',
-    google_map_url: ''
-  })
-  const [isSaving, setIsSaving] = useState(false)
-
-  async function handleSave() {
-    if (!editForm.name) return
-    setIsSaving(true)
-    const updates = { ...editForm }
-    
-    // Auto-pinning logic (non-note types)
-    if (updates.type !== 'note' && updates.type !== 'food_recommendation') {
-      try {
-        const res = await fetch(`/api/geocode?name=${encodeURIComponent(updates.name)}&city=${encodeURIComponent(cityContext?.name || '')}&lat=${cityContext?.lat || ''}&lng=${cityContext?.lng || ''}`)
-        const data = await res.json()
-        if (data.lat && data.lng) {
-          updates.lat = data.lat
-          updates.lng = data.lng
-        }
-      } catch (err) {
-        console.error('Auto-pinning failed:', err)
-      }
-    }
-
-    onSave && onSave({ action: 'add', day, ...updates })
-    setIsSaving(false)
-  }
-
-  const borderColor = TYPE_BORDER[editForm.type] ?? 'border-l-gray-300'
-
-  return (
-    <div className={`relative rounded-xl border border-border border-l-4 px-3 py-3 bg-white shadow-md flex flex-col gap-3 ${borderColor} ring-2 ring-amber/10 animate-in fade-in slide-in-from-top-2 duration-300`}>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2">
-          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Activity Title</label>
-          <input 
-            type="text" 
-            value={editForm.name} 
-            onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-            className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none"
-            placeholder="e.g. Grand Palace"
-            autoFocus
-          />
-        </div>
-        <div>
-          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Category</label>
-          <select
-            value={editForm.type}
-            onChange={e => setEditForm(f => ({ ...f, type: e.target.value }))}
-            className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none bg-white appearance-none cursor-pointer"
-          >
-            {Object.keys(TYPE_ICON).map(t => (
-              <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ')}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Start Time</label>
-          <select
-            value={editForm.time}
-            onChange={e => setEditForm(f => ({ ...f, time: e.target.value }))}
-            className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none bg-white appearance-none cursor-pointer"
-          >
-            <option value="">— pick a time —</option>
-            {TIME_SLOTS.map(slot => (
-              <option key={slot} value={slot}>{slot}</option>
-            ))}
-          </select>
-        </div>
-        <div className="col-span-2">
-          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Booking Link (URL)</label>
-          <input 
-            type="text" 
-            value={editForm.booking_url} 
-            onChange={e => setEditForm(f => ({ ...f, booking_url: e.target.value }))}
-            className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none"
-            placeholder="Paste reservation or ticket link..."
-          />
-        </div>
-        <div className="col-span-2">
-          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Google Maps Link (URL)</label>
-          <input 
-            type="text" 
-            value={editForm.google_map_url} 
-            onChange={e => setEditForm(f => ({ ...f, google_map_url: e.target.value }))}
-            className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none"
-            placeholder="Override default map link..."
-          />
-        </div>
-      </div>
-      <div>
-        <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Notes</label>
-        <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none resize-none" rows={2} />
-      </div>
-      <div className="flex justify-end gap-2 mt-1">
-        <button onClick={onCancel} className="px-3 py-1.5 text-xs font-semibold text-secondary hover:bg-muted rounded-md transition-colors">Cancel</button>
-        <button 
-          onClick={handleSave} 
-          disabled={!editForm.name || isSaving}
-          className="px-4 py-1.5 text-xs font-bold bg-amber text-white hover:bg-amberdark rounded-md transition-colors disabled:opacity-50"
-        >
-          {isSaving ? 'Saving...' : 'Add to Day'}
-        </button>
       </div>
     </div>
   )
