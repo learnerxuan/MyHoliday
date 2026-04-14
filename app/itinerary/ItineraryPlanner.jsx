@@ -197,6 +197,23 @@ export default function ItineraryPlanner() {
           // Mark as history so we don't clear it later by mistake
           hasSessionHistory = true
         }
+
+        // ── SYNC: Authoritative session metadata ─────────────────
+        // Prioritise database values over generic sessionStorage
+        if (session.planner_state) {
+          const s = session.planner_state
+          setTripContext(prev => ({
+            ...prev,
+            trip_days:         s.trip_days         ?? prev?.trip_days,
+            budget:            s.budget_profile    ?? prev?.budget,
+            travel_date_start: s.travel_date_start ?? prev?.travel_date_start,
+            travel_date_end:   s.travel_date_end   ?? prev?.travel_date_end,
+            group_size:        s.group_size        ?? prev?.group_size,
+            pace:              s.pace              ?? prev?.pace,
+            preferred_styles:  s.preferred_styles  ?? prev?.preferred_styles,
+            dietary:           s.needs?.dietary    ?? prev?.dietary,
+          }))
+        }
       }
 
       // Restore itinerary from localStorage (survives page refresh)
@@ -452,9 +469,8 @@ export default function ItineraryPlanner() {
 
   // ── Export flow ─────────────────────────────────────────────
   function handleExport() {
-    const month = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
     const days  = Object.keys(itinerary).filter(k => itinerary[k]?.length).length
-    setExportTitle(`${destination?.city} · ${days} Day${days !== 1 ? 's' : ''} · ${month}`)
+    setExportTitle(`${destination?.city} · ${days} Day${days !== 1 ? 's' : ''}`)
     setExportModal(true)
   }
 
@@ -543,7 +559,13 @@ export default function ItineraryPlanner() {
         <div className="pl-4 pr-5 py-1.5 border-b border-border/60 bg-white/70 backdrop-blur-sm shrink-0 flex items-center gap-6 text-xs font-body text-charcoal font-medium">
           {tripContext.travel_date_start && tripContext.travel_date_end && (
             <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
-              <span className="opacity-70 text-sm">🗓</span> {new Date(tripContext.travel_date_start).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} - {new Date(tripContext.travel_date_end).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+              <span className="opacity-70 text-sm">🗓</span> {(() => {
+                const [y, m, d] = tripContext.travel_date_start.split('-').map(Number);
+                return new Date(y, m - 1, d).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+              })()} - {(() => {
+                const [y, m, d] = tripContext.travel_date_end.split('-').map(Number);
+                return new Date(y, m - 1, d).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+              })()}
             </span>
           )}
           {tripContext.trip_days && (
@@ -564,11 +586,6 @@ export default function ItineraryPlanner() {
           {tripContext.group_size && (
             <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
               <span className="opacity-70 text-sm">🙋</span> {tripContext.group_size}
-            </span>
-          )}
-          {tripContext.dietary && (
-            <span className="flex items-center gap-2 bg-red-100 text-red-700 px-3 py-0.5 rounded-full font-bold shadow-sm">
-              🍽 {tripContext.dietary}
             </span>
           )}
         </div>

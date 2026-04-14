@@ -92,7 +92,7 @@ myholiday/
 │   │   ├── StatusBadge.jsx
 │   │   ├── Navbar.jsx
 │   │   ├── Footer.jsx
-│   │   ├── Spinner.jsx
+│   │   ├── Spinner.jsx               ← Global CSS ring (charcoal/amber) scalable loader
 │   │   ├── Modal.jsx
 │   │   ├── Avatar.jsx
 │   │   ├── StarRating.jsx
@@ -132,6 +132,12 @@ export default function YourPage() {
   )
 }
 ```
+
+### The "Island" Container Layout Pattern
+For isolated document-style pages like `<Listing Detail>` or `<My Itineraries>`, elements are contained within a centralized floating card island atop the `bg-warmwhite` background.
+1. The container `<section>` uses boundaries set strictly to `max-w-5xl mx-auto p-6 lg:p-12`. It should feature a `rounded-[24px]` border with drop-shadows.
+2. The grid rendering cards within an island MUST utilise structured breakdown: `grid-cols-1 md:grid-cols-2` and NOT 3 columns, to optimize inner padding spacing.
+3. Feature page tags (e.g. `My Plans`) are to be highlighted with `inline-flex items-center gap-2 bg-[color]/10 text-[color] px-3 py-1.5 text-[11px] font-bold rounded-md uppercase tracking-[0.2em]`.
 
 ---
 

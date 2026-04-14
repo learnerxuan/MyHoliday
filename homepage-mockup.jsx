@@ -186,6 +186,19 @@ const styles = `
   .filter-pill.on { border-color: #1A1A1A; color: #1A1A1A; background: #F0EBE3; font-weight: 600; }
   .filter-sep { width: 1px; height: 20px; background: #EBEBEB; margin: 0 6px; }
 
+  /* PROFILE ISLAND */
+  .profile-island { max-width: 1024px; margin: 40px auto; padding: 48px; background: #fff; border-radius: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #EBEBEB; }
+  .profile-header { display: flex; align-items: center; gap: 24px; margin-bottom: 40px; }
+  .profile-avatar { width: 90px; height: 90px; border-radius: 50%; background: linear-gradient(135deg, #C4874A, #8B6A3E); border: 4px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); flex-shrink: 0; }
+  .profile-name { font-family: 'Funnel Display', sans-serif; font-weight: 800; font-size: 32px; color: #1A1A1A; }
+  .profile-role { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; margin-top: 4px; }
+  .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+  .profile-card { background: #FDFCFB; border: 1px solid #EBEBEB; border-radius: 16px; padding: 24px; }
+  .profile-card-title { font-size: 16px; font-weight: 600; color: #1A1A1A; margin-bottom: 20px; }
+  .profile-field { margin-bottom: 16px; }
+  .profile-field-label { font-size: 11px; color: #888; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .profile-field-val { font-size: 14px; color: #1A1A1A; font-weight: 500; background: #fff; border: 1px solid #E5E0DA; padding: 10px 14px; border-radius: 8px; }
+
   /* FOOTER */
   .footer { background: #1A1A1A; padding: 60px 48px 32px; color: #FAF9F7; }
   .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 40px; }
@@ -306,10 +319,13 @@ export default function MyHolidayMockup() {
   const [page, setPage] = useState("home");
   const pages = [
     { key: "home", label: "Home" },
+    { key: "plan-a-trip", label: "Plan a Trip" },
     { key: "destinations", label: "Destinations" },
     { key: "city-detail", label: "City Detail" },
     { key: "marketplace", label: "Traveller Marketplace" },
     { key: "guide-marketplace", label: "Guide Marketplace" },
+    { key: "my-itineraries", label: "My Itineraries" },
+    { key: "my-profile", label: "My Profile" },
     { key: "ai-itinerary", label: "AI Itinerary" },
     { key: "about", label: "About" },
   ];
@@ -454,43 +470,138 @@ export default function MyHolidayMockup() {
         </footer>
       </>}
 
+      {/* ─── PLAN A TRIP ─── */}
+      {page === "plan-a-trip" && <>
+        <Nav active="Plan a Trip" />
+        <div style={{ background: "#F5F2EE", paddingBottom: 80, paddingTop: 40, minHeight: "100vh" }}>
+          
+          {/* Progress Bar Container */}
+          <div style={{ maxWidth: 800, margin: '0 auto', marginBottom: 32 }}>
+            <div style={{ display: 'flex', gap: 12 }}>
+              {["Travel Style", "Region", "Budget", "Climate", "Pace"].map((step, i) => (
+                <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <div style={{ width: '100%', height: 6, background: i === 0 ? '#C4874A' : '#E5E0DA', borderRadius: 3 }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? '#1A1A1A' : '#888', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>{step}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="profile-island" style={{ maxWidth: 800, marginTop: 0 }}>
+            <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <h1 style={{ fontFamily: "'Funnel Display', sans-serif", fontSize: 32, fontWeight: 800, color: "#1A1A1A", margin: '0 0 12px 0' }}>What kind of traveller are you?</h1>
+              <p style={{ color: "#888", fontSize: 15, margin: 0 }}>Select all travel styles that excite you — the more you pick, the better your matches.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 40 }}>
+              {[
+                { icon: "🏔️", title: "Adventure", desc: "Hiking, climbing, thrills", selected: true },
+                { icon: "🏛️", title: "Culture", desc: "History, art, heritage" },
+                { icon: "🏖️", title: "Beach & Relax", desc: "Sun, sand, chill vibes" },
+                { icon: "🌿", title: "Nature", desc: "Wildlife, forests, parks", selected: true },
+                { icon: "🍜", title: "Food & Cuisine", desc: "Local flavours, markets" },
+                { icon: "🌙", title: "Nightlife", desc: "Bars, clubs, live music" },
+              ].map((style) => (
+                <div key={style.title} style={{ 
+                  padding: 24, 
+                  borderRadius: 16, 
+                  border: style.selected ? '2px solid #C4874A' : '2px solid #EBEBEB',
+                  background: style.selected ? '#F0EBE3' : '#fff',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'all 0.2s ease'
+                }}>
+                   {style.selected && <div style={{ position: 'absolute', top: 16, right: 16, width: 24, height: 24, borderRadius: '50%', background: '#C4874A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 'bold' }}>✓</div>}
+                   <div style={{ fontSize: 36, marginBottom: 16 }}>{style.icon}</div>
+                   <div style={{ fontSize: 16, fontWeight: 700, color: '#1A1A1A', marginBottom: 6 }}>{style.title}</div>
+                   <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>{style.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 32, borderTop: '1px solid #EBEBEB' }}>
+               <button style={{ color: '#888', background: 'transparent', border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>← Cancel</button>
+               <button style={{ background: '#1A1A1A', color: '#fff', padding: '14px 32px', borderRadius: 12, fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: 14 }}>Continue →</button>
+            </div>
+          </div>
+        </div>
+      </>}
+
       {/* ─── DESTINATIONS ─── */}
       {page === "destinations" && <>
         <Nav active="Destinations" />
-        <section className="section">
-          <div style={{ marginBottom: 28 }}>
-            <div className="section-tag">Browse</div>
-            <div className="section-title">All Destinations</div>
+        <div style={{ background: "#F5F2EE", paddingBottom: 80, paddingTop: 40, minHeight: "100vh" }}>
+          <div className="profile-island" style={{ maxWidth: 1100, marginTop: 0 }}>
+            <div style={{ marginBottom: 32 }}>
+              <div className="section-tag" style={{ background: "#EAF3DE", color: "#3B6D11", display: 'inline-block', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>Explore the World</div>
+              <h1 style={{ fontFamily: "'Funnel Display', sans-serif", fontSize: 36, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>Browse Destinations</h1>
+              <p style={{ color: "#888", fontSize: 15, marginTop: 8 }}>Discover curated cities matched precisely to your unique travel algorithm.</p>
+            </div>
+
+            {/* Smart Search Bar */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexDirection: 'column', sm: { flexDirection: 'row' } }}>
+               <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ position: 'absolute', left: 18, fontSize: 18 }}>🔍</span>
+                  <input type="text" placeholder="Search cities, countries, or specific travel tags..." style={{ width: '100%', padding: '16px 16px 16px 48px', border: '1.5px solid #EBEBEB', borderRadius: 14, outline: 'none', fontSize: 14, background: '#FDFCFB', color: '#1A1A1A', fontWeight: 500 }} />
+               </div>
+               <button style={{ padding: '16px 32px', background: '#1A1A1A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Search</button>
+            </div>
+
+            {/* Comprehensive Dynamic Filters */}
+            <div style={{ background: '#FAF9F7', border: '1px solid #E5E0DA', borderRadius: 16, padding: 20, marginBottom: 40 }}>
+               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 24 }}>
+                 {/* Category Filter */}
+                 <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Primary Region</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {["All", "Asia", "Europe", "Oceania", "Americas"].map((f, i) => (
+                        <span key={f} className={`filter-pill ${i === 0 ? "on" : ""}`} style={i === 0 ? { background: '#1A1A1A', color: '#fff', borderColor: '#1A1A1A' } : {}}>{f}</span>
+                      ))}
+                    </div>
+                 </div>
+
+                 {/* Tags Filter */}
+                 <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Travel Style</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {["Culture", "Nature", "Adventure", "Beaches", "Food"].map((f, i) => (
+                        <span key={f} className={`filter-pill ${i === 2 ? "on" : ""}`} style={i === 2 ? { background: '#F0EBE3', color: '#1A1A1A', borderColor: '#C4874A' } : {}}>{f}</span>
+                      ))}
+                    </div>
+                 </div>
+
+                 {/* Budget Filter */}
+                 <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Estimated Cost</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {["Any", "$", "$$", "$$$"].map((f, i) => (
+                        <span key={f} className={`filter-pill ${i === 0 ? "on" : ""}`} style={i === 0 ? { background: '#EAF3DE', color: '#3B6D11', borderColor: '#3B6D11' } : {}}>{f}</span>
+                      ))}
+                    </div>
+                 </div>
+               </div>
+            </div>
+
+            {/* Listing Grid */}
+            <div style={{ display: 'flex', justifyItems: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+               <div style={{ fontSize: 16, fontWeight: 700, color: '#1A1A1A' }}>8 Destinations Found</div>
+               <div style={{ fontSize: 13, color: '#888', fontWeight: 600 }}>Sort by: <span style={{ color: '#1A1A1A', cursor: 'pointer' }}>Match Score (Highest) ↓</span></div>
+            </div>
+
+            <div className="city-grid" style={{ gap: 24 }}>
+              {[
+                { name: "Kyoto", country: "Japan", tags: ["Culture", "Food"], matchScore: 98, imgClass: "city-card-img-1", budget: "$$$" },
+                { name: "Bali", country: "Indonesia", tags: ["Beach", "Nature"], matchScore: 94, imgClass: "city-card-img-2", budget: "$" },
+                { name: "Penang", country: "Malaysia", tags: ["Food", "Heritage"], matchScore: 91, imgClass: "city-card-img-3", budget: "$" },
+                { name: "Queenstown", country: "New Zealand", tags: ["Adventure"], matchScore: 88, imgClass: "city-card-img-4", budget: "$$$" },
+                { name: "Chiang Mai", country: "Thailand", tags: ["Culture", "Food"], matchScore: 85, imgClass: "city-card-img-5", budget: "$" },
+                { name: "Seoul", country: "South Korea", tags: ["City", "Food"], matchScore: 82, imgClass: "city-card-img-6", budget: "$$" },
+                { name: "Cappadocia", country: "Turkey", tags: ["Adventure", "Nature"], matchScore: 79, imgClass: "city-card-img-7", budget: "$$" },
+                { name: "Langkawi", country: "Malaysia", tags: ["Beach", "Nature"], matchScore: 76, imgClass: "city-card-img-8", budget: "$" },
+              ].map(c => <CityCard key={c.name} {...c} />)}
+            </div>
           </div>
-          <div className="filter-bar">
-            <span className="filter-lbl">Category:</span>
-            {["All", "Beach", "City", "Nature", "Culture", "Adventure"].map((f, i) => (
-              <span key={f} className={`filter-pill ${i === 0 ? "on" : ""}`}>{f}</span>
-            ))}
-            <div className="filter-sep" />
-            <span className="filter-lbl">Budget:</span>
-            {["Any", "Budget", "Mid-range", "Luxury"].map((f, i) => (
-              <span key={f} className={`filter-pill ${i === 0 ? "on" : ""}`}>{f}</span>
-            ))}
-            <div className="filter-sep" />
-            <span className="filter-lbl">Climate:</span>
-            {["Any", "Tropical", "Temperate", "Cold"].map((f, i) => (
-              <span key={f} className={`filter-pill ${i === 0 ? "on" : ""}`}>{f}</span>
-            ))}
-          </div>
-          <div className="city-grid">
-            {[
-              { name: "Kyoto", country: "Japan", tags: ["Culture", "Food"], matchScore: 98, imgClass: "city-card-img-1", budget: "Mid-range" },
-              { name: "Bali", country: "Indonesia", tags: ["Beach", "Nature"], matchScore: 94, imgClass: "city-card-img-2", budget: "Budget" },
-              { name: "Penang", country: "Malaysia", tags: ["Food", "Heritage"], matchScore: 91, imgClass: "city-card-img-3", budget: "Budget" },
-              { name: "Queenstown", country: "New Zealand", tags: ["Adventure"], matchScore: 88, imgClass: "city-card-img-4", budget: "Luxury" },
-              { name: "Chiang Mai", country: "Thailand", tags: ["Culture", "Food"], matchScore: 85, imgClass: "city-card-img-5", budget: "Budget" },
-              { name: "Seoul", country: "South Korea", tags: ["City", "Food"], matchScore: 82, imgClass: "city-card-img-6", budget: "Mid-range" },
-              { name: "Cappadocia", country: "Turkey", tags: ["Adventure", "Nature"], matchScore: 79, imgClass: "city-card-img-7", budget: "Mid-range" },
-              { name: "Langkawi", country: "Malaysia", tags: ["Beach", "Nature"], matchScore: 76, imgClass: "city-card-img-8", budget: "Budget" },
-            ].map(c => <CityCard key={c.name} {...c} />)}
-          </div>
-        </section>
+        </div>
       </>}
 
       {/* ─── CITY DETAIL ─── */}
@@ -635,6 +746,67 @@ export default function MyHolidayMockup() {
         </section>
       </>}
 
+      {/* ─── MY PROFILE ─── */}
+      {page === "my-profile" && <>
+        <Nav active="" />
+        <div style={{ padding: "1px 0" }}>
+          <section className="profile-island">
+            <div className="profile-header">
+              <div className="profile-avatar" />
+              <div>
+                <div className="hero-tag" style={{ margin: 0, marginBottom: 8 }}><span className="hero-tag-dot" /> Verified Traveller</div>
+                <div className="profile-name">Sarah Jenkins</div>
+                <div className="profile-role">Joined March 2025</div>
+              </div>
+              <button className="btn-primary" style={{ marginLeft: "auto" }}>Save Changes</button>
+            </div>
+            
+            <div className="profile-grid">
+              <div className="profile-card">
+                <div className="profile-card-title">Personal Information</div>
+                <div className="profile-field">
+                  <div className="profile-field-label">Full Name</div>
+                  <div className="profile-field-val">Sarah Jenkins</div>
+                </div>
+                <div className="profile-field">
+                  <div className="profile-field-label">Nationality</div>
+                  <div className="profile-field-val">British</div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div className="profile-field">
+                    <div className="profile-field-label">Age</div>
+                    <div className="profile-field-val">28</div>
+                  </div>
+                  <div className="profile-field">
+                    <div className="profile-field-label">Language</div>
+                    <div className="profile-field-val">English</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="profile-card">
+                <div className="profile-card-title">Travel Preferences</div>
+                <div className="profile-field">
+                  <div className="profile-field-label">Dietary Restrictions</div>
+                  <div className="profile-field-val" style={{ background: "#F0EBE3", borderColor: "#E0D8CC", color: "#8B6A3E", fontWeight: 600 }}>Vegetarian</div>
+                </div>
+                <div className="profile-field">
+                  <div className="profile-field-label">Accessibility Needs</div>
+                  <div className="profile-field-val">None</div>
+                </div>
+                
+                <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #EBEBEB" }}>
+                   <div style={{ fontSize: 13, color: "#666", lineHeight: 1.5, margin: "0 0 12px 0" }}>
+                     Ready to upgrade your account to offer local tours in your home country?
+                   </div>
+                   <button className="btn-ghost" style={{ width: "100%", justifyContent: "center", display: "flex" }}>Apply as Tour Guide</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </>}
+
       {/* ─── AI ITINERARY ─── */}
       {page === "ai-itinerary" && <>
         <Nav />
@@ -687,6 +859,75 @@ export default function MyHolidayMockup() {
           </div>
         </section>
       </>}
+
+      {/* ─── MY ITINERARIES ─── */}
+      {page === "my-itineraries" && <>
+        <Nav active="" />
+        <section className="section" style={{ maxWidth: 1100, margin: "0 auto", padding: "60px 48px" }}>
+          <div className="section-header" style={{ marginBottom: 40 }}>
+            <div>
+              <div className="section-tag">My Plans</div>
+              <div className="section-title" style={{ fontSize: 36 }}>Your Saved Itineraries</div>
+            </div>
+            <button className="btn-primary" style={{ padding: "12px 24px" }}>+ Plan New Trip</button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+            {/* Card 1: Listed with Offers */}
+            <div style={{ background: "#fff", border: "1px solid #EBEBEB", borderRadius: 14, padding: 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>Kyoto Highlights</div>
+                  <div style={{ fontSize: 13, color: "#888", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 600, color: "#666" }}>Kyoto, Japan</span> • Created 12 Mar 2025
+                  </div>
+                </div>
+                <div className="tag tag-green" style={{ padding: "5px 12px", fontSize: 11 }}>Mid-range</div>
+              </div>
+
+              <div style={{ background: "#FDFCFB", border: "1px solid #F0EDE9", borderRadius: 10, padding: 16, marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#C4874A", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 8 }}>Day 1 Preview</div>
+                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>Arrival at Kansai Airport, check-in at downtown hotel, evening walk through Gion District and dinner at local Halal restaurant...</div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: 20, borderTop: "1px solid #E5E0DA" }}>
+                <div className="status-badge s-has-offers" style={{ padding: "6px 12px", fontSize: 12 }}>Listed: 3 Offers</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button className="btn-ghost" style={{ padding: "10px 18px" }}>View & Edit</button>
+                  <button className="btn-primary" style={{ padding: "10px 18px" }}>Manage Offers</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Draft / Needs listing */}
+            <div style={{ background: "#fff", border: "1px solid #EBEBEB", borderRadius: 14, padding: 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>Seoul Spring Trip</div>
+                  <div style={{ fontSize: 13, color: "#888", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 600, color: "#666" }}>Seoul, South Korea</span> • Created 28 Feb 2025
+                  </div>
+                </div>
+                <div className="tag" style={{ background: "#FCE8E8", color: "#B91C1C", padding: "5px 12px", fontSize: 11 }}>Budget</div>
+              </div>
+
+              <div style={{ background: "#FDFCFB", border: "1px solid #F0EDE9", borderRadius: 10, padding: 16, marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#C4874A", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 8 }}>Day 1 Preview</div>
+                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>Morning visit to Gyeongbokgung Palace, followed by Bukchon Hanok Village. Afternoon street food hunting at Myeongdong...</div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: 20, borderTop: "1px solid #E5E0DA" }}>
+                <div className="status-badge s-awaiting" style={{ padding: "6px 12px", fontSize: 12 }}>Draft / Not Listed</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button className="btn-ghost" style={{ padding: "10px 18px" }}>View & Edit</button>
+                  <button className="btn-amber" style={{ padding: "10px 18px" }}>Post to Marketplace</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </>}
+
 
       {/* ─── ABOUT ─── */}
       {page === "about" && <>

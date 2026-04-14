@@ -37,6 +37,8 @@ interface TripMeta {
   date_end: string
   group_size: string
   climate: string
+  budget?: string
+  pace?: string
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -207,27 +209,54 @@ function DestCard({ dest, rank }: { dest: Destination; rank: number }) {
   )
 }
 
+// ── Helpers ─────────────────────────────────────────────────
+function formatDate(isoString: string) {
+  if (!isoString) return ''
+  try {
+    const [y, m, d] = isoString.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch {
+    return isoString;
+  }
+}
+
 // ── Trip meta banner ─────────────────────────────────────────
 function TripMetaBanner({ meta }: { meta: TripMeta }) {
   return (
-    <div className="bg-charcoal text-warmwhite rounded-2xl p-5 flex flex-wrap gap-4 items-center justify-between mb-8">
-      <div>
-        <p className="text-xs font-body text-disabled mb-0.5">Your trip</p>
-        <p className="text-base font-extrabold font-display">
+    <div className="bg-white/5 border border-white/10 text-warmwhite rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between w-full lg:max-w-3xl transition-all">
+      <div className="shrink-0">
+        <p className="text-[10px] font-bold text-disabled uppercase tracking-widest mb-0.5">Your Trip Selection</p>
+        <p className="text-sm font-extrabold font-display text-white">
           {meta.duration_days} days · {meta.duration_label}
         </p>
       </div>
-      <div className="flex flex-wrap gap-4 text-xs font-body text-disabled">
-        <span>🗓️ {meta.date_start} → {meta.date_end}</span>
-        <span>🌡️ {meta.climate}</span>
-        <span>👥 {meta.group_size}</span>
-        <span>📅 {MONTH_NAMES[meta.travel_month]} travel</span>
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] font-medium text-disabled flex-1">
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <span className="text-amber">🗓️</span> {formatDate(meta.date_start)} — {formatDate(meta.date_end)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-amber">🌡️</span> {meta.climate}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-amber">👥</span> {meta.group_size}
+        </span>
+        {meta.budget && (
+          <span className="flex items-center gap-1.5 uppercase">
+            <span className="text-amber">💰</span> {meta.budget}
+          </span>
+        )}
+        {meta.pace && (
+          <span className="flex items-center gap-1.5 uppercase">
+            <span className="text-amber">🏃</span> {meta.pace}
+          </span>
+        )}
       </div>
+
       <Link
         href="/quiz"
-        className="text-xs font-semibold font-body text-amber hover:text-warmwhite transition-colors shrink-0"
+        className="text-[10px] font-bold text-amber hover:text-white transition-colors shrink-0 py-1.5 px-3 bg-white/5 rounded-lg border border-white/5 hover:border-amber/40 whitespace-nowrap"
       >
-        Retake quiz →
+        Edit Preferences →
       </Link>
     </div>
   )
@@ -274,6 +303,7 @@ function DestinationsInner() {
       } catch { /* ignore */ }
     } else {
       // Discovery Mode: Load initial page + recommendations
+      setTripMeta(null)
       loadDiscovery()
     }
   }, [fromQuiz])
@@ -339,149 +369,165 @@ function DestinationsInner() {
   const hasResults = destinations.length > 0
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col">
+    <div className="min-h-screen bg-warmwhite flex flex-col pt-2 pb-24 px-2 sm:px-6">
 
-      {/* Page header */}
-      <div 
-        className="text-warmwhite relative overflow-hidden pt-12 sm:pt-16 pb-8 sm:pb-10 px-4 sm:px-6"
-        style={{ background: '#0f0f0f' }}
-      >
-        {/* Ambient amber glow */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(196,135,74,0.22) 0%, transparent 70%),' +
-              'radial-gradient(ellipse 40% 40% at 20% 80%, rgba(196,135,74,0.10) 0%, transparent 65%)',
-          }}
-        />
-        {/* Subtle dot grid */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
+      {/* ── THE ISLAND CONTAINER ── */}
+      <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
 
-        <div className="relative max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-white/10 text-amber text-xs font-semibold px-3 py-1 rounded-full border border-amber/20 mb-2 uppercase tracking-widest">
-            {fromQuiz ? 'Your personalised results' : 'Discover Destinations'}
+        {/* Page header (Dark Hero inside Island) */}
+        <div 
+          className="text-warmwhite relative overflow-hidden pt-8 sm:pt-10 px-4 sm:px-10 pb-4 sm:pb-6"
+          style={{ background: '#0f0f0f' }}
+        >
+          {/* Ambient amber glow */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(196,135,74,0.22) 0%, transparent 70%),' +
+                'radial-gradient(ellipse 40% 40% at 20% 80%, rgba(196,135,74,0.10) 0%, transparent 65%)',
+            }}
+          />
+          {/* Subtle dot grid */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+              backgroundSize: '28px 28px',
+            }}
+          />
+
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-white/10 text-amber text-xs font-semibold px-3 py-1 rounded-full border border-amber/20 mb-2 uppercase tracking-widest">
+                {fromQuiz ? 'Your personalised results' : 'Discover Destinations'}
+              </div>
+              <h1 className="text-2xl sm:text-4xl font-extrabold font-display mb-1.5 text-warmwhite leading-tight">
+                {fromQuiz ? 'Your best matches' : 'Explore the World'}
+              </h1>
+              <p className="text-xs sm:text-sm font-body text-disabled max-w-xl">
+                {fromQuiz
+                  ? `${destinations.length} destinations ranked by how well they match your preferences.`
+                  : 'Browse our full catalog or check out our personalized picks for you.'}
+              </p>
+            </div>
+
+            {/* Trip Details in Top Right */}
+            {tripMeta && <TripMetaBanner meta={tripMeta} />}
           </div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold font-display mb-2 text-warmwhite">
-            {fromQuiz ? 'Your best matches' : 'Explore the World'}
-          </h1>
-          <p className="text-sm font-body text-disabled">
-            {fromQuiz
-              ? `${destinations.length} destinations ranked by how well they match your preferences.`
-              : 'Browse our full catalog or check out our personalized picks for you.'}
-          </p>
         </div>
-      </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        <div className="px-4 sm:px-10 pt-4 sm:pt-6 pb-12 sm:pb-16">
 
-        {tripMeta && <TripMetaBanner meta={tripMeta} />}
+          {/* Controls Grid Alignment (Centered Axis) */}
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-x-12 gap-y-4 mb-10 items-center">
+            {/* Row 1: Search (Left) & Budget (Right) */}
+            <div className="relative w-full">
+              <input
+                type="text"
+                placeholder="Search city or country…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="input-base pr-10 w-full"
+              />
+              {discoveryLoading && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-border border-t-amber rounded-full animate-spin" />
+              )}
+            </div>
 
-        {/* Controls */}
-        <div className="flex flex-wrap gap-3 mb-6 items-center">
-          <div className="relative flex-1 min-w-[240px]">
-            <input
-              type="text"
-              placeholder="Search city or country…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="input-base pr-10"
-            />
-            {discoveryLoading && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-border border-t-amber rounded-full animate-spin" />
-            )}
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {['All', 'Budget', 'Mid-range', 'Luxury'].map(b => (
-              <button
-                key={b}
-                onClick={() => setBudgetFilter(b)}
-                className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${budgetFilter === b
-                    ? 'bg-charcoal text-warmwhite border-charcoal'
-                    : 'bg-white text-secondary border-border hover:border-amber'
+            <div className="flex gap-1.5 items-center overflow-x-auto pb-2 -mb-2 scrollbar-hide no-scrollbar">
+              {['All', 'Budget', 'Mid-range', 'Luxury'].map(b => (
+                <button
+                  key={b}
+                  onClick={() => setBudgetFilter(b)}
+                  className={`px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all border shrink-0 ${
+                    budgetFilter === b
+                      ? 'bg-charcoal text-white border-charcoal'
+                      : 'bg-white text-secondary border-border hover:border-amber/50'
                   }`}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 border-l border-border pl-3">
-            <button
-              onClick={() => setRegionFilter('All')}
-              className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${regionFilter === 'All'
-                  ? 'bg-charcoal text-warmwhite border-charcoal'
-                  : 'bg-white text-secondary border-border hover:border-amber'
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+
+            {/* Row 2: Sort (Left) & Regions (Right) */}
+            <div className="flex items-center min-h-[40px]">
+              {fromQuiz ? (
+                <select
+                  value={sort}
+                  onChange={e => setSort(e.target.value as SortKey)}
+                  className="input-base text-xs font-semibold py-1.5 px-3 min-w-[140px] border-amber/30 text-charcoal outline-none focus:ring-1 focus:ring-amber bg-white/50 cursor-pointer"
+                >
+                  <option value="match">Best Match</option>
+                  <option value="az">A — Z</option>
+                  <option value="budget_asc">Lowest Price</option>
+                  <option value="budget_desc">Highest Price</option>
+                </select>
+              ) : (
+                <div 
+                  title="Complete the discovery quiz to unlock personalized recommendations and sorting!"
+                  className="input-base text-xs font-semibold py-1.5 px-3 min-w-[190px] border-border/40 text-disabled/60 bg-muted/20 cursor-not-allowed flex items-center justify-between"
+                >
+                  <span>Recommended Destinations</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-1.5 items-center overflow-x-auto pb-2 -mb-2 scrollbar-hide no-scrollbar">
+              <button
+                onClick={() => setRegionFilter('All')}
+                className={`px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all border shrink-0 ${
+                  regionFilter === 'All'
+                    ? 'bg-charcoal text-white border-charcoal'
+                    : 'bg-white text-secondary border-border hover:border-amber/50'
                 }`}
-            >
-              All Regions
-            </button>
-            {['africa', 'asia', 'europe', 'middle_east', 'north_america', 'oceania', 'south_america'].map(r => (
-              <button
-                key={r}
-                onClick={() => setRegionFilter(r)}
-                className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full border transition-colors shrink-0 ${regionFilter === r
-                    ? 'bg-charcoal text-warmwhite border-charcoal'
-                    : 'bg-white text-secondary border-border hover:border-amber'
-                  }`}
               >
-                {formatRegion(r)}
+                All Regions
               </button>
+              {['africa', 'asia', 'europe', 'middle_east', 'north_america', 'oceania', 'south_america'].map(r => (
+                <button
+                  key={r}
+                  onClick={() => setRegionFilter(r)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all border shrink-0 ${
+                    regionFilter === r
+                      ? 'bg-charcoal text-white border-charcoal'
+                      : 'bg-white text-secondary border-border hover:border-amber/50'
+                }`}
+                >
+                  {formatRegion(r)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {hasResults && filtered.length === 0 && (
+            <p className="text-sm font-body text-secondary text-center py-12">
+              No destinations match your filters.
+            </p>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filtered.map((dest, i) => (
+              <DestCard key={dest.id + (fromQuiz ? '' : i)} dest={dest} rank={i + 1} />
             ))}
           </div>
-          {fromQuiz && (
-            <select
-              value={sort}
-              onChange={e => setSort(e.target.value as SortKey)}
-              className="input-base max-w-[180px]"
-            >
-              <option value="match">Best Match</option>
-              <option value="az">Name (A-Z)</option>
-              <option value="budget_asc">Price (Low to high)</option>
-              <option value="budget_desc">Price (High to low)</option>
-            </select>
+
+          {/* Load more logic */}
+          {!fromQuiz && hasMore && (
+            <div className="mt-12 flex justify-center">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="bg-charcoal text-warmwhite font-semibold font-body text-sm py-3 px-10 rounded-full hover:bg-amber transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              >
+                {loadingMore && <span className="w-4 h-4 border-2 border-warmwhite/30 border-t-warmwhite rounded-full animate-spin" />}
+                {loadingMore ? 'Loading more destinations…' : 'Load More'}
+              </button>
+            </div>
           )}
         </div>
-
-        {hasResults && filtered.length === 0 && (
-          <p className="text-sm font-body text-secondary text-center py-12">
-            No destinations match your filters.
-          </p>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((dest, i) => (
-            <DestCard key={dest.id + (fromQuiz ? '' : i)} dest={dest} rank={i + 1} />
-          ))}
-        </div>
-
-        {/* Load more logic */}
-        {!fromQuiz && hasMore && (
-          <div className="mt-12 flex justify-center">
-            <button
-              onClick={handleLoadMore}
-              disabled={loadingMore}
-              className="bg-charcoal text-warmwhite font-semibold font-body text-sm py-3 px-10 rounded-full hover:bg-amber transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-            >
-              {loadingMore && <span className="w-4 h-4 border-2 border-warmwhite/30 border-t-warmwhite rounded-full animate-spin" />}
-              {loadingMore ? 'Loading more destinations…' : 'Load More'}
-            </button>
-          </div>
-        )}
-
-        {hasResults && filtered.length === 0 && (
-          <p className="text-sm font-body text-secondary text-center py-12">
-            No destinations match your filters.
-          </p>
-        )}
-
-      </div>
-
+      </section>
     </div>
   )
 }
