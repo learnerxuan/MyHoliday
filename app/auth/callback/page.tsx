@@ -17,7 +17,7 @@ function CallbackHandler() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
           const role = session.user.user_metadata?.role
           const intent = searchParams.get('intent')
 

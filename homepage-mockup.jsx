@@ -317,6 +317,10 @@ const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, o
 
 export default function MyHolidayMockup() {
   const [page, setPage] = useState("home");
+  const [postStep, setPostStep] = useState(1);
+  const [selectedItin, setSelectedItin] = useState(null);
+  const [postBudget, setPostBudget] = useState("");
+
   const pages = [
     { key: "home", label: "Home" },
     { key: "plan-a-trip", label: "Plan a Trip" },
@@ -325,6 +329,7 @@ export default function MyHolidayMockup() {
     { key: "marketplace", label: "Traveller Marketplace" },
     { key: "guide-marketplace", label: "Guide Marketplace" },
     { key: "my-itineraries", label: "My Itineraries" },
+    { key: "post-itinerary", label: "Post New Itinerary" },
     { key: "my-profile", label: "My Profile" },
     { key: "ai-itinerary", label: "AI Itinerary" },
     { key: "about", label: "About" },
@@ -860,7 +865,173 @@ export default function MyHolidayMockup() {
         </section>
       </>}
 
-      {/* ─── MY ITINERARIES ─── */}
+      {/* ─── POST NEW ITINERARY ─── */}
+      {page === "post-itinerary" && <>
+        <Nav active="Marketplace" />
+        <section className="section" style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 48px" }}>
+          
+          {/* Header (Identical style to the screenshot's dark banner) */}
+          <div style={{ background: "linear-gradient(145deg, #1A1A1A, #111)", borderRadius: 16, padding: "40px 48px", color: "#FAF9F7", display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 40, boxShadow: "0 10px 30px rgba(0,0,0,0.15)" }}>
+            <div>
+              <div style={{ background: "rgba(196,135,74,0.15)", border: "1px solid rgba(196,135,74,0.3)", color: "#C4874A", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, padding: "4px 12px", borderRadius: 20, display: "inline-block", marginBottom: 16, textTransform: "uppercase" }}>Marketplace</div>
+              <h1 style={{ fontFamily: "'Funnel Display', sans-serif", fontSize: 36, fontWeight: 800, margin: "0 0 10px 0" }}>Post New Itinerary</h1>
+              <p style={{ color: "#AAA", fontSize: 14, margin: 0, maxWidth: 500, lineHeight: 1.6 }}>Select a finalized itinerary to list on the marketplace and receive offers from verified local tour guides.</p>
+            </div>
+            
+            {/* Steps indicator */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", background: "rgba(255,255,255,0.05)", padding: "10px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep >= 1 ? 1 : 0.5 }}>
+                 <div style={{ width: 22, height: 22, borderRadius: "50%", background: postStep === 1 ? "#C4874A" : "transparent", border: postStep === 1 ? "none" : "1px solid #888", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: postStep === 1 ? "#fff" : "#888" }}>1</div>
+                 <span style={{ fontSize: 12, fontWeight: postStep === 1 ? 600 : 500, color: postStep === 1 ? "#FAF9F7" : "#888" }}>Select</span>
+              </div>
+              <span style={{ color: "#444", margin: "0 4px" }}>—</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep >= 2 ? 1 : 0.5 }}>
+                 <div style={{ width: 22, height: 22, borderRadius: "50%", background: postStep === 2 ? "#C4874A" : "transparent", border: postStep === 2 ? "none" : "1px solid #888", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: postStep === 2 ? "#fff" : "#888" }}>2</div>
+                 <span style={{ fontSize: 12, fontWeight: postStep === 2 ? 600 : 500, color: postStep === 2 ? "#FAF9F7" : "#888" }}>Budget</span>
+              </div>
+              <span style={{ color: "#444", margin: "0 4px" }}>—</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep === 3 ? 1 : 0.5 }}>
+                 <div style={{ width: 22, height: 22, borderRadius: "50%", background: postStep === 3 ? "#C4874A" : "transparent", border: postStep === 3 ? "none" : "1px solid #888", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: postStep === 3 ? "#fff" : "#888" }}>3</div>
+                 <span style={{ fontSize: 12, fontWeight: postStep === 3 ? 600 : 500, color: postStep === 3 ? "#FAF9F7" : "#888" }}>Review</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 1: Select Itinerary */}
+          {postStep === 1 && (
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1A1A1A", marginBottom: 20 }}>Finalized Itineraries</h2>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24, marginBottom: 40 }}>
+                {[
+                  { id: 1,  city: "Tokyo", days: 8, tags: ["SOLO", "BALANCED", "LUXURY"], country: "Japan", img: "linear-gradient(to bottom, #A1C4FD, #C2E9FB)" },
+                  { id: 2,  city: "Seoul", days: 5, tags: ["COUPLE", "FAST-PACED", "MID-RANGE"], country: "South Korea", img: "linear-gradient(to bottom, #ff9a9e, #fecfef)" },
+                  { id: 3,  city: "Bali", days: 7, tags: ["FAMILY", "RELAXED", "BUDGET"], country: "Indonesia", img: "linear-gradient(to bottom, #84fab0, #8fd3f4)" }
+                ].map((itin) => {
+                  const isSelected = selectedItin === itin.id;
+                  return (
+                    <div 
+                      key={itin.id} 
+                      onClick={() => setSelectedItin(itin.id)}
+                      style={{ 
+                        background: "#fff", 
+                        borderRadius: 16, 
+                        overflow: "hidden", 
+                        border: isSelected ? "2.5px solid #1A1A1A" : "1px solid #EBEBEB", 
+                        cursor: "pointer", 
+                        transition: "all 0.2s ease",
+                        boxShadow: isSelected ? "0 8px 24px rgba(0,0,0,0.08)" : "none",
+                        position: "relative"
+                      }}
+                    >
+                      {isSelected && (
+                        <div style={{ position: "absolute", top: 12, right: 12, width: 26, height: 26, borderRadius: "50%", background: "#1A1A1A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>
+                          <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1 5L4.5 8.5L13 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      )}
+                      <div style={{ height: 180, background: itin.img, position: "relative" }}>
+                        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.1)" }} />
+                      </div>
+                      <div style={{ padding: 20 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{itin.city} · {itin.days} Days</div>
+                          <div style={{ fontSize: 10, color: "#C4874A", fontWeight: 700, textTransform: "uppercase" }}>12 APR - 19 APR</div>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontSize: 13, color: "#666", fontWeight: 500 }}>{itin.country}</div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {itin.tags.map(t => (
+                              <span key={t} style={{ background: "#F5F2EE", padding: "4px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, color: "#888" }}>{t}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid #EBEBEB", paddingTop: 24 }}>
+                <button 
+                  disabled={!selectedItin}
+                  onClick={() => setPostStep(2)}
+                  className="btn-primary" 
+                  style={{ padding: "14px 32px", fontSize: 14, opacity: selectedItin ? 1 : 0.5, cursor: selectedItin ? "pointer" : "not-allowed" }}
+                >
+                  Proceed to Budgeting →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Budget */}
+          {postStep === 2 && (
+            <div style={{ maxWidth: 600, margin: "0 auto" }}>
+              <div style={{ background: "#fff", border: "1px solid #EBEBEB", borderRadius: 16, padding: "40px", textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 16 }}>💰</div>
+                <h2 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", marginBottom: 8, fontFamily: "'Funnel Display', sans-serif" }}>Set Your Budget</h2>
+                <p style={{ color: "#666", fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>How much are you willing to pay a local tour guide to execute this itinerary? Guides will send you offers based on this amount.</p>
+                
+                <div style={{ position: "relative", maxWidth: 300, margin: "0 auto 32px" }}>
+                  <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 20, fontWeight: 700, color: "#1A1A1A" }}>RM</span>
+                  <input 
+                    type="number" 
+                    value={postBudget}
+                    onChange={(e) => setPostBudget(e.target.value)}
+                    placeholder="2500" 
+                    style={{ width: "100%", padding: "16px 16px 16px 64px", fontSize: 24, fontWeight: 800, fontFamily: "'Funnel Display', sans-serif", border: "2px solid #EBEBEB", borderRadius: 12, outline: "none", color: "#1A1A1A", textAlign: "center" }} 
+                  />
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
+                  <button onClick={() => setPostStep(1)} className="btn-ghost" style={{ padding: "14px 28px", fontSize: 14 }}>← Back</button>
+                  <button onClick={() => setPostStep(3)} disabled={!postBudget} className="btn-primary" style={{ padding: "14px 28px", fontSize: 14, opacity: postBudget ? 1 : 0.5 }}>Review Details →</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Review */}
+          {postStep === 3 && (
+            <div style={{ maxWidth: 700, margin: "0 auto" }}>
+              <div style={{ background: "#fff", border: "1px solid #EBEBEB", borderRadius: 16, padding: "40px" }}>
+                <h2 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", marginBottom: 24, fontFamily: "'Funnel Display', sans-serif" }}>Review & List</h2>
+                
+                <div style={{ background: "#F9F9F9", borderRadius: 12, padding: 24, marginBottom: 32 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid #EBEBEB" }}>
+                    <div>
+                      <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>Selected Itinerary</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>Tokyo · 8 Days</div>
+                    </div>
+                    <button onClick={() => setPostStep(1)} style={{ background: "none", border: "none", color: "#C4874A", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>Edit</button>
+                  </div>
+                  
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>Desired Guide Budget</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", fontFamily: "'Funnel Display', sans-serif" }}>RM {postBudget}</div>
+                    </div>
+                    <button onClick={() => setPostStep(2)} style={{ background: "none", border: "none", color: "#C4874A", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>Edit</button>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 12, padding: 16, background: "#F0EBE3", borderRadius: 10, alignItems: "flex-start", marginBottom: 32 }}>
+                   <div style={{ fontSize: 18 }}>ℹ️</div>
+                   <div style={{ fontSize: 12, color: "#8B6A3E", lineHeight: 1.5 }}>By posting this listing, verified local guides in Japan will be able to review your itinerary and submit competing price proposals. You are not charged until you accept an offer.</div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <button onClick={() => setPostStep(2)} className="btn-ghost" style={{ padding: "14px 28px", fontSize: 14 }}>← Back</button>
+                  <button onClick={() => { setPostStep(1); setPage("marketplace"); }} className="btn-amber" style={{ padding: "14px 32px", fontSize: 14 }}>Post to Marketplace ✓</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      </>}
+
       {page === "my-itineraries" && <>
         <Nav active="" />
         <section className="section" style={{ maxWidth: 1100, margin: "0 auto", padding: "60px 48px" }}>
