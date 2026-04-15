@@ -110,7 +110,7 @@ function NewListingContent() {
 
         const { data: plansData, error: plansError } = await supabase
           .from('itineraries')
-          .select('id, title, content, created_at, trip_metadata, destination_id, destinations(city, country)')
+          .select('id, title, created_at, trip_metadata, destination_id, destinations(city, country)')
           .eq('user_id', currentUser.id)
           .order('created_at', { ascending: false })
 
@@ -182,19 +182,11 @@ function NewListingContent() {
 
   let selectedDays = '?';
   if (selectedPlan) {
-    const content = selectedPlan.content;
-    if (Array.isArray(content)) {
-      selectedDays = content.length;
-    } else if (content && typeof content === 'object') {
-      const keys = Object.keys(content);
-      if (keys.some(k => k.toLowerCase().includes('day'))) {
-        selectedDays = keys.length;
-      }
-    }
-    if (selectedDays === '?') {
-      const stringContent = typeof content === 'string' ? content : JSON.stringify(content || '');
-      const daysMatch = stringContent.match(/day \d+/gi);
-      if (daysMatch) selectedDays = new Set(daysMatch.map(d => d.toLowerCase())).size;
+    if (selectedPlan.trip_metadata?.trip_days) {
+      selectedDays = selectedPlan.trip_metadata.trip_days;
+    } else if (selectedPlan.title) {
+      const match = selectedPlan.title.match(/(?:^|\b)(\d+)(?:\s*|-)(?:Days?|Day)\b/i);
+      if (match) selectedDays = Number(match[1]);
     }
   }
 
@@ -281,18 +273,11 @@ function NewListingContent() {
               const isSelected = selectedItinId === itin.id;
               
               let days = '?';
-              if (Array.isArray(itin.content)) {
-                days = itin.content.length;
-              } else if (itin.content && typeof itin.content === 'object') {
-                const keys = Object.keys(itin.content);
-                if (keys.some(k => k.toLowerCase().includes('day'))) {
-                  days = keys.length;
-                }
-              }
-              if (days === '?') {
-                const stringContent = typeof itin.content === 'string' ? itin.content : JSON.stringify(itin.content || '');
-                const daysMatch = stringContent.match(/day \d+/gi);
-                if (daysMatch) days = new Set(daysMatch.map(d => d.toLowerCase())).size;
+              if (itin.trip_metadata?.trip_days) {
+                days = itin.trip_metadata.trip_days;
+              } else if (itin.title) {
+                const match = itin.title.match(/(?:^|\b)(\d+)(?:\s*|-)(?:Days?|Day)\b/i);
+                if (match) days = Number(match[1]);
               }
               
               const city = itin.destinations?.city || 'Unknown';
