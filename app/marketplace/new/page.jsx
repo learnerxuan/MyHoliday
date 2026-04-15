@@ -180,6 +180,24 @@ function NewListingContent() {
 
   const selectedPlan = itineraries.find(p => p.id === selectedItinId)
 
+  let selectedDays = '?';
+  if (selectedPlan) {
+    const content = selectedPlan.content;
+    if (Array.isArray(content)) {
+      selectedDays = content.length;
+    } else if (content && typeof content === 'object') {
+      const keys = Object.keys(content);
+      if (keys.some(k => k.toLowerCase().includes('day'))) {
+        selectedDays = keys.length;
+      }
+    }
+    if (selectedDays === '?') {
+      const stringContent = typeof content === 'string' ? content : JSON.stringify(content || '');
+      const daysMatch = stringContent.match(/day \d+/gi);
+      if (daysMatch) selectedDays = new Set(daysMatch.map(d => d.toLowerCase())).size;
+    }
+  }
+
   return (
     <>
       {/* Page header (Dark Hero inside Island) */}
@@ -211,7 +229,7 @@ function NewListingContent() {
               Marketplace
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold text-white font-display mb-1.5 tracking-tight">
-              Post an Itinerary
+              Post a New Itinerary
             </h1>
             <p className="text-xs sm:text-sm font-body text-disabled max-w-2xl leading-relaxed">
               Select a finalized itinerary to list on the marketplace and receive offers from verified local tour guides.
@@ -220,19 +238,28 @@ function NewListingContent() {
           
           {/* Steps indicator */}
           <div style={{ display: "flex", gap: 8, alignItems: "center", background: "rgba(255,255,255,0.05)", padding: "10px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep >= 1 ? 1 : 0.5 }}>
+            <div 
+              style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep >= 1 ? 1 : 0.5, cursor: "pointer", transition: "opacity 0.2s" }}
+              onClick={() => setPostStep(1)}
+            >
                <div style={{ width: 22, height: 22, borderRadius: "50%", background: postStep === 1 ? "#C4874A" : "transparent", border: postStep === 1 ? "none" : "1px solid #888", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: postStep === 1 ? "#fff" : "#888" }}>1</div>
-               <span style={{ fontSize: 12, fontWeight: postStep === 1 ? 600 : 500, color: postStep === 1 ? "#FAF9F7" : "#888" }}>Select</span>
+               <span style={{ fontSize: 12, fontWeight: postStep === 1 ? 600 : 500, color: postStep === 1 ? "#FAF9F7" : "#888" }}>Choose Itinerary</span>
             </div>
             <span style={{ color: "#444", margin: "0 4px" }}>—</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep >= 2 ? 1 : 0.5 }}>
+            <div 
+              style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep >= 2 ? 1 : 0.5, cursor: selectedItinId ? "pointer" : "not-allowed", transition: "opacity 0.2s" }}
+              onClick={() => { if (selectedItinId) setPostStep(2) }}
+            >
                <div style={{ width: 22, height: 22, borderRadius: "50%", background: postStep === 2 ? "#C4874A" : "transparent", border: postStep === 2 ? "none" : "1px solid #888", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: postStep === 2 ? "#fff" : "#888" }}>2</div>
-               <span style={{ fontSize: 12, fontWeight: postStep === 2 ? 600 : 500, color: postStep === 2 ? "#FAF9F7" : "#888" }}>Budget</span>
+               <span style={{ fontSize: 12, fontWeight: postStep === 2 ? 600 : 500, color: postStep === 2 ? "#FAF9F7" : "#888" }}>Set Budget</span>
             </div>
             <span style={{ color: "#444", margin: "0 4px" }}>—</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep === 3 ? 1 : 0.5 }}>
+            <div 
+              style={{ display: "flex", alignItems: "center", gap: 6, opacity: postStep === 3 ? 1 : 0.5, cursor: (selectedItinId && postBudget) ? "pointer" : "not-allowed", transition: "opacity 0.2s" }}
+              onClick={() => { if (selectedItinId && postBudget) setPostStep(3) }}
+            >
                <div style={{ width: 22, height: 22, borderRadius: "50%", background: postStep === 3 ? "#C4874A" : "transparent", border: postStep === 3 ? "none" : "1px solid #888", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: postStep === 3 ? "#fff" : "#888" }}>3</div>
-               <span style={{ fontSize: 12, fontWeight: postStep === 3 ? 600 : 500, color: postStep === 3 ? "#FAF9F7" : "#888" }}>Review</span>
+               <span style={{ fontSize: 12, fontWeight: postStep === 3 ? 600 : 500, color: postStep === 3 ? "#FAF9F7" : "#888" }}>Review & Post</span>
             </div>
           </div>
         </div>
@@ -364,8 +391,8 @@ function NewListingContent() {
         <div style={{ maxWidth: 600, margin: "0 auto" }}>
           <div style={{ background: "#fff", border: "1px solid #EBEBEB", borderRadius: 16, padding: "40px", textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>💰</div>
-            <h2 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", marginBottom: 8, fontFamily: "'Funnel Display', sans-serif" }}>Set Your Budget</h2>
-            <p style={{ color: "#666", fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>How much are you willing to pay a local tour guide to execute this itinerary? Guides will send you offers based on this amount.</p>
+            <h2 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", marginBottom: 8, fontFamily: "'Funnel Display', sans-serif" }}>Set a Desired Budget</h2>
+            <p style={{ color: "#666", fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>How much are you willing to pay a local tour guide to execute this itinerary? Guides will send you offers based on this amount. Negotations will be done through the chat.</p>
             
             <div style={{ position: "relative", maxWidth: 300, margin: "0 auto 32px" }}>
               <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 20, fontWeight: 700, color: "#1A1A1A" }}>RM</span>
@@ -379,7 +406,7 @@ function NewListingContent() {
             </div>
 
             <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
-              <Button onClick={() => setPostStep(1)} variant="secondary" style={{ padding: "14px 28px", fontSize: 14 }}>← Back</Button>
+              <Button onClick={() => setPostStep(1)} variant="secondary" style={{ padding: "14px 28px", fontSize: 14 }}>Back</Button>
               <Button onClick={() => setPostStep(3)} disabled={!postBudget} variant="primary" style={{ padding: "14px 28px", fontSize: 14, opacity: postBudget ? 1 : 0.5 }}>Review Details →</Button>
             </div>
           </div>
@@ -396,7 +423,7 @@ function NewListingContent() {
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid #EBEBEB" }}>
                 <div>
                   <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>Selected Itinerary</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{selectedPlan?.destinations?.city || 'City'} · {selectedPlan?.title || 'Trip'}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{selectedPlan?.destinations?.city || 'City'}, {selectedPlan?.destinations?.country || 'Country'} · {selectedDays} Days</div>
                 </div>
                 <button onClick={() => setPostStep(1)} style={{ background: "none", border: "none", color: "#C4874A", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>Edit</button>
               </div>
@@ -416,14 +443,14 @@ function NewListingContent() {
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Button onClick={() => setPostStep(2)} variant="secondary" style={{ padding: "14px 28px", fontSize: 14 }}>← Back</Button>
+              <Button onClick={() => setPostStep(2)} variant="secondary" style={{ padding: "14px 28px", fontSize: 14 }}>Back</Button>
               <Button 
                 onClick={handleSubmit} 
                 className="bg-[#C4874A] hover:bg-[#a6713e] text-white border-none" 
                 style={{ padding: "14px 32px", fontSize: 14 }}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? <Spinner /> : 'Post to Marketplace ✓'}
+                {isSubmitting ? <Spinner /> : 'Post to Marketplace'}
               </Button>
             </div>
           </div>
