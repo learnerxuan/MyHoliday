@@ -5,7 +5,7 @@ import { TOOL_DEFINITIONS, getToolStatus, executeTool } from '@/lib/ai/tools/ind
 import { checkGuardrails } from '@/lib/ai/guardrails'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4.1-mini'
+const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o'
 
 const encoder = new TextEncoder()
 
