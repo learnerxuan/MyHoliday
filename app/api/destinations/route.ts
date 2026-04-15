@@ -1,5 +1,28 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { scoreDestinations, inferPreferences, Destination } from '@/lib/recommendation'
+
+export const dynamic = 'force-dynamic'
+import {
+  scoreDestinations,
+  inferPreferences,
+  extractPreferredCountries,
+  Destination,
+} from '@/lib/recommendation'
+
+// ── Weighted random shuffle ───────────────────────────────────
+// Fallback when a user has no behavioural signals at all.
+// Destinations with a higher average category score surface
+// slightly more often, but there is enough randomness to produce
+// a fresh order every page load.
+function weightedRandomShuffle(dests: Destination[]): Destination[] {
+  const avgScore = (d: Destination) =>
+    (d.culture + d.adventure + d.nature + d.beaches +
+     d.nightlife + d.cuisine + d.wellness + d.urban + d.seclusion) / 9
+
+  return [...dests]
+    .map(d => ({ d, key: avgScore(d) * Math.random() }))
+    .sort((a, b) => b.key - a.key)
+    .map(x => x.d)
+}
 
 export async function GET(req: Request) {
   try {
@@ -14,34 +37,74 @@ export async function GET(req: Request) {
     const endIndex   = startIndex + limit
 
     const supabase = await createSupabaseServerClient()
-    
-    // Security Upgrade: use getUser() instead of getSession()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    let inferredPrefs = null
-    if (user) {
-      // Fetch itineraries (Hard Signals)
-      const { data: itineraries } = await supabase
-        .from('itineraries')
-        .select('trip_metadata')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-      
-      // Fetch interactions (Interest Signals - joined with destination data)
-      const { data: interactions } = await supabase
-        .from('user_interactions')
-        .select('*, destinations(*)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
 
-      if (itineraries?.length || interactions?.length) {
-        inferredPrefs = inferPreferences(itineraries || [], interactions || [])
+    // Security: use getUser() instead of getSession()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    let inferredPrefs = null
+    let preferredCountries = new Map<string, number>()
+    let debugSignals = { itineraries: 0, interactions: 0, chatSessions: 0 }
+
+    if (user) {
+      // ── Fetch all three signal sources in parallel ────────────
+      const [
+        { data: itineraries },
+        { data: interactions },
+        { data: chatSessions },
+      ] = await Promise.all([
+        // Hard Signal: saved itineraries
+        supabase
+          .from('itineraries')
+          .select('trip_metadata')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10),
+
+        // Interest Signal: clicked destinations (joined for style/region/country data)
+        supabase
+          .from('user_interactions')
+          .select('*, destinations(*)')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20),
+
+        // Strong Interest Signal: chat session planner_state
+        // Join destinations for region AND country
+        supabase
+          .from('chat_sessions')
+          .select('planner_state, destinations(region, country)')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(15),
+      ])
+
+      debugSignals = {
+        itineraries: itineraries?.length ?? 0,
+        interactions: interactions?.length ?? 0,
+        chatSessions: chatSessions?.length ?? 0,
+      }
+
+      if (itineraries?.length || interactions?.length || chatSessions?.length) {
+        inferredPrefs = inferPreferences(
+          itineraries || [],
+          interactions || [],
+          chatSessions || []
+        )
+        preferredCountries = extractPreferredCountries(
+          interactions || [],
+          itineraries || [],
+          chatSessions || []
+        )
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Discovery] User signals:', debugSignals)
+        console.log('[Discovery] Inferred prefs:', inferredPrefs)
+        console.log('[Discovery] Preferred countries:', Object.fromEntries(preferredCountries))
       }
     }
 
-    // 2. Fetch all destinations matching the filters
+    // ── Fetch destinations matching the UI filters ────────────
     let query = supabase
       .from('destinations')
       .select(`
@@ -71,13 +134,46 @@ export async function GET(req: Request) {
 
     let results = destinationsArray as unknown as Destination[]
 
-    // 3. Apply scoring if we have preferences
     if (inferredPrefs) {
-      const scored = scoreDestinations(results, inferredPrefs)
-      results = scored as any
+      // ── Step 1: Score by cosine similarity ────────────────────
+      const scored = scoreDestinations(results, inferredPrefs) as any[]
+
+      // ── Step 2: Region affinity boost (+20 pts) ───────────────
+      // Destinations in the user's preferred regions (learned from
+      // what they clicked/saved/chatted about) float to the top.
+      // Only applied when we have a real region signal (< all 7 regions).
+      const preferredRegions = new Set(inferredPrefs.regions)
+      const hasRegionSignal = preferredRegions.size > 0 && inferredPrefs.regions.length < 7
+
+      if (hasRegionSignal) {
+        scored.forEach((d: any) => {
+          if (preferredRegions.has(d.region)) {
+            d.match_score = Math.min(100, d.match_score + 20)
+          }
+        })
+      }
+
+      // ── Step 3: Country affinity boost (up to +15 pts) ────────
+      // More specific than region — if you've clicked destinations
+      // in Japan, Japanese destinations rank even higher than the
+      // rest of Asia. Frequency-weighted: each additional click in
+      // the same country adds +5 pts, capped at +15 per destination.
+      if (preferredCountries.size > 0) {
+        scored.forEach((d: any) => {
+          const clicks = preferredCountries.get(d.country) || 0
+          if (clicks > 0) {
+            d.match_score = Math.min(100, d.match_score + Math.min(clicks * 5, 15))
+          }
+        })
+      }
+
+      // ── Step 4: Re-sort after all boosts ──────────────────────
+      scored.sort((a: any, b: any) => b.match_score - a.match_score)
+
+      results = scored
     } else {
-      // Default fallback: Alpha sort by city if no relevance data
-      results.sort((a, b) => a.city.localeCompare(b.city))
+      // ── Fallback: weighted random shuffle ─────────────────────
+      results = weightedRandomShuffle(results) as any[]
     }
 
     const totalCount = results.length
@@ -88,7 +184,16 @@ export async function GET(req: Request) {
       totalCount,
       page,
       limit,
-      hasMore: totalCount > endIndex
+      hasMore: totalCount > endIndex,
+      // Debug field — check in browser Network tab to verify signals
+      _debug: {
+        isPersonalised: !!inferredPrefs,
+        signals: debugSignals,
+        inferredStyles: inferredPrefs?.styles ?? [],
+        inferredRegions: inferredPrefs?.regions ?? [],
+        inferredBudget: inferredPrefs?.budget ?? null,
+        preferredCountries: Object.fromEntries(preferredCountries),
+      },
     })
 
   } catch (error) {

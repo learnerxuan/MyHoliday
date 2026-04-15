@@ -140,7 +140,7 @@ function CityImage({ city, country, className = '' }: { city: string; country: s
 }
 
 // ── Destination card ─────────────────────────────────────────
-function DestCard({ dest, rank }: { dest: Destination; rank: number }) {
+function DestCard({ dest, rank, showScore }: { dest: Destination; rank: number; showScore: boolean }) {
   const topTags = getTopTags(dest)
   const matchScore = dest.match_score
 
@@ -165,8 +165,8 @@ function DestCard({ dest, rank }: { dest: Destination; rank: number }) {
         <span className="absolute top-2 left-2 bg-black/50 text-warmwhite text-xs font-semibold font-body px-2 py-0.5 rounded-full backdrop-blur-sm">
           #{rank}
         </span>
-        {/* Match score badge */}
-        {typeof matchScore === 'number' && (
+        {/* Match score badge - Only shown if showScore is true (arriving from quiz) */}
+        {showScore && typeof matchScore === 'number' && (
           <span className={`absolute top-2 right-2 border font-extrabold font-display text-sm px-2.5 py-1 rounded-xl backdrop-blur-sm ${scoreColour(matchScore)}`}>
             {matchScore}%
           </span>
@@ -509,7 +509,7 @@ function DestinationsInner() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((dest, i) => (
-              <DestCard key={dest.id + (fromQuiz ? '' : i)} dest={dest} rank={i + 1} />
+              <DestCard key={dest.id + (fromQuiz ? '' : i)} dest={dest} rank={i + 1} showScore={fromQuiz} />
             ))}
           </div>
 

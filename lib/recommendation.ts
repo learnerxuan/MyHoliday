@@ -127,13 +127,81 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return (magA === 0 || magB === 0) ? 0 : dot / (magA * magB)
 }
 
-export function inferPreferences(itineraries: any[], interactions: any[] = []): UserPreferences {
-  // Styles scoring map
+// ── Budget string normalisation ───────────────────────────────
+// chat_sessions.planner_state stores budget_profile in lowercase
+// (e.g. "mid-range"), while the rest of the system uses title-case
+// "Mid-range". Normalise so frequency counting works correctly.
+function normaliseBudget(raw: string): string {
+  if (!raw || raw === 'unknown') return ''
+  const map: Record<string, string> = {
+    'budget':    'Budget',
+    'mid-range': 'Mid-range',
+    'midrange':  'Mid-range',
+    'luxury':    'Luxury',
+  }
+  return map[raw.toLowerCase()] ?? raw
+}
+
+// ── Exported Helpers ─────────────────────────────────────────
+
+/**
+ * Extract a click-count map of countries the user has interacted with
+ * across clicks, saved itineraries, and chat sessions.
+ * Used to apply a country affinity boost in discovery ranking.
+ *
+ * @returns Map<country, clickCount>
+ */
+export function extractPreferredCountries(
+  interactions: any[],
+  itineraries: any[],
+  chatSessions: any[] = []
+): Map<string, number> {
+  const counts = new Map<string, number>()
+
+  // Clicks carry the strongest country signal
+  interactions.forEach(inter => {
+    const country = inter.destinations?.country
+    if (country) counts.set(country, (counts.get(country) || 0) + 1)
+  })
+
+  // Saved itineraries — if trip_metadata stores the destination country
+  itineraries.forEach(it => {
+    const meta = it.trip_metadata as any
+    if (meta?.country) counts.set(meta.country, (counts.get(meta.country) || 0) + 1)
+  })
+
+  // Chat sessions — country of the destination the user planned for
+  chatSessions.forEach(session => {
+    const country = session.destinations?.country
+    if (country) counts.set(country, (counts.get(country) || 0) + 1)
+  })
+
+  return counts
+}
+
+/**
+ * Infer user preferences from all available behavioural signals.
+ *
+ * Signal weights:
+ *   Saved itineraries  → styles/budget/regions  (weight 1.0)
+ *   Click interactions → styles/budget/regions  (weight 0.8)
+ *   Chat sessions      → styles/budget/regions  (weight 0.9)
+ *
+ * @param itineraries  Rows from `itineraries` table with `trip_metadata`
+ * @param interactions Rows from `user_interactions` joined with `destinations(*)`
+ * @param chatSessions Rows from `chat_sessions` joined with `destinations(region)`
+ */
+export function inferPreferences(
+  itineraries: any[],
+  interactions: any[] = [],
+  chatSessions: any[] = []
+): UserPreferences {
   const styleScores: Record<string, number> = {}
   const budgets: string[] = []
   const climates: string[] = []
-  
-  // 1. Process Saved Itineraries (Hard Signal - Weight 1.0)
+  const preferredRegions = new Set<string>()
+
+  // ── 1. Saved Itineraries (Hard Signal — weight 1.0) ──────────
   itineraries.forEach(it => {
     const meta = it.trip_metadata as any
     if (meta?.styles) {
@@ -143,63 +211,106 @@ export function inferPreferences(itineraries: any[], interactions: any[] = []): 
     }
     if (meta?.budget) budgets.push(meta.budget)
     if (meta?.climate) climates.push(meta.climate)
+    if (Array.isArray(meta?.regions)) {
+      meta.regions.forEach((r: string) => preferredRegions.add(r))
+    }
   })
 
-  // 2. Process Clicks (Interest Signal - Weight 0.8 - User requested "stronger impact")
-  // interactions should come with the destination object joined
+  // ── 2. Click Interactions (Interest Signal — weight 0.8) ──────
+  const possibleStyles = [
+    { key: 'culture',   label: 'Culture' },
+    { key: 'adventure', label: 'Adventure' },
+    { key: 'nature',    label: 'Nature' },
+    { key: 'beaches',   label: 'Beach & Relax' },
+    { key: 'nightlife', label: 'Nightlife' },
+    { key: 'cuisine',   label: 'Food & Cuisine' },
+    { key: 'wellness',  label: 'Wellness' },
+    { key: 'urban',     label: 'Urban' },
+    { key: 'seclusion', label: 'Seclusion' },
+  ]
+
   interactions.forEach(inter => {
     const dest = inter.destinations
     if (!dest) return
 
-    // Extract styles from destination columns
-    const possibleStyles = [
-      { key: 'culture',   label: 'Culture' },
-      { key: 'adventure', label: 'Adventure' },
-      { key: 'nature',    label: 'Nature' },
-      { key: 'beaches',   label: 'Beach & Relax' },
-      { key: 'nightlife', label: 'Nightlife' },
-      { key: 'cuisine',   label: 'Food & Cuisine' },
-      { key: 'wellness',  label: 'Wellness' },
-      { key: 'urban',     label: 'Urban' },
-      { key: 'seclusion', label: 'Seclusion' }
-    ]
-
     possibleStyles.forEach(s => {
-      // If the destination scores high (>=3) in this style, record interest
+      // If destination scores >= 3 in a category, record style interest
       if ((dest[s.key] || 0) >= 3) {
         styleScores[s.label] = (styleScores[s.label] || 0) + 0.8
       }
     })
-    
-    // Also consider clicked budgets/climate if available
+
     if (dest.budget_level) budgets.push(dest.budget_level)
+
+    // Infer region from the actual destination.region column
+    if (dest.region) preferredRegions.add(dest.region)
   })
 
-  // Get top 3 styles by weighted score
+  // ── 3. Chat Sessions (Strong Interest Signal — weight 0.9) ────
+  chatSessions.forEach(session => {
+    const state = session.planner_state as any
+    if (!state) return
+
+    // preferred_styles from planner_state are exact display labels
+    if (Array.isArray(state.preferred_styles)) {
+      state.preferred_styles.forEach((s: string) => {
+        styleScores[s] = (styleScores[s] || 0) + 0.9
+      })
+    }
+
+    // budget_profile stored lowercase in planner_state — normalise
+    if (state.budget_profile && state.budget_profile !== 'unknown') {
+      const normalised = normaliseBudget(state.budget_profile)
+      if (normalised) budgets.push(normalised)
+    }
+
+    // Region from the destination the user chatted about
+    // (joined via destinations(region) in the DB query)
+    const chatDestRegion = session.destinations?.region
+    if (chatDestRegion) preferredRegions.add(chatDestRegion)
+  })
+
+  // ── Resolve top styles (up to 3) ─────────────────────────────
   const topStyles = Object.entries(styleScores)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 3)
     .map(([style]) => style)
 
-  // Fallbacks if no data
   const finalStyles = topStyles.length > 0 ? topStyles : ['Culture', 'Urban']
 
+  // ── Resolve budget (most frequent wins) ───────────────────────
   const topBudget = budgets.length > 0
-    ? budgets.sort((a,b) => budgets.filter(v => v===b).length - budgets.filter(v => v===a).length).pop() || 'Mid-range'
+    ? budgets
+        .sort((a, b) => budgets.filter(v => v === b).length - budgets.filter(v => v === a).length)
+        .pop() || 'Mid-range'
     : 'Mid-range'
 
+  // ── Resolve climate (most frequent wins) ──────────────────────
   const topClimate = climates.length > 0
-    ? climates.sort((a,b) => climates.filter(v => v===b).length - climates.filter(v => v===a).length).pop() || 'Warm'
+    ? climates
+        .sort((a, b) => climates.filter(v => v === b).length - climates.filter(v => v === a).length)
+        .pop() || 'Warm'
     : 'Warm'
+
+  // ── Resolve regions from destinations.region ─────────────────
+  // Regions are inferred from clicked/saved/chatted destination rows.
+  // Fall back to all regions only when there are zero signals.
+  const ALL_REGIONS = [
+    'africa', 'asia', 'europe', 'middle_east',
+    'north_america', 'oceania', 'south_america'
+  ]
+  const finalRegions = preferredRegions.size > 0
+    ? Array.from(preferredRegions)
+    : ALL_REGIONS
 
   return {
     styles: finalStyles,
-    regions: ['africa', 'asia', 'europe', 'middle_east', 'north_america', 'oceania', 'south_america'],
+    regions: finalRegions,
     budget: topBudget,
     climate: topClimate,
     groupSize: 'Couple',
     travelDateStart: new Date().toISOString().split('T')[0],
-    travelDateEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    travelDateEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
   }
 }
 
@@ -211,7 +322,7 @@ export function scoreDestinations(
   const end   = new Date(prefs.travelDateEnd)
   const ms    = end.getTime() - start.getTime()
   const durationDays = Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1)
-  
+
   const encoded = durationDays <= 3 ? 0.25 : durationDays <= 6 ? 0.5 : durationDays <= 10 ? 0.75 : 1.0
   const travelMonth = new Date(prefs.travelDateStart).getMonth() + 1
 
