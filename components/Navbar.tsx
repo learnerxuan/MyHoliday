@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { signOut } from '@/lib/supabase/auth'
 
@@ -210,11 +211,18 @@ export default function Navbar() {
 }
 
 function NavLink({ href, onClick, children }: { href: string; onClick?: () => void; children: React.ReactNode }) {
+  const pathname = usePathname()
+  const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href))
+
   return (
     <Link
       href={href}
       onClick={onClick}
-      className="text-sm font-semibold font-body text-charcoal/70 hover:text-charcoal transition-colors tracking-wide"
+      className={`text-sm font-body tracking-wide transition-colors ${
+        isActive 
+          ? 'font-extrabold text-charcoal' 
+          : 'font-semibold text-charcoal/70 hover:text-charcoal'
+      }`}
     >
       {children}
     </Link>
@@ -222,11 +230,18 @@ function NavLink({ href, onClick, children }: { href: string; onClick?: () => vo
 }
 
 function MobileNavLink({ href, onClick, children }: { href: string; onClick?: () => void; children: React.ReactNode }) {
+  const pathname = usePathname()
+  const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href))
+
   return (
     <Link
       href={href}
       onClick={onClick}
-      className="block text-base font-semibold font-body text-charcoal hover:text-amber transition-colors px-4 py-3 rounded-xl hover:bg-black/5"
+      className={`block text-base font-body transition-colors px-4 py-3 rounded-xl hover:bg-black/5 ${
+        isActive
+          ? 'font-extrabold text-amber'
+          : 'font-semibold text-charcoal hover:text-amber'
+      }`}
     >
       {children}
     </Link>
