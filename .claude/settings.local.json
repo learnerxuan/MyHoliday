@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(bash \"C:/Users/User/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh\" --project-dir \"C:/Users/User/OneDrive - Asia Pacific University of Technology And Innovation \\(APU\\)/Desktop/MyHoliday\")"
+      "Bash(bash \"C:/Users/User/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh\" --project-dir \"C:/Users/User/OneDrive - Asia Pacific University of Technology And Innovation \\(APU\\)/Desktop/MyHoliday\")",
+      "Bash(node --check app/api/chat/route.js)",
+      "Bash(node --check app/itinerary/ItineraryPlanner.jsx)",
+      "Bash(npx --yes acorn --ecma2024 --module app/itinerary/ItineraryPlanner.jsx)"
     ]
   }
 }

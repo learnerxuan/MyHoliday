@@ -4,32 +4,43 @@ import { buildSystemPrompt, buildItineraryContext } from '@/lib/ai/system-prompt
 import { TOOL_DEFINITIONS, getToolStatus, executeTool } from '@/lib/ai/tools/index'
 import { checkGuardrails } from '@/lib/ai/guardrails'
 import { enrichItineraryDays, enrichLooseItems } from '@/lib/ai/tools/enrich_itinerary_items'
+import { sanitiseCoords as sharedSanitiseCoords } from '@/lib/ai/tools/sanitise-coords'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4.1-mini'
+const DEBUG_CHAT = process.env.DEBUG_CHAT === '1'
 
 const encoder = new TextEncoder()
 
-function send(controller, obj) {
-  controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
+function createStreamSink(controller) {
+  let closed = false
+  return {
+    send(obj) {
+      if (closed) return
+      try {
+        controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
+      } catch {
+        closed = true
+      }
+    },
+    close() {
+      if (closed) return
+      closed = true
+      try { controller.close() } catch { /* already closed */ }
+    },
+    get isClosed() { return closed },
+  }
 }
 
 function isPlainObject(value) {
   return value != null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function sanitiseCoords(item) {
-  let { lat, lng } = item
-  if (lat == null || lng == null) return item
-
-  lat = Number(lat)
-  lng = Number(lng)
-
-  if (lat === 0 && lng === 0) return { ...item, lat: null, lng: null }
-  if (Math.abs(lat) > 90) [lat, lng] = [lng, lat]
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ...item, lat: null, lng: null }
-
-  return { ...item, lat, lng }
+// sanitiseCoords is a thin wrapper so callers can pass the current destination
+// centre as bias context. Logic lives in lib/ai/tools/sanitise-coords.js and is
+// shared with the client to keep both sides in lock-step.
+function sanitiseCoords(item, context) {
+  return sharedSanitiseCoords(item, context)
 }
 
 function deepMergePlannerState(base, patch) {
@@ -131,12 +142,12 @@ function expandImplicitReply(message, history = []) {
   ].join(' ')
 }
 
-function applyItineraryUpdates(prev, updates) {
+function applyItineraryUpdates(prev, updates, coordsContext) {
   if (!updates?.length) return prev
 
   const next = { ...prev }
   for (const rawUpdate of updates) {
-    const update = sanitiseCoords(rawUpdate)
+    const update = sanitiseCoords(rawUpdate, coordsContext)
     const key = `day${update.day}`
     if (!next[key]) next[key] = []
 
@@ -236,9 +247,10 @@ async function geocodeItem(item, city, biasLat = null, biasLng = null) {
   const query = encodeURIComponent(`${item.name} ${city || ''}`)
   let url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=geometry&key=${process.env.GOOGLE_PLACES_API_KEY}`
   
-  // Add location bias if coordinates are available to prevent global/IP-based skew (the "Malaysia" fix)
+  // C3: use a circle bias (10 km radius) rather than a point; point bias is so narrow
+  // that Google sometimes returns empty or IP-skewed fallbacks for the same query.
   if (biasLat && biasLng) {
-    url += `&locationbias=point:${biasLat},${biasLng}`
+    url += `&locationbias=circle:10000@${biasLat},${biasLng}`
   }
 
   try {
@@ -325,6 +337,8 @@ export async function POST(request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      const sink = createStreamSink(controller)
+      const send = (obj) => sink.send(obj)
       try {
         const supabase = await createSupabaseServerClient()
 
@@ -335,8 +349,8 @@ export async function POST(request) {
           .single()
 
         if (destError || !destination) {
-          send(controller, { type: 'error', message: 'Destination not found' })
-          controller.close()
+          send({ type: 'error', message: 'Destination not found' })
+          sink.close()
           return
         }
 
@@ -377,33 +391,35 @@ export async function POST(request) {
               .single()
 
             if (sessionError) {
-              send(controller, { type: 'error', message: 'Failed to create session' })
-              controller.close()
-              return
+              // D3: another tab may have inserted the active session between our
+              // SELECT and INSERT. The unique partial index makes that fail with
+              // 23505; recover by re-reading the row instead of erroring out.
+              const { data: raced } = await supabase
+                .from('chat_sessions')
+                .select('id, planner_state')
+                .eq('user_id', userId)
+                .eq('destination_id', destinationId)
+                .eq('status', 'active')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+              if (raced) {
+                currentSessionId = raced.id
+                currentPlannerState = normalisePlannerState(raced.planner_state, profile)
+              } else {
+                console.error('[chat] session insert failed and no active row found:', sessionError)
+                send({ type: 'error', message: 'Failed to create session' })
+                sink.close()
+                return
+              }
+            } else {
+              currentSessionId = newSession.id
+              currentPlannerState = normalisePlannerState(newSession.planner_state, profile)
             }
-
-            currentSessionId = newSession.id
-            currentPlannerState = normalisePlannerState(newSession.planner_state, profile)
           }
 
-          // Pre-fill plannerState from quiz answers before sending the session ID.
-          // deepMergePlannerState is sufficient — currentPlannerState is already fully normalised.
-          if (quizContext) {
-            const normalisedBudget = quizContext.budget
-              ? quizContext.budget.toLowerCase()   // "Mid-range" → "mid-range"
-              : null
-            currentPlannerState = deepMergePlannerState(currentPlannerState, {
-              trip_days: quizContext.trip_days ?? null,
-              budget_profile: normalisedBudget ?? currentPlannerState.budget_profile,
-              pace: quizContext.pace ?? null,
-              travel_date_start: quizContext.travel_date_start ?? null,
-              travel_date_end: quizContext.travel_date_end ?? null,
-              group_size: quizContext.group_size ?? null,
-              preferred_styles: quizContext.preferred_styles ?? [],
-            })
-          }
-
-          send(controller, { type: 'session', sessionId: currentSessionId })
+          send({ type: 'session', sessionId: currentSessionId })
         } else {
           const { data: sessionRow } = await supabase
             .from('chat_sessions')
@@ -412,6 +428,36 @@ export async function POST(request) {
             .single()
 
           currentPlannerState = normalisePlannerState(sessionRow?.planner_state, profile)
+        }
+
+        // Quiz pre-fill MUST run for both new and reused sessions. Previously this lived inside
+        // the new-session branch, so reusing an active session for a destination silently dropped
+        // every quiz answer — the chatbot would then re-ask "How many days?" and ignore budget/pace.
+        // Only fills fields that aren't already set on the session, so existing planner state wins.
+        if (quizContext) {
+          const tripDaysNum = Number(quizContext.trip_days)
+          const groupSizeNum = Number(quizContext.group_size)
+          const normalisedBudget = quizContext.budget ? String(quizContext.budget).toLowerCase() : null
+          const fill = {}
+          if (currentPlannerState.trip_days == null && Number.isFinite(tripDaysNum) && tripDaysNum > 0) {
+            fill.trip_days = tripDaysNum
+          }
+          if ((currentPlannerState.budget_profile == null || currentPlannerState.budget_profile === 'unknown') && normalisedBudget) {
+            fill.budget_profile = normalisedBudget
+          }
+          if (currentPlannerState.pace == null && quizContext.pace) fill.pace = quizContext.pace
+          if (currentPlannerState.travel_date_start == null && quizContext.travel_date_start) fill.travel_date_start = quizContext.travel_date_start
+          if (currentPlannerState.travel_date_end == null && quizContext.travel_date_end) fill.travel_date_end = quizContext.travel_date_end
+          if (currentPlannerState.group_size == null && Number.isFinite(groupSizeNum) && groupSizeNum > 0) {
+            fill.group_size = groupSizeNum
+          }
+          if ((!Array.isArray(currentPlannerState.preferred_styles) || currentPlannerState.preferred_styles.length === 0)
+            && Array.isArray(quizContext.preferred_styles) && quizContext.preferred_styles.length) {
+            fill.preferred_styles = quizContext.preferred_styles
+          }
+          if (Object.keys(fill).length) {
+            currentPlannerState = deepMergePlannerState(currentPlannerState, fill)
+          }
         }
 
         const { data: history } = await supabase
@@ -461,14 +507,16 @@ export async function POST(request) {
               { session_id: currentSessionId, role: 'assistant', content: initResponse.message },
             ])
 
-            send(controller, {
+            send({
               type: 'result',
               sessionId: currentSessionId,
               data: initResponse,
             })
             return
           } else {
-            // Quiz data exists — FAST TRACK: proceed to LLM loop with hidden instruction
+            // Quiz data exists — FAST TRACK: proceed to LLM loop with hidden instruction.
+            // This mutated `message` is intentionally NOT saved to chat_messages (see isInit check below)
+            // because it's an internal directive, not user-visible speech.
             message = `Initialize: Start by greeting me with: "${destination.city} is a great pick for a well-planned getaway." and then immediately call your generate_itinerary tool to start the plan for ${known.knownDays} days at a ${known.knownBudget} budget. Once the itinerary is generated, provide a brief, friendly summary of what you've planned in your final response.`
             currentPlannerState.phase = 'planning'
             currentPlannerState.mode = 'quick_draft'
@@ -505,6 +553,10 @@ export async function POST(request) {
             response_format: { type: 'json_object' },
           })
 
+          if (DEBUG_CHAT) {
+            console.log('[chat] round', round, 'finish_reason:', response.choices[0]?.finish_reason, 'usage:', response.usage)
+          }
+
           const aiMsg = response.choices[0]?.message
           if (!aiMsg) break
 
@@ -513,13 +565,15 @@ export async function POST(request) {
             break
           }
 
-          loopMessages.push(aiMsg)
+          // Coerce null content to empty string — OpenAI rejects assistant messages with null content
+          // when there are also tool_calls, even though their own SDK returns null.
+          loopMessages.push({ ...aiMsg, content: aiMsg.content ?? '' })
 
           for (const toolCall of aiMsg.tool_calls) {
             const toolName = toolCall.function.name
             const toolArgs = JSON.parse(toolCall.function.arguments)
 
-            send(controller, {
+            send({
               type: 'status',
               message: getToolStatus(toolName, toolArgs),
             })
@@ -552,22 +606,38 @@ export async function POST(request) {
           }
         }
 
+        // If the tool loop exhausted without a text reply, force one final completion
+        // WITHOUT tools so the model must return the JSON envelope.
         if (!finalContent) {
-          send(controller, { type: 'error', message: 'AI did not return a final response' })
-          controller.close()
+          if (DEBUG_CHAT) console.log('[chat] tool loop exhausted — forcing final completion without tools')
+          try {
+            const forced = await openai.chat.completions.create({
+              model: CHAT_MODEL,
+              messages: [
+                ...loopMessages,
+                { role: 'user', content: 'Based on the tools you\'ve already called, produce your final JSON response now. Do not call any more tools.' },
+              ],
+              response_format: { type: 'json_object' },
+            })
+            finalContent = forced.choices[0]?.message?.content ?? null
+          } catch (err) {
+            console.error('[chat] forced final completion failed:', err)
+          }
+        }
+
+        if (!finalContent) {
+          send({ type: 'error', message: 'AI did not return a final response' })
+          sink.close()
           return
         }
 
         let parsed
         parsed = extractJSON(finalContent)
         if (!parsed) {
-          // If content looks like raw JSON that failed to parse, show a friendly error
-          // rather than dumping raw JSON into the chat
-          const looksLikeJSON = typeof finalContent === 'string' && finalContent.trim().startsWith('{')
+          // Extraction failed — never fall back to raw finalContent (it's malformed JSON
+          // and would dump garbage into the chat history).
           parsed = {
-            message: looksLikeJSON
-              ? 'Sorry, I had trouble formatting my response. Please try again.'
-              : (finalContent ?? 'Sorry, something went wrong. Please try again.'),
+            message: 'Sorry, I had trouble formatting my response. Please try again.',
             itinerary_updates: [],
             options: [],
             planner_state_patch: {},
@@ -606,19 +676,36 @@ export async function POST(request) {
           }
         }
 
-        await Promise.all(itemsToGeocode.map(item => geocodeItem(item, cityContext, destination.latitude, destination.longitude)))
-        // -----------------------------------------
-        if (parsed.itinerary_updates?.length) {
-          parsed.itinerary_updates = await enrichLooseItems(parsed.itinerary_updates, {
-            city: destination.city,
-            country: destination.country,
-            bias_lat: destination.latitude,
-            bias_lng: destination.longitude,
-          })
+        // Enrichment steps below are best-effort. If any external API (Google Places, OSRM)
+        // fails, we log and fall back to the un-enriched itinerary so the user still sees a draft.
+        try {
+          await Promise.all(itemsToGeocode.map(item => geocodeItem(item, cityContext, destination.latitude, destination.longitude)))
+        } catch (err) {
+          console.error('[chat] geocoding failed, continuing with partial coords:', err)
         }
 
-        if (!parsed.overwrite_itinerary?.length && parsed.itinerary_updates?.length) {
-          const mergedItinerary = applyItineraryUpdates(itinerary ?? {}, parsed.itinerary_updates)
+        if (parsed.itinerary_updates?.length) {
+          try {
+            parsed.itinerary_updates = await enrichLooseItems(parsed.itinerary_updates, {
+              city: destination.city,
+              country: destination.country,
+              bias_lat: destination.latitude,
+              bias_lng: destination.longitude,
+            })
+          } catch (err) {
+            console.error('[chat] enrichLooseItems failed, using raw updates:', err)
+          }
+        }
+
+        // D1: if the AI called both generate_itinerary AND modify_itinerary in the same turn,
+        // apply the modify updates on top of the generated overwrite so no changes are silently dropped.
+        const coordsContext = { bias_lat: destination.latitude, bias_lng: destination.longitude }
+        if (parsed.overwrite_itinerary?.length && collectedUpdates.length) {
+          const overwriteObj = itineraryDaysToObject(parsed.overwrite_itinerary)
+          const mergedObj = applyItineraryUpdates(overwriteObj, collectedUpdates, coordsContext)
+          parsed.overwrite_itinerary = itineraryObjectToDays(mergedObj)
+        } else if (!parsed.overwrite_itinerary?.length && parsed.itinerary_updates?.length) {
+          const mergedItinerary = applyItineraryUpdates(itinerary ?? {}, parsed.itinerary_updates, coordsContext)
           parsed.overwrite_itinerary = itineraryObjectToDays(mergedItinerary)
         }
 
@@ -635,12 +722,16 @@ export async function POST(request) {
         }
 
         if (parsed.overwrite_itinerary?.length) {
-          parsed.overwrite_itinerary = await enrichItineraryDays(parsed.overwrite_itinerary, {
-            city: destination.city,
-            country: destination.country,
-            bias_lat: destination.latitude,
-            bias_lng: destination.longitude,
-          })
+          try {
+            parsed.overwrite_itinerary = await enrichItineraryDays(parsed.overwrite_itinerary, {
+              city: destination.city,
+              country: destination.country,
+              bias_lat: destination.latitude,
+              bias_lng: destination.longitude,
+            })
+          } catch (err) {
+            console.error('[chat] enrichItineraryDays failed, returning un-enriched days:', err)
+          }
         }
 
         parsed.options = (parsed.options ?? []).map(normaliseOption)
@@ -672,19 +763,24 @@ export async function POST(request) {
         if (!isInit && !silentUserMessage) {
           messagesToInsert.push({ session_id: currentSessionId, role: 'user', content: message })
         }
-        messagesToInsert.push({ session_id: currentSessionId, role: 'assistant', content: parsed.message ?? finalContent })
+        messagesToInsert.push({
+          session_id: currentSessionId,
+          role: 'assistant',
+          content: parsed.message || 'Sorry, something went wrong. Please try again.',
+        })
 
         await supabase.from('chat_messages').insert(messagesToInsert)
 
-        send(controller, {
+        send({
           type: 'result',
           sessionId: currentSessionId,
           data: parsed,
         })
       } catch (err) {
-        send(controller, { type: 'error', message: err.message ?? 'Unexpected error' })
+        console.error('[chat] unexpected error:', err)
+        send({ type: 'error', message: err.message ?? 'Unexpected error' })
       } finally {
-        controller.close()
+        sink.close()
       }
     },
   })

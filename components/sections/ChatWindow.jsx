@@ -8,7 +8,8 @@ export default function ChatWindow({ messages = [], isLoading = false, toolStatu
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // E4: 'auto' jumps instantly so rapid status/loading toggles don't fight each other.
+    bottomRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [messages, isLoading, toolStatus])
 
   function handleSend() {
@@ -159,7 +160,7 @@ function MessageBubble({ role, content, quickReplies = [], onSend, disabled = fa
                     key={`${reply.label}-${reply.value}`}
                     type="button"
                     disabled={disabled}
-                    onClick={() => onSend(reply.value)}
+                    onClick={() => { if (!disabled) onSend(reply.value) }}
                     className="px-3 py-1.5 rounded-full border border-amber text-amber bg-white text-xs font-semibold font-body hover:bg-amber hover:text-warmwhite transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {reply.label}

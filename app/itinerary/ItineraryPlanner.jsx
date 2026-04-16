@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase/client'
+import { sanitiseCoords as sharedSanitiseCoords } from '@/lib/ai/tools/sanitise-coords'
 import ChatWindow from '@/components/sections/ChatWindow'
 import ItineraryPanel from '@/components/sections/ItineraryPanel'
 
@@ -14,26 +15,15 @@ const TABS = [
   { id: 'map', label: 'Map' },
 ]
 
-function sanitiseCoords(item) {
-  let { lat, lng } = item
-  if (lat == null || lng == null) return item
+// C4: client uses the same heuristic as the server via the shared module.
+const sanitiseCoords = sharedSanitiseCoords
 
-  lat = Number(lat)
-  lng = Number(lng)
-
-  if (lat === 0 && lng === 0) return { ...item, lat: null, lng: null }
-  if (Math.abs(lat) > 90) [lat, lng] = [lng, lat]
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ...item, lat: null, lng: null }
-
-  return { ...item, lat, lng }
-}
-
-function applyUpdates(prev, updates) {
+function applyUpdates(prev, updates, coordsContext) {
   if (!updates?.length) return prev
 
   const next = { ...prev }
   for (const rawUpdate of updates) {
-    const update = sanitiseCoords(rawUpdate)
+    const update = sanitiseCoords(rawUpdate, coordsContext)
     const key = `day${update.day}`
     if (!next[key]) next[key] = []
 
@@ -81,15 +71,20 @@ function overwriteDaysIntoItinerary(prev, overwriteDays = []) {
   return next
 }
 
+function toPositiveNumber(value) {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 function buildTripContextFromQuiz(prefs, meta, profile) {
   return {
-    trip_days: meta.duration_days ?? null,
-    budget: prefs.budget ?? null,
-    travel_date_start: meta.date_start ?? null,
-    travel_date_end: meta.date_end ?? null,
-    group_size: prefs.groupSize ?? null,
-    pace: prefs.pace ?? null,
-    preferred_styles: prefs.styles ?? [],
+    trip_days: toPositiveNumber(meta?.duration_days),
+    budget: prefs?.budget ?? null,
+    travel_date_start: meta?.date_start ?? null,
+    travel_date_end: meta?.date_end ?? null,
+    group_size: toPositiveNumber(prefs?.groupSize),
+    pace: prefs?.pace ?? null,
+    preferred_styles: Array.isArray(prefs?.styles) ? prefs.styles : [],
     dietary: profile?.dietary_restrictions && profile.dietary_restrictions !== 'None'
       ? profile.dietary_restrictions
       : null,
@@ -126,6 +121,7 @@ export default function ItineraryPlanner() {
   const [nearbyResults, setNearbyResults] = useState([])
   const [nearbyLoading, setNearbyLoading] = useState(false)
   const [mapSidebarOpen, setMapSidebarOpen] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const initDone = useRef(false)
 
   const syncTripContextFromSession = useCallback((plannerState) => {
@@ -237,6 +233,9 @@ export default function ItineraryPlanner() {
         // Ignore malformed local backup.
       }
 
+      // B1: flag that history restoration is finished so sendInit can decide correctly.
+      // Must be set AFTER setMessages/setItinerary so sendInit sees them on next render.
+      setHistoryLoaded(true)
       setPageReady(true)
     }
 
@@ -246,21 +245,26 @@ export default function ItineraryPlanner() {
   useEffect(() => {
     if (!userId || !cityId || !sessionId || Object.keys(itinerary).length === 0) return
 
+    // B3: capture sessionId at timer creation so stale closures can't write to a new session.
+    const savedSessionId = sessionId
+    const savedUserId = userId
+    const savedCityId = cityId
+
     const timer = setTimeout(async () => {
       const { data: current } = await supabase
         .from('chat_sessions')
         .select('planner_state')
-        .eq('id', sessionId)
+        .eq('id', savedSessionId)
         .single()
 
       const nextState = { ...(current?.planner_state || {}), itinerary }
       await supabase
         .from('chat_sessions')
         .update({ planner_state: nextState })
-        .eq('id', sessionId)
+        .eq('id', savedSessionId)
 
       try {
-        localStorage.setItem(`itinerary-${userId}-${cityId}`, JSON.stringify(itinerary))
+        localStorage.setItem(`itinerary-${savedUserId}-${savedCityId}`, JSON.stringify(itinerary))
       } catch {
         // Ignore storage failure.
       }
@@ -270,12 +274,29 @@ export default function ItineraryPlanner() {
   }, [cityId, itinerary, sessionId, userId])
 
   const applyServerResult = useCallback((data, replaceMessages = false) => {
-    const { message, itinerary_updates, options, quick_replies, overwrite_itinerary } = data
+    const { message, itinerary_updates, options, quick_replies, overwrite_itinerary: rawOverwrite } = data
 
     if (replaceMessages) {
       setMessages([{ role: 'assistant', content: message, quickReplies: quick_replies ?? [] }])
     } else {
       setMessages(prev => [...prev, { role: 'assistant', content: message, quickReplies: quick_replies ?? [] }])
+    }
+
+    // D2: filter out malformed days before writing to state. The server is supposed to
+    // emit { day: <number>, items: <array> } per day, but a regression there shouldn't
+    // wipe the user's itinerary — drop the bad entries and warn.
+    let overwrite_itinerary = null
+    if (Array.isArray(rawOverwrite)) {
+      overwrite_itinerary = rawOverwrite.filter((day) => {
+        const valid = day && Number.isFinite(Number(day.day)) && Array.isArray(day.items)
+        if (!valid) {
+          console.warn('[applyServerResult] dropping malformed overwrite_itinerary day', day)
+        }
+        return valid
+      })
+      if (overwrite_itinerary.length === 0) overwrite_itinerary = null
+    } else if (rawOverwrite != null) {
+      console.warn('[applyServerResult] overwrite_itinerary was not an array, ignoring', rawOverwrite)
     }
 
     if (overwrite_itinerary) {
@@ -299,7 +320,10 @@ export default function ItineraryPlanner() {
         return overwriteDaysIntoItinerary(prev, overwrite_itinerary)
       })
     } else if (itinerary_updates?.length) {
-      setItinerary(prev => applyUpdates(prev, itinerary_updates))
+      const coordsContext = destination
+        ? { bias_lat: destination.latitude, bias_lng: destination.longitude }
+        : undefined
+      setItinerary(prev => applyUpdates(prev, itinerary_updates, coordsContext))
     }
 
     if (options?.length) {
@@ -314,7 +338,7 @@ export default function ItineraryPlanner() {
       } : null)
       setActiveTab('map')
     }
-  }, [])
+  }, [destination])
 
   const streamChatRequest = useCallback(async ({ body, replaceMessages = false }) => {
     const res = await fetch('/api/chat', {
@@ -369,7 +393,13 @@ export default function ItineraryPlanner() {
   }, [applyServerResult])
 
   useEffect(() => {
-    if (!pageReady || initDone.current || messages.length > 0 || !userId || !destination) return
+    // B1: only fire init AFTER history restoration has finished. If history already exists,
+    // skip init entirely — the restored messages/itinerary are the source of truth.
+    if (!pageReady || !historyLoaded || initDone.current || !userId || !destination) return
+    if (messages.length > 0) {
+      initDone.current = true
+      return
+    }
     initDone.current = true
 
     async function sendInit() {
@@ -400,11 +430,15 @@ export default function ItineraryPlanner() {
     }
 
     sendInit()
-  }, [cityId, destination, itinerary, messages.length, pageReady, sessionId, streamChatRequest, tripContext, userId, resetKey])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageReady, historyLoaded, userId, destination, resetKey])
 
   const handleUpdateItem = useCallback((updates) => {
-    setItinerary(prev => applyUpdates(prev, updates))
-  }, [])
+    const coordsContext = destination
+      ? { bias_lat: destination.latitude, bias_lng: destination.longitude }
+      : undefined
+    setItinerary(prev => applyUpdates(prev, updates, coordsContext))
+  }, [destination])
 
   const handleDeleteItem = useCallback((dayKey, itemName) => {
     handleUpdateItem([{ action: 'remove', day: parseInt(dayKey.replace('day', ''), 10), name: itemName }])
@@ -602,6 +636,7 @@ export default function ItineraryPlanner() {
     }
 
     initDone.current = false
+    setHistoryLoaded(true)
     setResetKey(prev => prev + 1)
   }
 
@@ -634,6 +669,8 @@ export default function ItineraryPlanner() {
     setExportSaving(false)
     if (!error && data?.[0]) {
       setExportModal(false)
+      // E3: clear the title so the modal opens fresh next time the user exports.
+      setExportTitle('')
       router.push(`/saved-itinerary/${data[0].id}`)
     }
   }
@@ -787,7 +824,7 @@ export default function ItineraryPlanner() {
             />
             <div className="flex gap-3">
               <button
-                onClick={() => setExportModal(false)}
+                onClick={() => { setExportModal(false); setExportTitle('') }}
                 className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold font-body text-secondary hover:border-charcoal transition-colors"
               >
                 Cancel

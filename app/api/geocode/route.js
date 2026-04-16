@@ -16,7 +16,7 @@ export async function GET(request) {
     let url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=geometry&key=${process.env.GOOGLE_PLACES_API_KEY}`
     
     if (biasLat && biasLng) {
-      url += `&locationbias=point:${biasLat},${biasLng}`
+      url += `&locationbias=circle:10000@${biasLat},${biasLng}`
     }
 
     const res = await fetch(url)
