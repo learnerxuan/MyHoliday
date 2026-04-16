@@ -81,14 +81,14 @@ const getBudgetStyle = (budget) => {
 function NewListingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const preselectedItineraryId = searchParams.get('itinerary_id')
+  const preselectedItineraryId = searchParams.get('itinerary') || searchParams.get('itinerary_id')
 
   const [loading, setLoading] = useState(true)
   const [itineraries, setItineraries] = useState([])
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  const [postStep, setPostStep] = useState(1)
+  const [postStep, setPostStep] = useState(preselectedItineraryId ? 2 : 1)
   const [selectedItinId, setSelectedItinId] = useState(preselectedItineraryId || null)
   const [postBudget, setPostBudget] = useState('')
 
