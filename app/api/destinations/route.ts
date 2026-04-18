@@ -148,7 +148,7 @@ export async function GET(req: Request) {
       if (hasRegionSignal) {
         scored.forEach((d: any) => {
           if (preferredRegions.has(d.region)) {
-            d.match_score = Math.min(100, d.match_score + 20)
+            d.match_score = d.match_score + 20
           }
         })
       }
@@ -162,13 +162,22 @@ export async function GET(req: Request) {
         scored.forEach((d: any) => {
           const clicks = preferredCountries.get(d.country) || 0
           if (clicks > 0) {
-            d.match_score = Math.min(100, d.match_score + Math.min(clicks * 5, 15))
+            d.match_score = d.match_score + Math.min(clicks * 5, 15)
           }
         })
       }
 
       // ── Step 4: Re-sort after all boosts ──────────────────────
-      scored.sort((a: any, b: any) => b.match_score - a.match_score)
+      scored.sort((a: any, b: any) => {
+        if (b.match_score !== a.match_score) {
+          return b.match_score - a.match_score
+        }
+        // Fallback secondary sort by country, then city name
+        if (a.country !== b.country) {
+          return a.country.localeCompare(b.country)
+        }
+        return a.city.localeCompare(b.city)
+      })
 
       results = scored
     } else {
