@@ -58,16 +58,29 @@ export default function MarketplacePage() {
   const [filter, setFilter] = useState('all') // 'all' for traveller, 'requests' initialized for guide
 
   useEffect(() => {
+    const getAuthUserWithRetry = async (retries = 3) => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (error) throw error
+        return user
+      } catch (err) {
+        if (retries > 0 && (err.name === 'AbortError' || err.name === 'LockAcquireTimeoutError' || (err.message && err.message.includes('Lock')))) {
+          await new Promise(resolve => setTimeout(resolve, 300))
+          return getAuthUserWithRetry(retries - 1)
+        }
+        throw err
+      }
+    }
+
     const fetchSessionAndData = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        const currentUser = await getAuthUserWithRetry()
 
-        if (sessionError || !session?.user) {
+        if (!currentUser) {
           router.push('/auth/login')
           return
         }
 
-        const currentUser = session.user
         const role = currentUser.user_metadata?.role || 'traveler'
 
         let gProfile = null
@@ -214,8 +227,9 @@ export default function MarketplacePage() {
 
         setListings(formattedListings)
       } catch (err) {
-        console.error('Marketplace page error:', err)
-        setError(err.message || 'Failed to load marketplace data.')
+        const errorStr = err?.message || err?.name || String(err)
+        console.error('Marketplace page error:', errorStr, err)
+        setError(errorStr.includes('Failed') ? errorStr : 'Failed to load marketplace data: ' + errorStr)
       } finally {
         setLoading(false)
       }

@@ -51,10 +51,9 @@ export default function ListingDetailPage() {
 
     const fetchAllData = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session?.user) throw new Error('Not authenticated')
+        const { data: { user: currentUser }, error: sessionError } = await supabase.auth.getUser()
+        if (sessionError || !currentUser) throw new Error('Not authenticated')
 
-        const currentUser = session.user
         setUser({
           id: currentUser.id,
           email: currentUser.email,
