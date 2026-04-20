@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   const supabase = await createSupabaseServerClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -9,13 +12,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  
+
   const { data, error } = await supabase
     .from('marketplace_listings')
     .select(`
       *,
-      destinations(city),
-      itineraries(title, content)
+      destinations(city)
     `)
     .eq('id', params.id)
     .single()
@@ -24,21 +26,39 @@ export async function GET(request: Request, { params }: { params: { id: string }
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
+  if (!data) {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+  }
+
   if (data.user_id !== user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { data: itinerary, error: itineraryError } = await supabase
+    .from('itineraries')
+    .select('title, content, trip_metadata')
+    .eq('id', data.itinerary_id)
+    .single()
+
+  if (itineraryError && itineraryError.code !== 'PGRST116') {
+    return NextResponse.json({ error: itineraryError.message }, { status: 400 })
   }
 
   const formattedData = {
     ...data,
     city_name: data.destinations?.city || 'Unknown',
-    itinerary_title: data.itineraries?.title || 'Untitled Itinerary',
-    itinerary_content: data.itineraries?.content || null
+    itinerary_title: itinerary?.title || 'Untitled Itinerary',
+    itinerary_content: itinerary?.content || null,
+    trip_metadata: itinerary?.trip_metadata || null
   }
 
   return NextResponse.json(formattedData)
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   const supabase = await createSupabaseServerClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -51,6 +71,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const { status } = body
 
   const allowedStatuses = ['open', 'negotiating', 'confirmed', 'closed']
+
   if (!allowedStatuses.includes(status)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }

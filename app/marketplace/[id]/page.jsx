@@ -25,8 +25,11 @@ const formatMYR = (amount) => `RM ${Number(amount).toLocaleString('en-MY', { min
 
 export default function ListingDetailPage() {
   const router = useRouter()
-  const { id: listingId } = useParams()
+  const params = useParams()
+  const listingId = Array.isArray(params?.id) ? params.id[0] : params?.id
 
+  console.log('params =', params)
+  console.log('listingId =', listingId)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [listing, setListing] = useState(null)
@@ -34,47 +37,36 @@ export default function ListingDetailPage() {
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
 
-  // Guide-specific state
-  const [proposedPrice, setProposedPrice] = useState('')
-  const [isSubmittingOffer, setIsSubmittingOffer] = useState(false)
-  
-  // Traveller-specific state
-  const [showAcceptModal, setShowAcceptModal] = useState(false)
-  const [selectedOffer, setSelectedOffer] = useState(null)
-  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false)
-  
-  // Chat state
-  const [chatMessage, setChatMessage] = useState('')
-  const [isSendingMsg, setIsSendingMsg] = useState(false)
-
   useEffect(() => {
+    if (!listingId) return
+
     const fetchAllData = async () => {
       try {
-        // 1. Fetch User Profile
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         if (sessionError || !session?.user) throw new Error('Not authenticated')
-        
+
         const currentUser = session.user
-        setUser({ 
-          id: currentUser.id, 
+        setUser({
+          id: currentUser.id,
           email: currentUser.email,
           role: currentUser.user_metadata?.role || 'traveler'
         })
 
-        // 2. Fetch Listing
         const listingRes = await fetch(`/api/marketplace/listings/${listingId}`)
-        if (!listingRes.ok) throw new Error('Listing not found')
         const listingData = await listingRes.json()
+
+        if (!listingRes.ok) {
+          throw new Error(listingData.error || 'Failed to load listing')
+        }
+
         setListing(listingData)
 
-        // 3. Fetch Offers
         const offersRes = await fetch(`/api/marketplace/offers/${listingId}`)
         if (offersRes.ok) {
           const offersData = await offersRes.json()
           setOffers(offersData)
         }
 
-        // 4. Fetch Messages
         const msgRes = await fetch(`/api/marketplace/messages/${listingId}`)
         if (msgRes.ok) {
           const msgData = await msgRes.json()
@@ -86,6 +78,7 @@ export default function ListingDetailPage() {
         setLoading(false)
       }
     }
+
     fetchAllData()
   }, [listingId])
 

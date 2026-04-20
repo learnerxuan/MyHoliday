@@ -61,38 +61,51 @@ export default function MarketplacePage() {
     const fetchSessionAndData = async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
+
         if (sessionError || !session?.user) {
           router.push('/auth/login')
           return
         }
-        
+
         const currentUser = session.user
         const role = currentUser.user_metadata?.role || 'traveler'
 
         let gProfile = null
+
         if (role === 'guide') {
-          // Fetch tour guide profile
-          const { data: guideData } = await supabase
+          const { data: guideData, error: guideError } = await supabase
             .from('tour_guides')
             .select('id, verification_status, city_id, destinations(city, country)')
             .eq('user_id', currentUser.id)
-            .single();
+            .single()
+
+          if (guideError && guideError.code !== 'PGRST116') {
+            throw guideError
+          }
+
           gProfile = guideData
           setGuideProfile(guideData)
-          setFilter('requests') // override initial default
+          setFilter('requests')
         }
-        
-        setUser({ id: currentUser.id, email: currentUser.email, role })
+
+        setUser({
+          id: currentUser.id,
+          email: currentUser.email,
+          role
+        })
 
         let listingsQuery = supabase
           .from('marketplace_listings')
           .select(`
-            id, user_id, desired_budget, status, created_at,
+            id,
+            user_id,
+            itinerary_id,
+            destination_id,
+            desired_budget,
+            status,
+            created_at,
             destinations ( city, country ),
-            itineraries ( content, title ),
-            marketplace_offers ( id, status, guide_id, proposed_price ),
-            users ( full_name )
+            marketplace_offers ( id, status, guide_id, proposed_price )
           `)
           .order('created_at', { ascending: false })
 
@@ -100,28 +113,66 @@ export default function MarketplacePage() {
           if (gProfile?.verification_status === 'approved' && gProfile?.city_id) {
             listingsQuery = listingsQuery.eq('destination_id', gProfile.city_id)
           } else {
-             // If not approved or missing a city, fetch nothing
-             listingsQuery = listingsQuery.is('id', null) 
+            listingsQuery = listingsQuery.is('id', null)
           }
         } else {
-          // Traveller reads their own listings
           listingsQuery = listingsQuery.eq('user_id', currentUser.id)
         }
 
-        const { data: listingsData } = await listingsQuery
-          
-        const formattedListings = (listingsData || []).map(l => {
+        const { data: listingsData, error: listingsError } = await listingsQuery
+
+        if (listingsError) {
+          throw listingsError
+        }
+
+        const itineraryIds = [
+          ...new Set((listingsData || []).map(l => l.itinerary_id).filter(Boolean))
+        ]
+
+        let itineraryMap = {}
+
+        if (itineraryIds.length > 0) {
+          const { data: itinerariesData, error: itinerariesError } = await supabase
+            .from('itineraries')
+            .select('id, title, content, trip_metadata')
+            .in('id', itineraryIds)
+
+          if (itinerariesError) {
+            throw itinerariesError
+          }
+
+          itineraryMap = Object.fromEntries(
+            (itinerariesData || []).map(item => [item.id, item])
+          )
+        }
+
+        const formattedListings = (listingsData || []).map((l) => {
+          const itinerary = itineraryMap[l.itinerary_id]
+          const rawContent = itinerary?.content
+
           let parsedMeta = {}
-          try { 
-            parsedMeta = typeof l.itineraries?.content === 'string' 
-              ? JSON.parse(l.itineraries.content) 
-              : (l.itineraries?.content || {})
-          } catch(e) {}
-          
-          const days = parsedMeta.trip_days || 5
-          const pax = parsedMeta.group_size ? parseInt(parsedMeta.group_size) : 2
-          
-          let tags = parsedMeta.preferred_styles || []
+          try {
+            parsedMeta =
+              typeof rawContent === 'string'
+                ? JSON.parse(rawContent)
+                : (rawContent || {})
+          } catch (e) {
+            parsedMeta = {}
+          }
+
+          const tripMeta = itinerary?.trip_metadata || {}
+          const days =
+            parsedMeta.trip_days ||
+            tripMeta.trip_days ||
+            parsedMeta.duration_days ||
+            5
+
+          const pax =
+            parsedMeta.group_size
+              ? parseInt(parsedMeta.group_size)
+              : tripMeta.group_size || 2
+
+          let tags = parsedMeta.preferred_styles || tripMeta.preferred_styles || []
           if (!tags || tags.length === 0) {
             tags = ['Culture', 'Budget']
           } else if (tags.length > 2) {
@@ -129,6 +180,7 @@ export default function MarketplacePage() {
           }
 
           const offers = l.marketplace_offers || []
+
           let displayStatus = l.status
           if (l.status === 'open') {
             displayStatus = offers.length > 0 ? 'has_offers' : 'awaiting'
@@ -143,20 +195,12 @@ export default function MarketplacePage() {
           }
 
           let formattedDateRange = `${days} Days`
-          if (parsedMeta.travel_date_start) {
-              const start = new Date(parsedMeta.travel_date_start)
-              const end = new Date(parsedMeta.travel_date_start)
-              end.setDate(end.getDate() + days - 1)
-              const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
-              formattedDateRange = `${fmt(start)} - ${fmt(end)}`
-          }
 
           return {
             ...l,
-            title: l.itineraries?.title || 'Untitled Itinerary',
+            title: itinerary?.title || 'Untitled Itinerary',
             city_name: l.destinations?.city || 'Unknown',
             country_name: l.destinations?.country || 'Destination',
-            travellerName: l.users?.full_name || 'Traveller',
             dates: formattedDateRange,
             days,
             pax,
@@ -170,7 +214,8 @@ export default function MarketplacePage() {
 
         setListings(formattedListings)
       } catch (err) {
-        setError('Failed to load marketplace data.')
+        console.error('Marketplace page error:', err)
+        setError(err.message || 'Failed to load marketplace data.')
       } finally {
         setLoading(false)
       }
