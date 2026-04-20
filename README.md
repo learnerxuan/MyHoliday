@@ -152,11 +152,11 @@ Handles account creation, session management, and personal profiling for all use
 
 ### 2. Destination Recommendation Engine
 
-The core discovery feature of MyHoliday. Instead of showing the user a catalogue of destinations, the engine works backwards from the user's stated preferences.
+The core discovery feature of MyHoliday. Instead of showing the user a static catalogue of destinations, the engine offers two co-existing methods to discover travel locations: an explicit preference quiz, and a personalized discovery feed.
 
-**How it works:**
+**1. The Preference Quiz (Primary)**
 
-The user answers a preference quiz with the following inputs:
+The system works backwards from the user's stated preferences. The user answers a quiz with the following inputs:
 
 | Input | Options |
 |---|---|
@@ -166,15 +166,17 @@ The user answers a preference quiz with the following inputs:
 | Trip Duration | Weekend / 1 Week / 2 Weeks / Extended |
 | Climate Preference | Tropical / Temperate / Cold / Desert / Any |
 
-The engine then:
-1. Analyses the submitted preferences
-2. Filters the destination database against the preference criteria
-3. Calculates a **match score** for each qualifying destination
-4. Returns a ranked list of cities with their match scores displayed
+The engine then analyzes the submitted preferences, filters the destination database, and returns a ranked list of cities explicitly matched with a **match score**.
 
-Users who already have a destination in mind can **skip the quiz entirely** and navigate directly to any city page.
+**2. Explore Page Personalization (Discovery)**
 
-**Destination dataset:** The engine operates on a predefined, curated destination dataset rather than live travel data. Each destination entry includes tags aligned to the preference axes above, allowing the scoring algorithm to compute a reliable match.
+Users who skip the quiz or simply want to browse arrive at the "Explore" page. Here, the engine uses **multi-signal personalization** to dynamically rank destinations based on implicit user behavior:
+- **User Interactions (Clicks)**: Tracks which destinations a user views to boost affinity for specific regions and countries.
+- **Saved Itineraries & Chat History**: Analyzes past travel planning behavior to refine recommendations.
+
+To ensure a fresh experience, the engine avoids repetitive sorting, maintaining a mix of highly relevant personalized matches alongside randomized discovery.
+
+**Destination dataset:** Both engines operate on a predefined, curated destination dataset rather than live travel data. Each destination entry includes thematic tags, allowing the scoring algorithm to compute reliable matches seamlessly.
 
 ---
 
@@ -352,45 +354,19 @@ Browser
   │                           │
   │                           ▼
   │                    Supabase (data fetch)
-  │                           │
-  │                           ▼
-  │                    Rendered HTML → Browser
-  │
-  └─── API Call ──────► Next.js API Route (/api/*)
-                               │
-                ┌──────────────┴──────────────┐
-                ▼                             ▼
-         Supabase DB                    LLM API
-    (user data, plans,            (itinerary generation
-     listings, offers,              via OpenAI/Gemini)
-     messages)
-```
-
----
-
-## 🗃️ Database Schema
-
-```sql
+  │                           │```sql
 -- ============================================================
--- MyHoliday — Database Schema
+-- MyHoliday — Consolidated Database Schema
 -- Travel and Tourism Recommendation System
--- AAPP011-4-2 Capstone Project
 -- ============================================================
--- Run this entire file in Supabase SQL Editor
--- Tables are ordered to respect foreign key dependencies
--- ============================================================
-
 
 -- ── EXTENSIONS ──────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-
 -- ============================================================
 -- 1. DESTINATIONS
--- Must be created before users, tour_guides, chat_sessions,
--- itineraries, marketplace_listings
 -- ============================================================
-CREATE TABLE destinations (
+CREATE TABLE public.destinations (
     id                  UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
     city                VARCHAR(100)  NOT NULL,
     country             VARCHAR(100)  NOT NULL,
@@ -414,12 +390,129 @@ CREATE TABLE destinations (
     best_time_to_visit  TEXT
 );
 
+-- ============================================================
+-- 2. TRAVELLER PROFILES (Linked to auth.users)
+-- ============================================================
+CREATE TABLE public.traveller_profiles (
+    id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id                 UUID          NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name               VARCHAR(150),
+    age                     INTEGER,
+    nationality             VARCHAR(100),
+    dietary_restrictions    VARCHAR(100),
+    accessibility_needs     BOOLEAN       DEFAULT FALSE,
+    preferred_language      VARCHAR(50)   DEFAULT 'English',
+    created_at              TIMESTAMP     DEFAULT NOW()
+);
 
 -- ============================================================
--- 2. HISTORICAL_TRIPS
--- Standalone dataset table, no foreign keys
+-- 3. TOUR_GUIDES (Linked to auth.users)
 -- ============================================================
-CREATE TABLE historical_trips (
+CREATE TABLE public.tour_guides (
+    id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id                 UUID          NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name               VARCHAR(150),
+    city_id                 UUID          REFERENCES public.destinations(id) ON DELETE SET NULL,
+    document_url            VARCHAR(500),
+    verification_status     VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (verification_status IN ('pending', 'approved', 'rejected')),
+    created_at              TIMESTAMP     DEFAULT NOW()
+);
+
+-- ============================================================
+-- 4. CHAT_SESSIONS
+-- ============================================================
+CREATE TABLE public.chat_sessions (
+    id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    destination_id  UUID        NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
+    status          VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed')),
+    planner_state   JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    created_at      TIMESTAMP   DEFAULT NOW()
+);
+
+-- ============================================================
+-- 5. CHAT_MESSAGES
+-- ============================================================
+CREATE TABLE public.chat_messages (
+    id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id  UUID        NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
+    role        VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
+    content     TEXT        NOT NULL,
+    created_at  TIMESTAMP   DEFAULT NOW()
+);
+
+-- ============================================================
+-- 6. ITINERARIES
+-- ============================================================
+CREATE TABLE public.itineraries (
+    id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    destination_id  UUID         NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
+    session_id      UUID         REFERENCES public.chat_sessions(id) ON DELETE SET NULL,
+    title           VARCHAR(255) NOT NULL,
+    content         JSONB        NOT NULL,
+    created_at      TIMESTAMP    DEFAULT NOW(),
+    updated_at      TIMESTAMP    DEFAULT NOW()
+);
+
+-- ============================================================
+-- 7. MARKETPLACE_LISTINGS
+-- ============================================================
+CREATE TABLE public.marketplace_listings (
+    id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID          NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    itinerary_id    UUID          NOT NULL REFERENCES public.itineraries(id) ON DELETE CASCADE,
+    destination_id  UUID          NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
+    desired_budget  NUMERIC(10,2),
+    status          VARCHAR(20)   NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'negotiating', 'confirmed', 'closed')),
+    created_at      TIMESTAMP     DEFAULT NOW()
+);
+
+-- ============================================================
+-- 8. MARKETPLACE_OFFERS
+-- ============================================================
+CREATE TABLE public.marketplace_offers (
+    id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    listing_id      UUID          NOT NULL REFERENCES public.marketplace_listings(id) ON DELETE CASCADE,
+    guide_id        UUID          NOT NULL REFERENCES public.tour_guides(id) ON DELETE CASCADE,
+    proposed_price  NUMERIC(10,2) NOT NULL,
+    status          VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'withdrawn')),
+    created_at      TIMESTAMP     DEFAULT NOW()
+);
+
+-- ============================================================
+-- 9. MARKETPLACE_MESSAGES
+-- ============================================================
+CREATE TABLE public.marketplace_messages (
+    id          UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    listing_id  UUID          NOT NULL REFERENCES public.marketplace_listings(id) ON DELETE CASCADE,
+    sender_type VARCHAR(20)   NOT NULL CHECK (sender_type IN ('traveler', 'guide')),
+    sender_id   UUID          NOT NULL,
+    content     TEXT          NOT NULL,
+    created_at  TIMESTAMP     DEFAULT NOW()
+);
+
+-- ============================================================
+-- 10. TRANSACTIONS
+-- ============================================================
+CREATE TABLE public.transactions (
+    id                  UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    offer_id            UUID          NOT NULL REFERENCES marketplace_offers(id) ON DELETE RESTRICT,
+    payer_id            UUID          NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+    payee_id            UUID          NOT NULL REFERENCES public.tour_guides(id) ON DELETE RESTRICT,
+    total_amount        NUMERIC(10,2) NOT NULL,
+    service_charge      NUMERIC(10,2) NOT NULL DEFAULT 0,
+    guide_payout        NUMERIC(10,2) NOT NULL,
+    status              VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'refunded')),
+    payment_reference   VARCHAR(100)  UNIQUE,
+    created_at          TIMESTAMP     DEFAULT NOW(),
+    CONSTRAINT payout_check CHECK (guide_payout = total_amount - service_charge)
+);
+
+-- ============================================================
+-- 11. HISTORICAL_TRIPS (ML Dataset)
+-- ============================================================
+CREATE TABLE public.historical_trips (
     id                      SERIAL        PRIMARY KEY,
     destination             VARCHAR(150),
     duration_days           FLOAT,
@@ -432,170 +525,18 @@ CREATE TABLE historical_trips (
     transportation_cost     NUMERIC(10,2)
 );
 
-
 -- ============================================================
--- 3. USERS
+-- 12. USER_INTERACTIONS
 -- ============================================================
-CREATE TABLE users (
-    id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email                   VARCHAR(255)  NOT NULL UNIQUE,
-    password_hash           VARCHAR(255)  NOT NULL,
-    full_name               VARCHAR(150)  NOT NULL,
-    phone                   VARCHAR(20),
-    date_of_birth           DATE,
-    nationality             VARCHAR(100),
-    dietary_restrictions    VARCHAR(100),
-    accessibility_needs     BOOLEAN       DEFAULT FALSE,
-    language_preferences    VARCHAR(50)   DEFAULT 'English',
-    role                    VARCHAR(20)   NOT NULL DEFAULT 'traveler' CHECK (role IN ('traveler', 'admin')),
-    created_at              TIMESTAMP     DEFAULT NOW()
+CREATE TABLE public.user_interactions (
+    id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID        REFERENCES auth.users(id) ON DELETE CASCADE,
+    destination_id  UUID        REFERENCES public.destinations(id) ON DELETE CASCADE,
+    type            TEXT,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
-
--- ============================================================
--- 4. TOUR_GUIDES
--- Depends on: destinations
--- ============================================================
-CREATE TABLE tour_guides (
-    id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email                   VARCHAR(255)  NOT NULL UNIQUE,
-    password_hash           VARCHAR(255)  NOT NULL,
-    full_name               VARCHAR(150)  NOT NULL,
-    phone                   VARCHAR(20),
-    city_id                 UUID          REFERENCES destinations(id) ON DELETE SET NULL,
-    document_url            VARCHAR(500),
-    verification_status     VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (verification_status IN ('pending', 'approved', 'rejected')),
-    created_at              TIMESTAMP     DEFAULT NOW()
-);
-
-
--- ============================================================
--- 5. CHAT_SESSIONS
--- Depends on: users, destinations
--- ============================================================
-CREATE TABLE chat_sessions (
-    id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    destination_id  UUID          NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
-    status          VARCHAR(20)   NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed')),
-    created_at      TIMESTAMP     DEFAULT NOW()
-);
-
-
--- ============================================================
--- 6. CHAT_MESSAGES
--- Depends on: chat_sessions
--- ============================================================
-CREATE TABLE chat_messages (
-    id          UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id  UUID          NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
-    role        VARCHAR(20)   NOT NULL CHECK (role IN ('user', 'assistant')),
-    content     TEXT          NOT NULL,
-    created_at  TIMESTAMP     DEFAULT NOW()
-);
-
-
--- ============================================================
--- 7. ITINERARIES
--- Depends on: users, destinations, chat_sessions
--- ============================================================
-CREATE TABLE itineraries (
-    id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    destination_id  UUID          NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
-    session_id      UUID          REFERENCES chat_sessions(id) ON DELETE SET NULL,
-    title           VARCHAR(255)  NOT NULL,
-    content         JSONB         NOT NULL,
-    created_at      TIMESTAMP     DEFAULT NOW(),
-    updated_at      TIMESTAMP     DEFAULT NOW()
-);
-
-
--- ============================================================
--- 8. MARKETPLACE_LISTINGS
--- Depends on: users, itineraries, destinations
--- ============================================================
-CREATE TABLE marketplace_listings (
-    id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    itinerary_id    UUID          NOT NULL REFERENCES itineraries(id) ON DELETE CASCADE,
-    destination_id  UUID          NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
-    desired_budget  NUMERIC(10,2),
-    status          VARCHAR(20)   NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'negotiating', 'confirmed', 'closed')),
-    created_at      TIMESTAMP     DEFAULT NOW()
-);
-
-
--- ============================================================
--- 9. MARKETPLACE_OFFERS
--- Depends on: marketplace_listings, tour_guides
--- ============================================================
-CREATE TABLE marketplace_offers (
-    id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    listing_id      UUID          NOT NULL REFERENCES marketplace_listings(id) ON DELETE CASCADE,
-    guide_id        UUID          NOT NULL REFERENCES tour_guides(id) ON DELETE CASCADE,
-    proposed_price  NUMERIC(10,2) NOT NULL,
-    status          VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'withdrawn')),
-    created_at      TIMESTAMP     DEFAULT NOW()
-);
-
-
--- ============================================================
--- 10. MARKETPLACE_MESSAGES
--- Depends on: marketplace_listings
--- Note: sender_id is NOT a FK — polymorphic association
---       sender_type indicates whether sender is 'traveler' or 'guide'
--- ============================================================
-CREATE TABLE marketplace_messages (
-    id          UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    listing_id  UUID          NOT NULL REFERENCES marketplace_listings(id) ON DELETE CASCADE,
-    sender_type VARCHAR(20)   NOT NULL CHECK (sender_type IN ('traveler', 'guide')),
-    sender_id   UUID          NOT NULL,
-    content     TEXT          NOT NULL,
-    created_at  TIMESTAMP     DEFAULT NOW()
-);
-
-
--- ============================================================
--- 11. TRANSACTIONS
--- Depends on: marketplace_offers, users, tour_guides
--- ============================================================
-CREATE TABLE transactions (
-    id                  UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    offer_id            UUID          NOT NULL REFERENCES marketplace_offers(id) ON DELETE RESTRICT,
-    payer_id            UUID          NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    payee_id            UUID          NOT NULL REFERENCES tour_guides(id) ON DELETE RESTRICT,
-    total_amount        NUMERIC(10,2) NOT NULL,
-    service_charge      NUMERIC(10,2) NOT NULL DEFAULT 0,
-    guide_payout        NUMERIC(10,2) NOT NULL,
-    status              VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'refunded')),
-    payment_reference   VARCHAR(100)  UNIQUE,
-    created_at          TIMESTAMP     DEFAULT NOW(),
-
-    -- Ensure the maths always adds up
-    CONSTRAINT payout_check CHECK (guide_payout = total_amount - service_charge)
-);
-
-
--- ============================================================
--- INDEXES
--- For commonly queried foreign keys and filter columns
--- ============================================================
-CREATE INDEX idx_tour_guides_city         ON tour_guides(city_id);
-CREATE INDEX idx_chat_sessions_user       ON chat_sessions(user_id);
-CREATE INDEX idx_chat_sessions_dest       ON chat_sessions(destination_id);
-CREATE INDEX idx_chat_messages_session    ON chat_messages(session_id);
-CREATE INDEX idx_itineraries_user         ON itineraries(user_id);
-CREATE INDEX idx_itineraries_dest         ON itineraries(destination_id);
-CREATE INDEX idx_listings_user            ON marketplace_listings(user_id);
-CREATE INDEX idx_listings_dest            ON marketplace_listings(destination_id);
-CREATE INDEX idx_listings_status          ON marketplace_listings(status);
-CREATE INDEX idx_offers_listing           ON marketplace_offers(listing_id);
-CREATE INDEX idx_offers_guide             ON marketplace_offers(guide_id);
-CREATE INDEX idx_messages_listing         ON marketplace_messages(listing_id);
-CREATE INDEX idx_transactions_offer       ON transactions(offer_id);
-CREATE INDEX idx_transactions_payer       ON transactions(payer_id);
 ```
+
 
 ---
 
@@ -638,14 +579,14 @@ NEXT_PUBLIC_APP_URL=                # e.g. https://myholiday.vercel.app
 
 ## 👥 Team
 
-| Name | Student ID | Responsibility |
-|---|---|---|
-| Laeu Zi-Li | TP- | Project Objectives |
-| Low Ze Xuan | TP- | System Introduction |
-| Heng Ee Sern | TP- | — |
-| Tan Hao Shuan | TP- | — |
-| Muhammad Farris Bin Razman | TP082730 | Project Planning, Methodology, Gantt Chart |
-| Soo Jian Wen | TP081803 | System Hierarchy Chart, Workload Matrix |
+| Name |
+|---|
+| Laeu Zi-Li |
+| Low Ze Xuan |
+| Heng Ee Sern |
+| Tan Hao Shuan |
+| Muhammad Farris Bin Razman |
+| Soo Jian Wen |
 
 > **Course:** AAPP011-4-2 Capstone Project
 > **Institution:** Asia Pacific University of Technology & Innovation

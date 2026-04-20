@@ -37,15 +37,23 @@ export default function ListingDetailPage() {
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
 
+  // Action states
+  const [proposedPrice, setProposedPrice] = useState('')
+  const [isSubmittingOffer, setIsSubmittingOffer] = useState(false)
+  const [chatMessage, setChatMessage] = useState('')
+  const [isSendingMsg, setIsSendingMsg] = useState(false)
+  const [selectedOffer, setSelectedOffer] = useState(null)
+  const [showAcceptModal, setShowAcceptModal] = useState(false)
+  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false)
+
   useEffect(() => {
     if (!listingId) return
 
     const fetchAllData = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session?.user) throw new Error('Not authenticated')
+        const { data: { user: currentUser }, error: sessionError } = await supabase.auth.getUser()
+        if (sessionError || !currentUser) throw new Error('Not authenticated')
 
-        const currentUser = session.user
         setUser({
           id: currentUser.id,
           email: currentUser.email,

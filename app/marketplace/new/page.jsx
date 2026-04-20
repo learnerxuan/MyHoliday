@@ -95,13 +95,12 @@ function NewListingContent() {
   useEffect(() => {
     const init = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session?.user) {
+        const { data: { user: currentUser }, error: sessionError } = await supabase.auth.getUser()
+        if (sessionError || !currentUser) {
           router.push('/auth/login')
           return
         }
         
-        const currentUser = session.user
         const role = currentUser.user_metadata?.role || 'traveller'
         if (role === 'guide') {
           router.push('/')
@@ -135,7 +134,7 @@ function NewListingContent() {
       const selectedPlan = itineraries.find(p => p.id === selectedItinId)
       if (!selectedPlan) throw new Error('Invalid itinerary selected')
 
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { user } } = await supabase.auth.getUser()
       
       const { data: newListing, error: insertError } = await supabase
         .from('marketplace_listings')
@@ -144,7 +143,7 @@ function NewListingContent() {
           destination_id: selectedPlan.destination_id,
           desired_budget: Number(postBudget),
           status: 'open',
-          user_id: session.user.id
+          user_id: user.id
         })
         .select()
         .single()

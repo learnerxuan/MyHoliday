@@ -10,7 +10,7 @@ export async function GET(
   const { data, error } = await supabase
     .from('marketplace_messages')
     .select('*')
-    .eq('listing_id', params.id)
+    .eq('listing_id', (await params).id)
     .order('created_at', { ascending: true })
 
   if (error) {

@@ -17,7 +17,7 @@ export async function GET(
   const { data, error } = await supabase
     .from('marketplace_offers')
     .select('*, tour_guides(full_name)')
-    .eq('listing_id', params.id)
+    .eq('listing_id', (await params).id)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -49,7 +49,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from('marketplace_offers')
     .update({ status: body.status })
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .select()
 
   if (error) {
@@ -63,7 +63,7 @@ export async function PATCH(
       .from('marketplace_offers')
       .update({ status: 'rejected' })
       .eq('listing_id', selectedOffer.listing_id)
-      .neq('id', params.id)
+      .neq('id', (await params).id)
   }
 
   return NextResponse.json(data)

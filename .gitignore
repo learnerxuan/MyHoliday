@@ -40,3 +40,51 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+# Removed broad build/ and lib/ as they conflict with project structure
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+# lib/ (removed)
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+
+# ide
+.vscode/
+.idea/
+*.swp
+*.swo
+.project
+.classpath
+.settings/
+
+# os
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# database / supabase
+supabase/.temp/
+.supabase/
+
+# logs
+*.log
+
