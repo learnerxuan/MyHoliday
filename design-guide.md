@@ -172,24 +172,30 @@ transportation_type VARCHAR(50), transportation_cost NUMERIC(10,2)
 -- Cannot JOIN to destinations by id — match by city name string only.
 ```
 
-### `users`
+### `auth.users` (Supabase Built-in)
+```sql
+-- Managed by Supabase Auth
+id UUID PK
+email VARCHAR
+```
+
+### `traveller_profiles`
 ```sql
 id UUID PK
-email VARCHAR(255) UNIQUE, password_hash VARCHAR(255)
-full_name VARCHAR(150), phone VARCHAR(20)
-date_of_birth DATE, nationality VARCHAR(100)
+user_id UUID FK → auth.users CASCADE
+full_name VARCHAR(150)
+age INTEGER, nationality VARCHAR(100)
 dietary_restrictions VARCHAR(100)
 accessibility_needs BOOLEAN DEFAULT FALSE
-language_preferences VARCHAR(50) DEFAULT 'English'
-role VARCHAR DEFAULT 'traveler'  -- CHECK: 'traveler' | 'admin'
+preferred_language VARCHAR(50) DEFAULT 'English'
 created_at TIMESTAMP DEFAULT NOW()
 ```
 
 ### `tour_guides`
 ```sql
 id UUID PK
-email VARCHAR(255) UNIQUE, password_hash VARCHAR(255)
-full_name VARCHAR(150), phone VARCHAR(20)
+user_id UUID FK → auth.users CASCADE
+full_name VARCHAR(150)
 city_id UUID FK → destinations ON DELETE SET NULL
 document_url VARCHAR(500)
 verification_status VARCHAR DEFAULT 'pending'  -- CHECK: 'pending' | 'approved' | 'rejected'
@@ -199,9 +205,10 @@ created_at TIMESTAMP DEFAULT NOW()
 ### `chat_sessions`
 ```sql
 id UUID PK
-user_id UUID FK → users CASCADE
+user_id UUID FK → auth.users CASCADE
 destination_id UUID FK → destinations CASCADE
 status VARCHAR DEFAULT 'active'  -- CHECK: 'active' | 'completed'
+planner_state JSONB
 created_at TIMESTAMP DEFAULT NOW()
 ```
 
@@ -217,7 +224,7 @@ created_at TIMESTAMP DEFAULT NOW()
 ### `itineraries`
 ```sql
 id UUID PK
-user_id UUID FK → users CASCADE
+user_id UUID FK → auth.users CASCADE
 destination_id UUID FK → destinations CASCADE
 session_id UUID FK → chat_sessions ON DELETE SET NULL
 title VARCHAR(255)
@@ -229,7 +236,7 @@ updated_at TIMESTAMP DEFAULT NOW()
 ### `marketplace_listings`
 ```sql
 id UUID PK
-user_id UUID FK → users CASCADE
+user_id UUID FK → auth.users CASCADE
 itinerary_id UUID FK → itineraries CASCADE
 destination_id UUID FK → destinations CASCADE
 desired_budget NUMERIC(10,2)   -- !! column is desired_budget — NOT budget
@@ -263,7 +270,7 @@ created_at TIMESTAMP DEFAULT NOW()
 ```sql
 id UUID PK
 offer_id UUID FK → marketplace_offers RESTRICT
-payer_id UUID FK → users RESTRICT
+payer_id UUID FK → auth.users RESTRICT
 payee_id UUID FK → tour_guides RESTRICT
 total_amount NUMERIC(10,2)
 service_charge NUMERIC(10,2)
@@ -272,6 +279,15 @@ status VARCHAR DEFAULT 'pending'  -- CHECK: 'pending' | 'completed' | 'refunded'
 payment_reference VARCHAR(100) UNIQUE
 created_at TIMESTAMP DEFAULT NOW()
 -- RESTRICT: cannot delete a user/guide/offer with a completed transaction
+```
+
+### `user_interactions`
+```sql
+id UUID PK
+user_id UUID FK → auth.users CASCADE
+destination_id UUID FK → destinations CASCADE
+type TEXT
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 ```
 
 ---
@@ -378,7 +394,6 @@ Card padding:         p-5
 
 Handles registration, login, logout, and password reset for both travellers and tour guides. Also manages the personal profile that feeds into the AI itinerary system. Travellers and tour guides have completely separate registration flows.
 
-**Dependencies:** `01-project-setup` (Supabase auth), `02-ui-components` (Button, Input, Select, Avatar, Spinner, PageHeader)
 
 ---
 
@@ -490,7 +505,6 @@ Single-step form:
 
 A multi-step preference quiz that collects travel preferences and scores them against the 9 thematic columns in the `destinations` table (culture, adventure, nature, beaches, nightlife, cuisine, wellness, urban, seclusion). The output is a ranked list of cities with match scores.
 
-**Dependencies:** `01-project-setup`, `02-ui-components` (Button, Select, PageHeader, DestinationCard, Badge, Spinner, FilterPanel)
 
 ---
 
@@ -585,7 +599,6 @@ Skip option: "I already know where I want to go →" at top — links to `/desti
 
 The city detail page shows full destination information. The AI itinerary planner is a split-screen chat interface where the user builds a personalised day-by-day itinerary by talking to an AI assistant. The AI is aware of the user's profile (dietary restrictions, accessibility needs, travel style).
 
-**Dependencies:** `01-project-setup`, `02-ui-components` (Button, Badge, Spinner, PageHeader, Modal), `04-auth` (user profile for AI context)
 
 ---
 
@@ -680,7 +693,6 @@ Read `?destination_id=` from URL params on load. Split-screen layout.
 
 A dashboard of the logged-in traveller's saved itineraries. Protected route — traveller must be authenticated. Each itinerary can be viewed, edited, or posted to the marketplace.
 
-**Dependencies:** `01-project-setup`, `02-ui-components` (Button, Badge, PageHeader, Spinner), `04-auth`, `05-city-detail-and-ai-itinerary` (itineraries to display)
 
 ---
 
@@ -748,7 +760,6 @@ itineraries
 
 The marketplace connects travellers with verified local tour guides. Travellers publish their finalised itinerary as a listing with a desired budget. Guides in the matching city browse listings, submit price proposals, and negotiate via in-platform chat. This is the final step in the MyHoliday journey.
 
-**Dependencies:** `01-project-setup`, `02-ui-components` (Button, ListingCard, StatusBadge, Badge, Input, PageHeader, Modal, Avatar, Spinner), `04-auth` (authentication, role checks), `07-itinerary-management` (itineraries to post)
 
 ---
 
@@ -972,7 +983,6 @@ Used by both traveller and guide within the listing detail page.
 
 An analytics and management dashboard accessible only to users with `role = 'admin'`. Provides descriptive statistics from the database and tools to manage users, approve tour guides, and moderate marketplace listings.
 
-**Dependencies:** `01-project-setup`, `02-ui-components` (Button, Avatar, Badge, PageHeader, Spinner, Modal), `04-auth`, Recharts
 
 ---
 
