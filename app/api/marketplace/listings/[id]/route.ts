@@ -19,7 +19,7 @@ export async function GET(
       *,
       destinations(city)
     `)
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .single()
 
   if (error) {
@@ -30,8 +30,11 @@ export async function GET(
     return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
   }
 
-  if (data.user_id !== user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: userData } = await supabase.auth.getUser()
+  const role = userData?.user?.user_metadata?.role || 'traveller'
+
+  if (role === 'traveller' && data.user_id !== user.id) {
+    return NextResponse.json({ error: 'Forbidden. You are not the owner of this listing.' }, { status: 403 })
   }
 
   const { data: itinerary, error: itineraryError } = await supabase
@@ -79,7 +82,7 @@ export async function PATCH(
   const { data: listing, error: listingError } = await supabase
     .from('marketplace_listings')
     .select('id, user_id')
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .single()
 
   if (listingError || !listing) {
@@ -93,7 +96,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from('marketplace_listings')
     .update({ status })
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .select()
     .single()
 

@@ -37,6 +37,15 @@ export default function ListingDetailPage() {
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
 
+  // Action states
+  const [proposedPrice, setProposedPrice] = useState('')
+  const [isSubmittingOffer, setIsSubmittingOffer] = useState(false)
+  const [chatMessage, setChatMessage] = useState('')
+  const [isSendingMsg, setIsSendingMsg] = useState(false)
+  const [selectedOffer, setSelectedOffer] = useState(null)
+  const [showAcceptModal, setShowAcceptModal] = useState(false)
+  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false)
+
   useEffect(() => {
     if (!listingId) return
 
