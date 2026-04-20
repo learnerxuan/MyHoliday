@@ -16,7 +16,7 @@ const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, o
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="text-[16px] font-bold text-charcoal">{title}</div>
-          <div className="text-[11.5px] text-secondary mt-1 tracking-wide">{dates} · {travellerName}</div>
+          <div className="text-[11.5px] text-secondary mt-1 tracking-wide">{dates} · {travellerName || 'Anonymous Traveller'}</div>
         </div>
         <div className="text-right">
           <div className="font-display font-extrabold text-[18px] text-amber">{budget}</div>
@@ -207,7 +207,27 @@ export default function MarketplacePage() {
             }
           }
 
+          const startDate = parsedMeta.start_date || tripMeta.start_date || tripMeta.travel_dates?.start
+          const endDate = parsedMeta.end_date || tripMeta.end_date || tripMeta.travel_dates?.end
+
           let formattedDateRange = `${days} Days`
+          if (startDate && endDate) {
+            try {
+              const start = new Date(startDate)
+              const end = new Date(endDate)
+              if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                const sMonth = start.toLocaleDateString('en-US', { month: 'short' })
+                const eMonth = end.toLocaleDateString('en-US', { month: 'short' })
+                if (sMonth === eMonth && start.getFullYear() === end.getFullYear()) {
+                  formattedDateRange = `${start.getDate()} - ${end.getDate()} ${sMonth} ${start.getFullYear()}`
+                } else if (start.getFullYear() === end.getFullYear()) {
+                  formattedDateRange = `${start.getDate()} ${sMonth} - ${end.getDate()} ${eMonth} ${start.getFullYear()}`
+                } else {
+                  formattedDateRange = `${start.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                }
+              }
+            } catch (err) {}
+          }
 
           return {
             ...l,
@@ -403,7 +423,7 @@ export default function MarketplacePage() {
               </p>
               <div className="flex items-center gap-4 bg-[#FAF9F7] border border-border/50 py-3 px-5 rounded-xl inline-flex w-fit">
                 <div className="font-bold text-[13px] text-charcoal flex gap-2 items-center">
-                   Status: <span className="bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Verified Guide</span>
+                   Status: <span className="bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Verified</span>
                 </div>
                 <div className="w-[1px] h-4 bg-border"></div>
                 <div className="text-[13px] text-secondary font-medium">Assigned to: <strong className="text-charcoal ml-1">{guideProfile?.destinations?.city}, {guideProfile?.destinations?.country}</strong></div>
