@@ -21,6 +21,9 @@
     "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0"
   },
+  "overrides": {
+    "next": "16.1.7"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.21",
