@@ -122,7 +122,7 @@ export default function MarketplacePage() {
         const { data: listingsData, error: listingsError } = await listingsQuery
 
         if (listingsError) {
-          throw listingsError
+          throw new Error(listingsError.message || JSON.stringify(listingsError))
         }
 
         const itineraryIds = [
@@ -138,7 +138,7 @@ export default function MarketplacePage() {
             .in('id', itineraryIds)
 
           if (itinerariesError) {
-            throw itinerariesError
+            throw new Error(itinerariesError.message || JSON.stringify(itinerariesError))
           }
 
           itineraryMap = Object.fromEntries(
