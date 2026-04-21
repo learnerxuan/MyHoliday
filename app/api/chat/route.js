@@ -128,11 +128,15 @@ function buildInitMessage(destination, profile, known = null) {
 }
 
 async function geocodeItem(item, city, biasLat = null, biasLng = null) {
-  // Only attempt geocode if it doesn't have coordinates already
-  if (item.lat && item.lng) return
+  // Prioritize new_name for activity updates, otherwise use name
+  const effectiveName = item.new_name || item.name
+
+  // Only skip if it already has coordinates AND this isn't a name update.
+  // If a new_name is provided, we MUST re-geocode to move the map pin.
+  if (item.lat && item.lng && !item.new_name) return
 
   // Safety Catch: If the AI mis-tagged a generic item, or the name is vague, skip pinning and coerce to generic types.
-  const nameLower = item.name?.toLowerCase() || ''
+  const nameLower = effectiveName?.toLowerCase() || ''
   const genericKeywords = ['local', 'authentic', 'nearby', 'suggested', 'recommendation', 'lunch at a', 'dinner at a', 'breakfast at a', 'brunch at a']
   const logisticKeywords = ['arrival', 'departure', 'check-in', 'check-out']
 
@@ -141,7 +145,12 @@ async function geocodeItem(item, city, biasLat = null, biasLng = null) {
 
   if (isGeneric || isLogistics) {
     if (isLogistics) {
-      item.type = 'note'
+      // Allow "Arrival & Check-in" to be a hotel type as per user preference
+      if (nameLower.includes('arrival') && nameLower.includes('check-in')) {
+        item.type = 'hotel'
+      } else {
+        item.type = 'note'
+      }
     } else {
       if (item.type === 'restaurant') item.type = 'food_recommendation'
       if (item.type === 'attraction') item.type = 'note'
@@ -149,32 +158,54 @@ async function geocodeItem(item, city, biasLat = null, biasLng = null) {
     }
   }
 
-  // If we reach here, it's a specific name. Attempt geocoding.
-  const query = encodeURIComponent(`${item.name} ${city || ''}`)
-  let url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=geometry&key=${process.env.GOOGLE_PLACES_API_KEY}`
-  
-  // Add location bias if coordinates are available to prevent global/IP-based skew (the "Malaysia" fix)
+  // If we reach here, it's a specific name. Attempt geocoding using Places API (New)
+  // We rely on locationBias for position context rather than appending city strings.
+  const payload = {
+    textQuery: effectiveName,
+    maxResultCount: 1,
+  }
+
+  // Add location bias if coordinates are available (using the New API schema)
   if (biasLat && biasLng) {
-    url += `&locationbias=point:${biasLat},${biasLng}`
+    payload.locationBias = {
+      circle: {
+        center: { latitude: biasLat, longitude: biasLng },
+        radius: 50000.0 // 50km bias radius (API max)
+      }
+    }
   }
 
   try {
-    const res = await fetch(url)
-    const data = await res.json()
-    if (data.status === 'OK' && data.candidates?.[0]?.geometry?.location) {
-      item.lat = data.candidates[0].geometry.location.lat
-      item.lng = data.candidates[0].geometry.location.lng
+    console.log(`[GEOCODE] Searching (New API) for: "${effectiveName}"`)
+    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY,
+        'X-Goog-FieldMask': 'places.displayName,places.location,places.formattedAddress'
+      },
+      body: JSON.stringify(payload)
+    })
 
-      // Upgrade the type if we found a real location. 
-      // If the AI forgot to send 'type', or sent a generic one, promote it.
+    const data = await res.json()
+
+    if (data.places?.[0]?.location) {
+      const loc = data.places[0].location
+      item.lat = loc.latitude
+      item.lng = loc.longitude
+      console.log(`[GEOCODE] SUCCESS: Found "${data.places[0].displayName?.text}" at ${item.lat}, ${item.lng}`)
+
+      // Upgrade the type based on search results if possible
       if (!item.type || item.type === 'food_recommendation') {
         item.type = 'restaurant'
       } else if (item.type === 'note') {
         item.type = 'attraction'
       }
+    } else {
+      console.warn(`[GEOCODE] FAILED: No results for query "${effectiveName}"`)
     }
   } catch (err) {
-    console.error('Geocoding error for', item.name, err)
+    console.error(`[GEOCODE] ERROR for "${effectiveName}":`, err)
   }
 }
 

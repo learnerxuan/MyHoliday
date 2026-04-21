@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase/client'
 import ChatWindow from '@/components/sections/ChatWindow'
 import ItineraryPanel from '@/components/sections/ItineraryPanel'
+import QuickIntakeModal from '@/components/sections/QuickIntakeModal'
 
 const MapPanel = dynamic(() => import('@/components/sections/MapPanel'), { ssr: false })
 
@@ -37,6 +38,50 @@ function sanitiseCoords(item) {
   }
 
   return { ...item, lat, lng }
+}
+
+// ── Icons ─────────────────────────────────────────────────────
+const PaceIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+)
+
+const BudgetIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="1" x2="12" y2="23" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+)
+
+const CalendarIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+)
+
+const GroupIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
+const getBudgetStyle = (budget) => {
+  if (!budget) return 'bg-white text-secondary border-border/50';
+  const b = budget.toLowerCase();
+  if (b.includes('economy') || b.includes('budget')) 
+    return 'bg-success-bg text-success border-success/10';
+  if (b.includes('mid-range') || b.includes('balanced') || b.includes('midrange')) 
+    return 'bg-warning-bg text-warning border-warning/10';
+  if (b.includes('luxury')) 
+    return 'bg-muted text-amberdark border-amberdark/10';
+  return 'bg-white text-secondary border-border/50';
 }
 
 // ── Itinerary state helpers ───────────────────────────────────
@@ -108,6 +153,8 @@ export default function ItineraryPlanner() {
   const [tripContext,   setTripContext]   = useState(null)
   const [autoMessage,   setAutoMessage]   = useState(null)
   const [resetKey,      setResetKey]      = useState(0)
+  const [showIntake,    setShowIntake]    = useState(false)
+  const [intakeDone,    setIntakeDone]    = useState(false)
   const initDone = useRef(false)
 
   // ── Init: auth + destination + existing session ─────────────
@@ -155,6 +202,9 @@ export default function ItineraryPlanner() {
             dietary:           profile?.dietary_restrictions && profile.dietary_restrictions !== 'None' ? profile.dietary_restrictions : null,
           }
           setTripContext(savedQuizContext)
+        } else if (!sessionParam) {
+          // No quiz data and not resuming a specific shared session -> show quick intake
+          setShowIntake(true)
         }
       } catch { /* ignore */ }
 
@@ -264,6 +314,7 @@ export default function ItineraryPlanner() {
   // ── Auto-send opening message on fresh session ───────────────
   useEffect(() => {
     if (!pageReady || initDone.current || messages.length > 0 || !userId || !destination) return
+    if (showIntake && !intakeDone) return // Wait for manual intake
     initDone.current = true
 
     // POST __INIT__ silently — no user bubble, no UI update before sending
@@ -330,7 +381,7 @@ export default function ItineraryPlanner() {
 
     sendInit()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageReady, userId, destination, resetKey])
+  }, [pageReady, userId, destination, resetKey, intakeDone])
 
   // ── Local updates (`delete` / `update` from UI) ─────────────
   const handleUpdateItem = useCallback((updates) => {
@@ -458,11 +509,21 @@ export default function ItineraryPlanner() {
     setSessionId(null)
     setActiveTab('itinerary')
     setActiveDay('all')
-    try { localStorage.removeItem(`itinerary-${userId}-${cityId}`) } catch { /* ignore */ }
+    setIntakeDone(false)
+    try { 
+      localStorage.removeItem(`itinerary-${userId}-${cityId}`) 
+    } catch { /* ignore */ }
 
     // Re-trigger __INIT__ fetch
     initDone.current = false
     setResetKey(prev => prev + 1)
+  }
+
+  // ── Intake logic ────────────────────────────────────────────
+  const handleIntakeSubmit = async (data) => {
+    setTripContext(data)
+    setIntakeDone(true)
+    setShowIntake(false)
   }
 
 
@@ -556,36 +617,54 @@ export default function ItineraryPlanner() {
 
       {/* ── Trip context bar (full-width) ── */}
       {tripContext && (
-        <div className="pl-4 pr-5 py-1.5 border-b border-border/60 bg-white/70 backdrop-blur-sm shrink-0 flex items-center gap-6 text-xs font-body text-charcoal font-medium">
+        <div className="pl-4 pr-5 py-1.5 border-b border-border/40 bg-white shrink-0 flex items-center gap-4 text-xs font-body text-charcoal font-medium">
           {tripContext.travel_date_start && tripContext.travel_date_end && (
-            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
-              <span className="opacity-70 text-sm">🗓</span> {(() => {
-                const [y, m, d] = tripContext.travel_date_start.split('-').map(Number);
-                return new Date(y, m - 1, d).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
-              })()} - {(() => {
-                const [y, m, d] = tripContext.travel_date_end.split('-').map(Number);
-                return new Date(y, m - 1, d).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
-              })()}
+            <span 
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              style={{ backgroundColor: '#F0EBE3' }}
+            >
+              <CalendarIcon />
+              <span className="pt-[1px]">
+                {(() => {
+                  const [y, m, d] = tripContext.travel_date_start.split('-').map(Number);
+                  return new Date(y, m - 1, d).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+                })()} - {(() => {
+                  const [y, m, d] = tripContext.travel_date_end.split('-').map(Number);
+                  return new Date(y, m - 1, d).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+                })()}
+              </span>
             </span>
           )}
           {tripContext.trip_days && (
-            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
-              <span className="opacity-70 text-sm">⏱</span> {tripContext.trip_days} Days
+            <span 
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              style={{ backgroundColor: '#F0EBE3' }}
+            >
+              <span className="pt-[1px]">{tripContext.trip_days} Days</span>
             </span>
           )}
           {tripContext.budget && (
-            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
-              <span className="opacity-70 text-sm">💰</span> {tripContext.budget}
+            <span className={`flex items-center gap-1.5 px-2 rounded border text-[10px] font-bold uppercase leading-none h-[22px] ${getBudgetStyle(tripContext.budget)}`}>
+              <BudgetIcon />
+              <span className="pt-[1px]">{tripContext.budget}</span>
             </span>
           )}
           {tripContext.pace && (
-            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
-              <span className="opacity-70 text-sm">🏃</span> {tripContext.pace}
+            <span 
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              style={{ backgroundColor: '#F0EBE3' }}
+            >
+              <PaceIcon />
+              <span className="pt-[1px]">{tripContext.pace}</span>
             </span>
           )}
           {tripContext.group_size && (
-            <span className="flex items-center gap-2 px-3 py-0.5 bg-muted rounded-full shadow-sm">
-              <span className="opacity-70 text-sm">🙋</span> {tripContext.group_size}
+            <span 
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              style={{ backgroundColor: '#F0EBE3' }}
+            >
+              <GroupIcon />
+              <span className="pt-[1px]">{tripContext.group_size}</span>
             </span>
           )}
         </div>
@@ -688,6 +767,13 @@ export default function ItineraryPlanner() {
             </div>
           </div>
         </div>
+      )}
+
+      {showIntake && (
+        <QuickIntakeModal 
+          city={destination?.city} 
+          onSubmit={handleIntakeSubmit} 
+        />
       )}
 
     </div>

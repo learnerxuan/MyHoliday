@@ -22,10 +22,17 @@ const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const MONTH_KEYS  = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
 
 const BUDGET_COLOUR = {
-  'Budget':    'bg-success-bg text-success',
-  'Mid-range': 'bg-warning-bg text-warning',
-  'Luxury':    'bg-muted text-amberdark',
+  'Budget':    'bg-success-bg text-success border-success/10',
+  'Mid-range': 'bg-warning-bg text-warning border-warning/10',
+  'Luxury':    'bg-muted text-amberdark border-amberdark/10',
 }
+
+const BudgetIcon = () => (
+  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="1" x2="12" y2="23" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+)
 
 function ScoreBar({ value }) {
   const pct = Math.round((value / 5) * 100)
@@ -101,9 +108,9 @@ export default async function DestinationPage({ params }) {
   } catch { /* fallback to no image */ }
 
 
-  // Parse categories string into array
+  // Parse categories string into array (ignoring commas inside parentheses)
   const tags = dest.categories
-    ? dest.categories.split(',').map(t => t.trim()).filter(Boolean)
+    ? dest.categories.split(/\s*,\s*(?![^()]*\))/).map(t => t.trim()).filter(Boolean)
     : []
 
   // Monthly temps (use numeric keys 1–12)
@@ -162,13 +169,18 @@ export default async function DestinationPage({ params }) {
             {/* Quick badges */}
             <div className="flex flex-wrap gap-2 mt-6">
               {dest.budget_level && (
-                <span className={`text-xs font-semibold font-body px-3 py-1.5 rounded-full shadow-sm ${BUDGET_COLOUR[dest.budget_level] ?? 'bg-muted text-secondary'}`}>
-                  {dest.budget_level}
+                <span className={`text-[10px] font-bold flex items-center gap-1 uppercase px-2 rounded border leading-none h-[22px] ${BUDGET_COLOUR[dest.budget_level] ?? 'bg-muted text-secondary border-transparent'}`}>
+                  <BudgetIcon />
+                  <span className="pt-[1px]">{dest.budget_level}</span>
                 </span>
               )}
-              {tags.slice(0, 3).map(tag => (
-                <span key={tag} className="text-xs font-semibold font-body px-3 py-1.5 rounded-full bg-white text-charcoal shadow-sm">
-                  {tag}
+              {tags.map(tag => (
+                <span 
+                  key={tag} 
+                  className="text-[10px] font-bold flex items-center gap-1 uppercase px-2 rounded border border-border/40 text-charcoal leading-none h-[22px]"
+                  style={{ backgroundColor: '#F0EBE3' }}
+                >
+                  <span className="pt-[1px]">{tag}</span>
                 </span>
               ))}
             </div>

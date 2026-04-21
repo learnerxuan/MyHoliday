@@ -239,7 +239,7 @@ export default function ItineraryPanel({ itinerary = {}, onExport, onDelete, onU
             disabled={!hasContent}
             className="w-full bg-amber text-warmwhite text-sm font-semibold font-body py-2.5 rounded-lg hover:bg-amberdark transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Export to My Plans
+            Save to My Trips
           </button>
         </div>
       )}

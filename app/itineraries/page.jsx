@@ -317,14 +317,22 @@ export default function ItinerariesPage() {
                           )}
 
                           {session.planner_state?.pace && (
-                            <span className="text-[10px] font-bold text-charcoal/60 flex items-center gap-1 uppercase">
-                              <PaceIcon /> {session.planner_state.pace}
+                            <span 
+                              className="text-[9px] font-bold text-secondary flex items-center gap-1 uppercase px-1.5 py-0.5 rounded border border-border/40 leading-none h-[20px]"
+                              style={{ backgroundColor: '#F0EBE3' }}
+                            >
+                              <PaceIcon /> 
+                              <span className="pt-[1px]">{session.planner_state.pace}</span>
                             </span>
                           )}
 
                           {session.planner_state?.group_size && (
-                            <span className="text-[10px] font-bold text-charcoal/60 flex items-center gap-1 uppercase">
-                              <GroupIcon /> {session.planner_state.group_size}
+                            <span 
+                              className="text-[9px] font-bold text-secondary flex items-center gap-1 uppercase px-1.5 py-0.5 rounded border border-border/40 leading-none h-[20px]"
+                              style={{ backgroundColor: '#F0EBE3' }}
+                            >
+                              <GroupIcon />
+                              <span className="pt-[1px]">{session.planner_state.group_size}</span>
                             </span>
                           )}
                         </div>

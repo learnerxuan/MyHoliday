@@ -43,10 +43,41 @@ interface TripMeta {
 
 // ── Helpers ──────────────────────────────────────────────────
 const BUDGET_COLOUR: Record<string, string> = {
-  'Budget': 'bg-success-bg text-success',
-  'Mid-range': 'bg-warning-bg text-warning',
-  'Luxury': 'bg-muted text-amberdark',
+  'Budget': 'bg-success-bg text-success border-success/10',
+  'Mid-range': 'bg-warning-bg text-warning border-warning/10',
+  'Luxury': 'bg-muted text-amberdark border-amberdark/10',
 }
+
+const BudgetIcon = () => (
+  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="1" x2="12" y2="23" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+)
+
+const CalendarIcon = () => (
+  <svg className="w-3.5 h-3.5 text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+)
+
+const GroupIcon = () => (
+  <svg className="w-3.5 h-3.5 text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
+const ClimateIcon = () => (
+  <svg className="w-3.5 h-3.5 text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+  </svg>
+)
 
 const TOP_TAGS: { key: keyof Destination; icon: string; label: string }[] = [
   { key: 'culture', icon: '🏛️', label: 'Culture' },
@@ -59,6 +90,25 @@ const TOP_TAGS: { key: keyof Destination; icon: string; label: string }[] = [
   { key: 'urban', icon: '🏙️', label: 'Urban' },
   { key: 'seclusion', icon: '🌄', label: 'Seclusion' },
 ]
+
+function getCategoryStyle(label: string) {
+  const l = label.toLowerCase();
+  if (l.includes('nature') || l.includes('seclusion') || l.includes('caves') || l.includes('peaks')) 
+    return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  if (l.includes('culture') || l.includes('history') || l.includes('temple') || l.includes('museum')) 
+    return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+  if (l.includes('cuisine') || l.includes('food') || l.includes('dining')) 
+    return 'bg-rose-50 text-rose-700 border-rose-100';
+  if (l.includes('adventure') || l.includes('active') || l.includes('hiking')) 
+    return 'bg-orange-50 text-orange-800 border-orange-100';
+  if (l.includes('urban') || l.includes('architecture') || l.includes('city') || l.includes('modern')) 
+    return 'bg-slate-50 text-slate-700 border-slate-200';
+  if (l.includes('beach') || l.includes('wellness') || l.includes('spa') || l.includes('water')) 
+    return 'bg-teal-50 text-teal-700 border-teal-100';
+  if (l.includes('nightlife') || l.includes('shopping') || l.includes('bars')) 
+    return 'bg-purple-50 text-purple-700 border-purple-100';
+  return 'bg-white text-secondary border-border';
+}
 
 function getTopTags(dest: Destination, n = 2) {
   return TOP_TAGS
@@ -194,13 +244,15 @@ function DestCard({ dest, rank, showScore }: { dest: Destination; rank: number; 
         {/* Tags row */}
         <div className="flex flex-wrap gap-2">
           {dest.budget_level && (
-            <span className={`text-xs font-semibold font-body px-2 py-0.5 rounded-full ${BUDGET_COLOUR[dest.budget_level] ?? 'bg-muted text-secondary'}`}>
-              {dest.budget_level}
+            <span className={`text-[10px] font-bold flex items-center gap-1 uppercase px-2 rounded border leading-none h-[22px] ${BUDGET_COLOUR[dest.budget_level] ?? 'bg-muted text-secondary border-transparent'}`}>
+              <BudgetIcon /> 
+              <span className="pt-[1px]">{dest.budget_level}</span>
             </span>
           )}
           {topTags.map(t => (
-            <span key={t.key} className="text-xs font-body px-2 py-0.5 rounded-full bg-subtle text-charcoal">
-              {t.icon} {t.label}
+            <span key={t.key} className={`text-[10px] font-bold flex items-center gap-1 uppercase px-2 rounded border leading-none h-[22px] ${getCategoryStyle(t.label)}`}>
+              <span className="text-xs">{t.icon}</span>
+              <span className="pt-[1px]">{t.label}</span>
             </span>
           ))}
         </div>
@@ -232,13 +284,13 @@ function TripMetaBanner({ meta }: { meta: TripMeta }) {
       </div>
       <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] font-medium text-disabled flex-1">
         <span className="flex items-center gap-1.5 whitespace-nowrap">
-          <span className="text-amber">🗓️</span> {formatDate(meta.date_start)} — {formatDate(meta.date_end)}
+          <CalendarIcon /> {formatDate(meta.date_start)} — {formatDate(meta.date_end)}
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="text-amber">🌡️</span> {meta.climate}
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <ClimateIcon /> {meta.climate}
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="text-amber">👥</span> {meta.group_size}
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <GroupIcon /> {meta.group_size}
         </span>
         {meta.budget && (
           <span className="flex items-center gap-1.5 uppercase">
@@ -303,6 +355,11 @@ function DestinationsInner() {
       } catch { /* ignore */ }
     } else {
       // Discovery Mode: Load initial page + recommendations
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('quiz_results')
+        sessionStorage.removeItem('quiz_trip_meta')
+        sessionStorage.removeItem('quiz_prefs')
+      }
       setTripMeta(null)
       loadDiscovery()
     }

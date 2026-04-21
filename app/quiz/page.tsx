@@ -65,13 +65,13 @@ const PACES: { value: Pace; icon: string; desc: string }[] = [
 ]
 
 const REGIONS = [
-  { value: 'africa', label: 'Africa', icon: '🌍' },
-  { value: 'asia', label: 'Asia', icon: '🌏' },
-  { value: 'europe', label: 'Europe', icon: '🇪🇺' },
-  { value: 'middle_east', label: 'Middle East', icon: '🕌' },
-  { value: 'north_america', label: 'North America', icon: '🏔️' },
-  { value: 'oceania', label: 'Oceania', icon: '🏝️' },
-  { value: 'south_america', label: 'South America', icon: '🏜️' },
+  { value: 'africa', label: 'Africa' },
+  { value: 'asia', label: 'Asia' },
+  { value: 'europe', label: 'Europe' },
+  { value: 'middle_east', label: 'Middle East' },
+  { value: 'north_america', label: 'North America' },
+  { value: 'oceania', label: 'Oceania' },
+  { value: 'south_america', label: 'South America' },
 ]
 
 // ── Step indicator ───────────────────────────────────────────
@@ -86,7 +86,7 @@ export default function QuizPage() {
 
   const [prefs, setPrefs] = useState<Preferences>({
     styles: [],
-    regions: REGIONS.map(r => r.value), // Default to All
+    regions: [], // Start with none selected
     budget: '',
     climate: '',
     pace: '',
@@ -262,7 +262,7 @@ export default function QuizPage() {
                         <button
                           key={r.value}
                           onClick={() => toggleRegion(r.value)}
-                          className={`flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${selected
+                          className={`flex items-center gap-4 p-5 rounded-xl border text-left transition-all ${selected
                               ? 'border-amber bg-amber/10 shadow-sm'
                               : 'border-border bg-white hover:border-amber/50'
                             }`}
@@ -271,7 +271,6 @@ export default function QuizPage() {
                             }`}>
                             {selected && <span className="text-white text-xs">✓</span>}
                           </div>
-                          <span className="text-xl">{r.icon}</span>
                           <span className="text-sm font-semibold font-body text-charcoal">{r.label}</span>
                         </button>
                       )
