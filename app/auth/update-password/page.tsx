@@ -9,6 +9,23 @@ import { supabase } from '@/lib/supabase/client'
 // The browser client fires onAuthStateChange with event 'PASSWORD_RECOVERY' on mount,
 // which is our signal that the token is valid and we can allow the password update.
 
+const RECOVERY_TIMEOUT_MS = 8000
+
+function currentUrlLooksLikeRecovery() {
+  if (typeof window === 'undefined') return false
+
+  const url = new URL(window.location.href)
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ''))
+
+  return (
+    url.searchParams.has('code') ||
+    url.searchParams.get('type') === 'recovery' ||
+    hash.get('type') === 'recovery' ||
+    hash.has('access_token') ||
+    hash.has('refresh_token')
+  )
+}
+
 export default function UpdatePasswordPage() {
   const router = useRouter()
   const [ready, setReady] = useState(false)   // true once PASSWORD_RECOVERY fires
@@ -19,23 +36,49 @@ export default function UpdatePasswordPage() {
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    let active = true
+    const hasRecoveryParams = currentUrlLooksLikeRecovery()
+
+    const fallback = setTimeout(() => {
+      if (!active) return
+      setError('This reset link is invalid or expired. Please request a new link.')
+      router.replace('/auth/reset-password')
+    }, RECOVERY_TIMEOUT_MS)
+
+    const markReady = () => {
+      if (!active) return
+      clearTimeout(fallback)
+      setReady(true)
+      setError('')
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        setReady(true)
+        markReady()
+      }
+
+      // @supabase/ssr uses the PKCE flow, where the reset link can return with
+      // a ?code=... URL and then become a normal signed-in recovery session.
+      if (hasRecoveryParams && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        markReady()
       }
     })
 
-    // Fallback: if no token in the URL, redirect to reset request page after 4s
-    const fallback = setTimeout(() => {
-      if (!ready) router.replace('/auth/reset-password')
-    }, 4000)
+    async function verifyExistingRecoverySession() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (hasRecoveryParams && session?.user) {
+        markReady()
+      }
+    }
+
+    verifyExistingRecoverySession()
 
     return () => {
+      active = false
       subscription.unsubscribe()
       clearTimeout(fallback)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

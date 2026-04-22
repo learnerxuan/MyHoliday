@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 
 // Handles both OAuth flows:
@@ -12,26 +12,13 @@ import { supabase } from '@/lib/supabase/client'
 
 function CallbackHandler() {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-          const role = session.user.user_metadata?.role
-          const intent = searchParams.get('intent')
-
-          // Returning user — redirect by role
-          if (role === 'admin')      { router.replace('/admin'); return }
-          if (role === 'guide')      { router.replace('/guide'); return }
-          if (role === 'traveller')  { router.replace('/'); return }
-
-          // First-time user — onboarding
-          if (intent === 'guide') {
-            router.replace('/auth/onboarding/guide')
-          } else {
-            router.replace('/auth/onboarding/traveller')
-          }
+          router.replace('/')
+          router.refresh()
         }
 
         if (event === 'SIGNED_OUT') {
@@ -49,7 +36,7 @@ function CallbackHandler() {
       subscription.unsubscribe()
       clearTimeout(fallback)
     }
-  }, [router, searchParams])
+  }, [router])
 
   return (
     <div className="h-screen flex items-center justify-center bg-warmwhite">
@@ -61,7 +48,7 @@ function CallbackHandler() {
   )
 }
 
-// Wrap in Suspense because useSearchParams requires it in Next.js App Router
+// Keep this wrapped so the auth callback can render consistently in App Router.
 import { Suspense } from 'react'
 
 export default function CallbackPage() {

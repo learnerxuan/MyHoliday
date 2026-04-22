@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signInWithGoogle, signUpWithEmail } from '@/lib/supabase/auth'
+import { supabase } from '@/lib/supabase/client'
 
 type Role = 'traveller' | 'guide'
 
@@ -16,6 +17,15 @@ export default function RegisterPage() {
   const [loading, setLoading]   = useState<'email' | 'google-traveller' | 'google-guide' | null>(null)
   const [error, setError]       = useState('')
   const [sent, setSent]         = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        router.replace('/')
+        router.refresh()
+      }
+    })
+  }, [router])
 
   async function handleEmailSignUp(e: React.FormEvent) {
     e.preventDefault()
@@ -46,13 +56,10 @@ export default function RegisterPage() {
       return
     }
 
-    // Email confirmation DISABLED → session returned immediately, redirect to onboarding
+    // Email confirmation disabled: Supabase returns a session immediately.
     if (data.session) {
-      if (role === 'guide') {
-        router.replace('/auth/onboarding/guide')
-      } else {
-        router.replace('/auth/onboarding/traveller')
-      }
+      router.replace('/')
+      router.refresh()
       return
     }
 
@@ -82,11 +89,11 @@ export default function RegisterPage() {
           <div className="text-5xl">📬</div>
           <h2 className="text-2xl font-extrabold font-display text-charcoal">Check your inbox!</h2>
           <p className="text-sm font-body text-secondary leading-relaxed">
-            We've sent a confirmation link to <strong>{email}</strong>.
+            We&apos;ve sent a confirmation link to <strong>{email}</strong>.
             Click it to activate your account and complete your profile setup.
           </p>
           <p className="text-xs font-body text-tertiary">
-            Didn't receive it? Check your spam folder.
+            Didn&apos;t receive it? Check your spam folder.
           </p>
           <Link
             href="/auth/login"

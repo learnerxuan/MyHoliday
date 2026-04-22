@@ -4,6 +4,23 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { sendPasswordReset } from '@/lib/supabase/auth'
 
+const RESET_COOLDOWN_SECONDS = 60
+const resetCooldownKey = (email: string) => `myholiday:password-reset:${email.toLowerCase()}`
+
+function getFriendlyResetError(message: string) {
+  const lower = message.toLowerCase()
+
+  if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('429')) {
+    return 'Too many reset emails were requested. Please wait a while before trying again.'
+  }
+
+  if (lower.includes('email address not authorized')) {
+    return 'Supabase is using the default email sender, so this address is not allowed. Add a custom SMTP provider for real users.'
+  }
+
+  return message
+}
+
 export default function ResetPasswordPage() {
   const [email, setEmail]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,13 +32,27 @@ export default function ResetPasswordPage() {
     setLoading(true)
     setError('')
 
-    const { error: err } = await sendPasswordReset(email)
+    const normalizedEmail = email.trim().toLowerCase()
+    const key = resetCooldownKey(normalizedEmail)
+    const lastSentAt = Number(window.localStorage.getItem(key) || 0)
+    const secondsSinceLastSend = Math.floor((Date.now() - lastSentAt) / 1000)
+
+    if (lastSentAt && secondsSinceLastSend < RESET_COOLDOWN_SECONDS) {
+      setLoading(false)
+      setError(`Please wait ${RESET_COOLDOWN_SECONDS - secondsSinceLastSend}s before requesting another reset email.`)
+      return
+    }
+
+    const { error: err } = await sendPasswordReset(normalizedEmail)
 
     setLoading(false)
     if (err) {
-      setError(err.message)
+      setError(getFriendlyResetError(err.message))
       return
     }
+
+    window.localStorage.setItem(key, String(Date.now()))
+    setEmail(normalizedEmail)
     setSent(true)
   }
 
@@ -46,8 +77,8 @@ export default function ResetPasswordPage() {
                 Check your inbox
               </h2>
               <p className="text-sm font-body text-secondary leading-relaxed">
-                If <strong>{email}</strong> is registered, you'll receive a
-                password reset link shortly. Check your spam folder if it doesn't appear.
+                If <strong>{email}</strong> is registered, you&apos;ll receive a
+                password reset link shortly. Check your spam folder if it doesn&apos;t appear.
               </p>
               <Link
                 href="/auth/login"
@@ -64,7 +95,7 @@ export default function ResetPasswordPage() {
                   Reset your password
                 </h2>
                 <p className="mt-1 text-sm font-body text-secondary">
-                  Enter your email and we'll send you a reset link.
+                  Enter your email and we&apos;ll send you a reset link.
                 </p>
               </div>
 

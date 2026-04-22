@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signInWithGoogle, signInWithEmail } from '@/lib/supabase/auth'
+import { supabase } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -12,12 +13,21 @@ export default function LoginPage() {
   const [loading, setLoading]   = useState<'email' | 'google' | null>(null)
   const [error, setError]       = useState('')
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        router.replace('/')
+        router.refresh()
+      }
+    })
+  }, [router])
+
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault()
     setLoading('email')
     setError('')
 
-    const { data, error: err } = await signInWithEmail(email, password)
+    const { error: err } = await signInWithEmail(email, password)
     if (err) {
       if (err.message.includes('Invalid login credentials')) {
         setError('Incorrect email or password. Please try again.')
@@ -30,14 +40,8 @@ export default function LoginPage() {
       return
     }
 
-    // Redirect by role — mirrors the callback page logic
-    const role = data.user?.user_metadata?.role
-    if (role === 'admin')     { router.replace('/admin'); return }
-    if (role === 'guide')     { router.replace('/guide'); return }
-    if (role === 'traveller') { router.replace('/'); return }
-
-    // No role yet (first-time email user if email confirmation was disabled)
-    router.replace('/auth/onboarding/traveller')
+    router.replace('/')
+    router.refresh()
   }
 
   async function handleGoogleSignIn() {
@@ -138,7 +142,7 @@ export default function LoginPage() {
           </button>
 
           <p className="text-center text-sm font-body text-secondary pt-1">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/auth/register" className="text-amber hover:text-amberdark font-semibold transition-colors">
               Sign up
             </Link>
