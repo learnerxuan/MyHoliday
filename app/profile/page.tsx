@@ -29,7 +29,7 @@ export default function ProfilePage() {
 
   // Traveller form state
   const [tForm, setTForm] = useState({
-    full_name: '', age: '', nationality: '',
+    full_name: '', date_of_birth: '', nationality: '',
     dietary_restrictions: 'None',
     accessibility_needs: false,
     preferred_language: 'English',
@@ -62,7 +62,7 @@ export default function ProfilePage() {
           const oauthName = user.user_metadata?.full_name || user.user_metadata?.name || ''
           const loadedData = {
             full_name: data.full_name || oauthName,
-            age: data.age?.toString() ?? '',
+            date_of_birth: data.date_of_birth ?? '',
             nationality: data.nationality ?? '',
             dietary_restrictions: data.dietary_restrictions ?? 'None',
             accessibility_needs: data.accessibility_needs ?? false,
@@ -106,12 +106,12 @@ export default function ProfilePage() {
       .upsert({
         user_id: user.id,
         full_name: tForm.full_name,
-        age: tForm.age ? parseInt(tForm.age) : null,
+        date_of_birth: tForm.date_of_birth || null,
         nationality: tForm.nationality,
         dietary_restrictions: tForm.dietary_restrictions,
         accessibility_needs: tForm.accessibility_needs,
         preferred_language: tForm.preferred_language,
-      })
+      }, { onConflict: 'user_id' })
 
     setSaving(false)
     if (err) { setError(err.message); return }
@@ -187,8 +187,8 @@ export default function ProfilePage() {
   const oauthName = user.user_metadata?.full_name || user.user_metadata?.name || ''
 
   return (
-    <div className="w-full bg-warmwhite min-h-screen font-body pb-24 pt-8 sm:pt-12 px-4 sm:px-6 lg:px-8">
-      <section className="max-w-5xl mx-auto p-6 lg:p-12 bg-white rounded-[24px] shadow-sm border border-border/50">
+    <div className="min-h-screen bg-warmwhite flex flex-col pt-2 pb-24 px-2 sm:px-6 font-body">
+      <section className="max-w-5xl mx-auto w-full p-6 lg:p-12 bg-white rounded-[24px] shadow-sm border border-border/50">
         
         {/* Profile Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-8 mb-10">
@@ -267,8 +267,8 @@ export default function ProfilePage() {
                </Field>
 
                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Age">
-                    <input type="number" value={tForm.age} onChange={e => setTForm({...tForm, age: e.target.value})} className={`input-base bg-white ${!isEditing ? 'opacity-70 cursor-not-allowed pointer-events-none' : ''}`} placeholder="e.g. 28" min={10} max={120} disabled={!isEditing} />
+                  <Field label="Date of Birth">
+                    <input type="date" value={tForm.date_of_birth} onChange={e => setTForm({...tForm, date_of_birth: e.target.value})} className={`input-base bg-white h-[42px] ${!isEditing ? 'opacity-70 cursor-not-allowed pointer-events-none' : ''}`} disabled={!isEditing} />
                   </Field>
                   <Field label="Language">
                      <select value={tForm.preferred_language} onChange={e => setTForm({...tForm, preferred_language: e.target.value})} className={`input-base bg-white ${isEditing ? 'cursor-pointer' : 'opacity-70 cursor-not-allowed pointer-events-none'}`} disabled={!isEditing}>
@@ -282,7 +282,7 @@ export default function ProfilePage() {
             <div className="flex flex-col gap-6">
               {/* Travel Preferences Card */}
               <div className="bg-[#FDFCFB] border border-border rounded-[16px] p-6 lg:p-8 flex flex-col">
-                 <h2 className="text-[16px] font-bold text-charcoal mb-6 font-body">Travel Preferences</h2>
+                 <h2 className="text-[16px] font-bold text-charcoal mb-6 font-body">Personal Travel Needs</h2>
                  
                  <Field label="Dietary Restrictions">
                    <select value={tForm.dietary_restrictions} onChange={e => setTForm({...tForm, dietary_restrictions: e.target.value})} className={`input-base font-semibold ${tForm.dietary_restrictions !== 'None' ? 'bg-[#F0EBE3] !border-transparent text-[#8B6A3E]' : 'bg-white'} ${isEditing ? 'cursor-pointer' : 'opacity-70 cursor-not-allowed pointer-events-none'}`} disabled={!isEditing}>
@@ -301,20 +301,6 @@ export default function ProfilePage() {
                  </div>
               </div>
 
-              {/* Apply as Guide Banner */}
-              <div className="bg-[#FDFCFB] border border-border rounded-[16px] p-6 shadow-sm">
-                 <div className="flex flex-col sm:flex-row items-center gap-4 justify-between text-center sm:text-left">
-                    <div>
-                      <h3 className="text-[14px] font-bold text-charcoal">Are you a local expert?</h3>
-                      <p className="text-[12px] text-secondary leading-relaxed mt-1">
-                        Ready to upgrade your account to offer local tours in your home country?
-                      </p>
-                    </div>
-                    <button onClick={() => router.push('/marketplace')} className="shrink-0 w-full sm:w-auto py-2 px-5 bg-transparent border border-[#E5E0DA] hover:bg-[#F0EDE9] rounded-lg text-charcoal font-semibold text-[13px] transition-colors flex items-center justify-center">
-                      Apply as Tour Guide
-                    </button>
-                 </div>
-              </div>
             </div>
           </div>
         )}

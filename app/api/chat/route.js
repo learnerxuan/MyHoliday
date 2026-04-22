@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { buildSystemPrompt, buildItineraryContext } from '@/lib/ai/system-prompt'
 import { TOOL_DEFINITIONS, getToolStatus, executeTool } from '@/lib/ai/tools/index'
 import { checkGuardrails } from '@/lib/ai/guardrails'
+import { calculateAge } from '@/lib/utils/age'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o'
@@ -421,6 +422,11 @@ export async function POST(request) {
             currentPlannerState.phase = 'planning'
             currentPlannerState.mode = 'quick_draft'
           }
+        }
+
+        // --- Calculate age for AI context ---
+        if (profile) {
+          profile.age = calculateAge(profile.date_of_birth)
         }
 
         const systemPrompt = buildSystemPrompt(destination, profile, currentPlannerState)

@@ -40,7 +40,7 @@ CREATE TABLE public.traveller_profiles (
     id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id                 UUID          NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name               VARCHAR(150),
-    age                     INTEGER,
+    date_of_birth           DATE,
     nationality             VARCHAR(100),
     dietary_restrictions    VARCHAR(100),
     accessibility_needs     BOOLEAN       DEFAULT FALSE,
@@ -218,14 +218,20 @@ ALTER TABLE public.user_interactions   ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public: read all destinations" ON public.destinations FOR SELECT USING (true);
 
 -- Traveller Profiles: Own Access + Admin Read
-CREATE POLICY "traveller: own row" ON public.traveller_profiles USING (auth.uid() = user_id);
+CREATE POLICY "traveller: own row" ON public.traveller_profiles 
+    FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "admin: read all profiles" ON public.traveller_profiles FOR SELECT 
-    USING ((SELECT (raw_user_meta_data->>'role') FROM auth.users WHERE id = auth.uid()) = 'admin');
+    USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
 
 -- Tour Guides: Own Access + Admin Full
-CREATE POLICY "guide: own row" ON public.tour_guides USING (auth.uid() = user_id);
+CREATE POLICY "guide: own row" ON public.tour_guides 
+    FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "admin: manage guides" ON public.tour_guides USING 
-    ((SELECT (raw_user_meta_data->>'role') FROM auth.users WHERE id = auth.uid()) = 'admin');
+    ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
 
 -- Chat & Itineraries: Own Access
 CREATE POLICY "user: own chat sessions" ON public.chat_sessions USING (auth.uid() = user_id);

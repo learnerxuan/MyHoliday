@@ -23,7 +23,7 @@ export default function TravellerOnboarding() {
 
   const [form, setForm] = useState({
     full_name: '',
-    age: '',
+    date_of_birth: '',
     nationality: '',
     dietary_restrictions: 'None',
     accessibility_needs: false,
@@ -63,7 +63,7 @@ export default function TravellerOnboarding() {
         .insert({
           user_id: user.id,
           full_name: form.full_name,
-          age: form.age ? parseInt(form.age) : null,
+          date_of_birth: form.date_of_birth || null,
           nationality: form.nationality,
           dietary_restrictions: form.dietary_restrictions,
           accessibility_needs: form.accessibility_needs,
@@ -114,19 +114,16 @@ export default function TravellerOnboarding() {
             />
           </div>
 
-          {/* Age */}
+          {/* Date of Birth */}
           <div className="space-y-1">
             <label className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider">
-              Age <span className="text-tertiary font-normal normal-case">(optional)</span>
+              Date of Birth <span className="text-tertiary font-normal normal-case">(optional)</span>
             </label>
             <input
-              type="number"
-              min={10}
-              max={120}
-              value={form.age}
-              onChange={e => setForm(f => ({ ...f, age: e.target.value }))}
-              placeholder="e.g. 25"
-              className="w-full py-2.5 px-3.5 rounded-xl border border-border text-sm font-body text-charcoal placeholder:text-tertiary focus:outline-none focus:border-amber transition-colors"
+              type="date"
+              value={form.date_of_birth}
+              onChange={e => setForm(f => ({ ...f, date_of_birth: e.target.value }))}
+              className="w-full py-2.5 px-3.5 rounded-xl border border-border text-sm font-body text-charcoal focus:outline-none focus:border-amber transition-colors"
             />
           </div>
 
