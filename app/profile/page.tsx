@@ -38,8 +38,9 @@ export default function ProfilePage() {
 
   // Guide state (read-only + doc upload)
   const [guide, setGuide] = useState<any>(null)
-  const [gForm, setGForm] = useState({ full_name: '' })
-  const [gFormOg, setGFormOg] = useState({ full_name: '' })
+  const [gForm, setGForm] = useState({ full_name: '', city_id: '' })
+  const [gFormOg, setGFormOg] = useState({ full_name: '', city_id: '' })
+  const [allDestinations, setAllDestinations] = useState<any[]>([])
   const [newDoc, setNewDoc] = useState<File | null>(null)
   const [uploadingDoc, setUploadingDoc] = useState(false)
 
@@ -81,10 +82,13 @@ export default function ProfilePage() {
         if (data) {
           setGuide(data)
           const oauthName = user.user_metadata?.full_name || user.user_metadata?.name || ''
-          const loadedGForm = { full_name: data.full_name || oauthName }
+          const loadedGForm = { full_name: data.full_name || oauthName, city_id: data.city_id || '' }
           setGForm(loadedGForm)
           setGFormOg(loadedGForm)
         }
+        
+        const { data: dests } = await supabase.from('destinations').select('id, city, country').order('city')
+        if (dests) setAllDestinations(dests)
       }
     }
     load()
@@ -126,13 +130,21 @@ export default function ProfilePage() {
 
     const { error: err } = await supabase
       .from('tour_guides')
-      .update({ full_name: gForm.full_name })
+      .update({ full_name: gForm.full_name, city_id: gForm.city_id || null })
       .eq('user_id', user.id)
 
     setSaving(false)
     if (err) { setError(err.message); return }
     setGFormOg(gForm)
-    setGuide((g: any) => ({ ...g, full_name: gForm.full_name }))
+    
+    // Update local guide display state
+    const selectedDest = allDestinations.find(d => d.id === gForm.city_id)
+    setGuide((g: any) => ({ 
+      ...g, 
+      full_name: gForm.full_name,
+      city_id: gForm.city_id,
+      destinations: selectedDest ? { city: selectedDest.city, country: selectedDest.country } : g.destinations
+    }))
     setSaved(true)
     setIsEditing(false)
     setTimeout(() => setSaved(false), 3000)
@@ -318,7 +330,23 @@ export default function ProfilePage() {
                  <Field label="Full Name">
                    <input type="text" value={gForm.full_name} onChange={e => setGForm({...gForm, full_name: e.target.value})} className={`input-base bg-white ${!isEditing ? 'opacity-70 cursor-not-allowed pointer-events-none' : ''}`} placeholder="Enter your full name" disabled={!isEditing} />
                  </Field>
-                 <GuideField label="Assigned City" value={guide.destinations ? `${guide.destinations.city}, ${guide.destinations.country}` : '—'} />
+                 
+                 {!isEditing ? (
+                   <GuideField label="Assigned City" value={guide.destinations ? `${guide.destinations.city}, ${guide.destinations.country}` : '—'} />
+                 ) : (
+                   <Field label="Assigned City">
+                     <select 
+                       value={gForm.city_id} 
+                       onChange={e => setGForm({...gForm, city_id: e.target.value})} 
+                       className="input-base bg-white cursor-pointer w-full"
+                     >
+                       <option value="" disabled>Select your city</option>
+                       {allDestinations.map(d => (
+                         <option key={d.id} value={d.id}>{d.city}, {d.country}</option>
+                       ))}
+                     </select>
+                   </Field>
+                 )}
                  <div>
                     <label className="text-[11px] text-[#888] font-bold uppercase tracking-wider mb-1 block">Verification Status</label>
                     <span className={`inline-block px-3 py-1 rounded w-fit text-[12px] font-bold capitalize ${STATUS_STYLES[guide.verification_status] ?? ''}`}>
