@@ -133,51 +133,56 @@ async function geocodeItem(item, city, biasLat = null, biasLng = null) {
   const effectiveName = item.new_name || item.name
 
   // Only skip if it already has coordinates AND this isn't a name update.
-  // If a new_name is provided, we MUST re-geocode to move the map pin.
   if (item.lat && item.lng && !item.new_name) return
 
-  // Safety Catch: If the AI mis-tagged a generic item, or the name is vague, skip pinning and coerce to generic types.
   const nameLower = effectiveName?.toLowerCase() || ''
-  const genericKeywords = ['local', 'authentic', 'nearby', 'suggested', 'recommendation', 'lunch at a', 'dinner at a', 'breakfast at a', 'brunch at a']
-  const logisticKeywords = ['arrival', 'departure', 'check-in', 'check-out']
-
-  const isGeneric = genericKeywords.some(kw => nameLower.includes(kw))
+  
+  // 1. Identify logistic/generic nodes that shouldn't be pinned
+  const logisticKeywords = ['departure', 'arrival', 'flight', 'check-in', 'check-out', 'transit', 'travel to', 'heading to']
   const isLogistics = logisticKeywords.some(kw => nameLower.includes(kw))
+  
+  // If it's a generic phrase like "Lunch at a local cafe", we also skip pinning
+  const genericPhrases = ['local', 'authentic', 'vibrant', 'suggested', 'recommendation', 'nearby']
+  const isGeneric = genericPhrases.some(kw => nameLower.includes(kw)) && (nameLower.includes('lunch') || nameLower.includes('dinner') || nameLower.includes('breakfast'))
 
-  if (isGeneric || isLogistics) {
+  if (isLogistics || isGeneric) {
     if (isLogistics) {
-      // Allow "Arrival & Check-in" to be a hotel type as per user preference
       if (nameLower.includes('arrival') && nameLower.includes('check-in')) {
-        item.type = 'hotel'
+        item.type = 'hotel' // Per user preference
       } else {
         item.type = 'note'
       }
     } else {
       if (item.type === 'restaurant') item.type = 'food_recommendation'
       if (item.type === 'attraction') item.type = 'note'
-      return
     }
+    // Remove any accidental coordinates that might have been passed
+    delete item.lat
+    delete item.lng
+    return
   }
 
-  // If we reach here, it's a specific name. Attempt geocoding using Places API (New)
-  // We rely on locationBias for position context rather than appending city strings.
+  // 2. Build a highly specific query by appending the city
+  // This is the "Hard Bias" that prevents it from jumping to Canada/etc.
+  const queryWithContext = `${effectiveName}, ${city}`
+
   const payload = {
-    textQuery: effectiveName,
+    textQuery: queryWithContext,
     maxResultCount: 1,
   }
 
-  // Add location bias if coordinates are available (using the New API schema)
+  // 3. Add Location Bias (as a preference)
   if (biasLat && biasLng) {
     payload.locationBias = {
       circle: {
         center: { latitude: biasLat, longitude: biasLng },
-        radius: 50000.0 // 50km bias radius (API max)
+        radius: 50000.0 // Restored to 50km (max API bias)
       }
     }
   }
 
   try {
-    console.log(`[GEOCODE] Searching (New API) for: "${effectiveName}"`)
+    console.log(`[GEOCODE] Searching with Context: "${queryWithContext}"`)
     const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
       headers: {
@@ -196,14 +201,14 @@ async function geocodeItem(item, city, biasLat = null, biasLng = null) {
       item.lng = loc.longitude
       console.log(`[GEOCODE] SUCCESS: Found "${data.places[0].displayName?.text}" at ${item.lat}, ${item.lng}`)
 
-      // Upgrade the type based on search results if possible
-      if (!item.type || item.type === 'food_recommendation') {
-        item.type = 'restaurant'
-      } else if (item.type === 'note') {
-        item.type = 'attraction'
+      // Refine type based on success
+      if (!item.type || item.type === 'food_recommendation' || item.type === 'note') {
+        item.type = (nameLower.includes('ramen') || nameLower.includes('sushi') || nameLower.includes('cafe')) 
+          ? 'restaurant' 
+          : 'attraction'
       }
     } else {
-      console.warn(`[GEOCODE] FAILED: No results for query "${effectiveName}"`)
+      console.warn(`[GEOCODE] FAILED: No results for query "${queryWithContext}"`)
     }
   } catch (err) {
     console.error(`[GEOCODE] ERROR for "${effectiveName}":`, err)

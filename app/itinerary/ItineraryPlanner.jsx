@@ -392,6 +392,10 @@ export default function ItineraryPlanner() {
     handleUpdateItem([{ action: 'remove', day: parseInt(dayKey.replace('day', '')), name: itemName }])
   }, [handleUpdateItem])
 
+  const handleAddFromMap = useCallback((item, dayNum) => {
+    handleUpdateItem([{ action: 'add', day: dayNum, ...item }])
+  }, [handleUpdateItem])
+
   // ── Send message ────────────────────────────────────────────
   const handleSend = useCallback(async (text) => {
     if (!text.trim() || isLoading) return
@@ -719,6 +723,13 @@ export default function ItineraryPlanner() {
                 onUpdate={handleUpdateItem}
                 city={destination?.city}
                 tripContext={tripContext}
+                allowFullEdit={true}
+                cityContext={{
+                  name: destination?.city,
+                  country: destination?.country,
+                  lat: destination?.latitude,
+                  lng: destination?.longitude
+                }}
               />
             )}
             {activeTab === 'map' && (
@@ -728,6 +739,13 @@ export default function ItineraryPlanner() {
                 onDayChange={setActiveDay}
                 cityLat={destination?.latitude}
                 cityLng={destination?.longitude}
+                onAddToItinerary={handleAddFromMap}
+                cityContext={{
+                  name: destination?.city,
+                  country: destination?.country,
+                  lat: destination?.latitude,
+                  lng: destination?.longitude
+                }}
               />
             )}
           </div>

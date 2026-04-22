@@ -3,8 +3,11 @@
 import { useState, useEffect } from 'react'
 
 // ── Time slot options for the edit dropdown ───────────────────
+const TIME_LABELS = ['All Day', 'Morning', 'Noon', 'Afternoon', 'Evening', 'Night']
+
 const TIME_SLOTS = [
-  '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM',
+  ...TIME_LABELS,
+  '5:00 AM', '5:30 AM', '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM',
   '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM',
   '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
   '12:00 PM (Noon)', '12:30 PM',
@@ -12,7 +15,7 @@ const TIME_SLOTS = [
   '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM',
   '5:00 PM', '5:30 PM', '6:00 PM', '6:30 PM',
   '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM',
-  '9:00 PM', '9:30 PM', '10:00 PM',
+  '9:00 PM', '9:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM'
 ]
 
 const TYPE_ICON = {
@@ -37,7 +40,15 @@ const TYPE_BORDER = {
 
 function guessMinutes(timeStr) {
   if (!timeStr) return 9999
-  const s = timeStr.toLowerCase()
+  const s = timeStr.toLowerCase().trim()
+
+  // Strict matches for our 6 labels (Independent Values)
+  if (s === 'all day')    return -10
+  if (s === 'morning')    return 8 * 60     // 08:00
+  if (s === 'noon')       return 12 * 60    // 12:00
+  if (s === 'afternoon')  return 15 * 60    // 15:00
+  if (s === 'evening')    return 18 * 60    // 18:00
+  if (s === 'night')      return 21 * 60    // 21:00
 
   // Try matching HH:MM AM/PM or H AM/PM
   const timeMatch = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
@@ -51,21 +62,105 @@ function guessMinutes(timeStr) {
     return h * 60 + m
   }
 
-  let offset = 0
-  if (s.includes('early')) offset = -60
-  if (s.includes('late')) offset = 60
-
-  // Keyword fallbacks
-  if (s.includes('morning')) return 8 * 60 + offset
-  if (s.includes('afternoon')) return 14 * 60 + offset
-  if (s.includes('lunch') || s.includes('noon') || s.includes('midday')) return 12 * 60 + offset
-  if (s.includes('evening')) return 18 * 60 + offset
-  if (s.includes('night') || s.includes('dinner')) return 20 * 60 + offset
-
-  // Prioritise "All Day" or untimed activities at the very top
-  if (s.includes('all day') || s.includes('anytime')) return -1
+  // Fallback keyword detection for loose strings from AI
+  if (s.includes('morning'))   return 8 * 60
+  if (s.includes('afternoon')) return 14 * 60
+  if (s.includes('evening'))   return 18 * 60
+  if (s.includes('night'))     return 20 * 60
+  if (s.includes('all day'))   return -10
 
   return 9999
+}
+
+// ── Shared UI helper: Triple Dropdown Time Picker ────────────
+function GridTimePicker({ value, onChange }) {
+  const isLabel = TIME_LABELS.includes(value)
+  
+  // Default parsing for numeric time display
+  let h = 9, m = 0, ap = 'AM'
+  if (!isLabel && value) {
+    const match = value.match(/(\d+):(\d+)\s*(AM|PM)/i)
+    if (match) {
+      h = parseInt(match[1], 10)
+      m = parseInt(match[2], 10)
+      ap = match[3].toUpperCase()
+    }
+  }
+
+  const setNumeric = (newH, newM, newAp) => {
+    const timeStr = `${newH}:${newM === 0 ? '00' : newM} ${newAp}`
+    onChange(timeStr)
+  }
+
+  return (
+    <div className="bg-muted/30 p-3 rounded-xl border border-border/50 select-none">
+      {/* Category Labels Section */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {TIME_LABELS.map(lbl => (
+          <button 
+            key={lbl} 
+            type="button"
+            onClick={() => onChange(lbl)}
+            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all 
+              ${value === lbl 
+                ? 'bg-charcoal text-white border-charcoal shadow-sm' 
+                : 'bg-white text-secondary border-border hover:border-charcoal/30'}`}
+          >
+            {lbl}
+          </button>
+        ))}
+        {/* Toggle to Specific Time */}
+        <button 
+          type="button"
+          onClick={() => setNumeric(h, m, ap)}
+          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all 
+            ${!isLabel 
+              ? 'bg-amber text-white border-amber shadow-sm' 
+              : 'bg-white text-secondary border-border hover:border-amber/30'}`}
+        >
+          Specific Time
+        </button>
+      </div>
+
+      {/* Triple Dropdown Row (Specific Time) */}
+      <div className={`flex gap-2 transition-opacity duration-200 ${isLabel ? 'opacity-40 cursor-not-allowed' : ''}`}>
+        {/* Hour Selector */}
+        <select
+          disabled={isLabel}
+          value={h}
+          onChange={e => setNumeric(parseInt(e.target.value, 10), m, ap)}
+          className="flex-1 text-sm py-1.5 px-2 border border-border rounded-md bg-white focus:outline-none focus:border-amber cursor-pointer disabled:cursor-not-allowed"
+        >
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => (
+            <option key={num} value={num}>{num}</option>
+          ))}
+        </select>
+
+        {/* Minute Selector */}
+        <select
+          disabled={isLabel}
+          value={m}
+          onChange={e => setNumeric(h, parseInt(e.target.value, 10), ap)}
+          className="flex-1 text-sm py-1.5 px-2 border border-border rounded-md bg-white focus:outline-none focus:border-amber cursor-pointer disabled:cursor-not-allowed"
+        >
+          {[0, 15, 30, 45].map(mm => (
+            <option key={mm} value={mm}>{mm === 0 ? '00' : mm}</option>
+          ))}
+        </select>
+
+        {/* AM/PM Selector */}
+        <select
+          disabled={isLabel}
+          value={ap}
+          onChange={e => setNumeric(h, m, e.target.value)}
+          className="flex-1 text-sm py-1.5 px-2 border border-border rounded-md bg-white focus:outline-none focus:border-amber cursor-pointer disabled:cursor-not-allowed"
+        >
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </div>
+  )
 }
 
 // ── Main export ───────────────────────────────────────────────
@@ -262,6 +357,7 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
     google_map_url: item.google_map_url || ''
   })
   const [isPinning, setIsPinning] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState(null)
 
   // Sync edit form if item changes from backend
   useEffect(() => {
@@ -305,6 +401,24 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
   const icon = TYPE_ICON[effectiveType] ?? '📌'
   const borderColor = TYPE_BORDER[effectiveType] ?? 'border-l-gray-300'
   const typeLabel = isHotel ? 'Hotel' : isTransport ? 'Transport' : (item.type === 'food_recommendation' ? 'Food Recommendation' : (effectiveType.charAt(0).toUpperCase() + effectiveType.slice(1)))
+
+  // Conditionally fetch photo
+  useEffect(() => {
+    if (effectiveType === 'restaurant' || effectiveType === 'attraction' || effectiveType === 'hotel') {
+      const controller = new AbortController()
+      fetch(`/api/place-image?name=${encodeURIComponent(item.name)}&city=${encodeURIComponent(cityContext?.name || city || '')}`, { signal: controller.signal })
+        .then(r => r.json())
+        .then(data => {
+          if (data.imageUrl) setPhotoUrl(data.imageUrl)
+        })
+        .catch(err => {
+          if (err.name !== 'AbortError') console.error('Error fetching image:', err)
+        })
+      return () => controller.abort()
+    } else {
+      setPhotoUrl(null)
+    }
+  }, [item.name, cityContext?.name, city, effectiveType])
 
   const confirmed = item.status === 'confirmed'
 
@@ -395,18 +509,12 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Start Time</label>
-              <select
-                value={editForm.time}
-                onChange={e => setEditForm(f => ({ ...f, time: e.target.value }))}
-                className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none bg-white appearance-none cursor-pointer"
-              >
-                <option value="">— pick a time —</option>
-                {TIME_SLOTS.map(slot => (
-                  <option key={slot} value={slot}>{slot}</option>
-                ))}
-              </select>
+            <div className="col-span-2">
+              <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-2 block">Scheduled Time</label>
+              <GridTimePicker 
+                value={editForm.time} 
+                onChange={(t) => setEditForm(f => ({ ...f, time: t }))} 
+              />
             </div>
             <div className="col-span-2">
               <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Booking Link (URL)</label>
@@ -465,12 +573,12 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
   return (
     <div
       onClick={() => onFocus && onFocus()}
-      className={`relative rounded-xl border border-border border-l-4 px-3 py-2.5 bg-white shadow-sm hover:shadow-md transition-all group
+      className={`relative flex flex-row overflow-hidden rounded-xl border border-border border-l-4 bg-white shadow-sm hover:shadow-md transition-all group
         ${borderColor}
         ${(onFocus && item.lat && item.lng) ? 'cursor-pointer hover:border-amber' : ''}
         ${isConflict ? 'bg-red-50 border-red-200' : confirmed ? 'bg-success-bg border-success/20' : ''}`}
     >
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-full flex items-center shadow-sm border border-border/50">
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-full flex items-center shadow-sm border border-border/50 z-10">
         {onUpdate && (
           <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="p-1.5 text-secondary hover:text-amber transition-colors" title="Edit item">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -483,78 +591,92 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
         )}
       </div>
 
-      <div className="flex items-center justify-between mb-1 pr-6">
-        {timeLabel ? (
-          <span className="text-[11px] font-semibold font-body px-2 py-0.5 rounded-full bg-muted text-secondary">
-            {timeLabel}
-          </span>
-        ) : (
-          <span className="text-[11px] text-tertiary font-body">flexible time</span>
-        )}
-        {confirmed && (
-          <span className="flex items-center gap-1 text-[10px] font-semibold text-success">
-            <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
-            Confirmed
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-start gap-2 pr-12 mt-1">
-        <span className="text-base leading-snug mt-0.5">{icon}</span>
-        <div className="flex flex-col">
-          <a href={`https://www.google.com/search?q=${query}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={`font-bold text-sm leading-snug hover:underline ${isConflict ? 'text-red-700' : 'text-charcoal'}`}>
-            {item.name}
-          </a>
-          {typeLabel && (
-            <span className="inline-block px-1.5 py-0.5 mt-1 text-[9px] uppercase font-bold tracking-widest border border-border text-secondary rounded bg-white w-max">
-              {typeLabel}
+      <div className="flex-1 flex flex-col min-w-0 px-3 py-2.5 pb-3">
+        <div className="flex items-center justify-between mb-1 pr-6">
+          {timeLabel ? (
+            <span className="text-[11px] font-semibold font-body px-2 py-0.5 rounded-full bg-muted text-secondary">
+              {timeLabel}
+            </span>
+          ) : (
+            <span className="text-[11px] text-tertiary font-body">flexible time</span>
+          )}
+          {confirmed && (
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-success">
+              <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
+              Confirmed
             </span>
           )}
-          {item.notes && <p className="text-[11px] text-secondary font-body mt-1 leading-normal italic">{item.notes}</p>}
+        </div>
+
+        <div className="flex items-start gap-2 flex-1 min-w-0 pr-2 mt-1">
+          <span className="text-base leading-snug mt-0.5 shrink-0">{icon}</span>
+          <div className="flex flex-col min-w-0 w-full">
+            <a href={`https://www.google.com/search?q=${query}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={`font-bold text-sm leading-snug hover:underline ${isConflict ? 'text-red-700' : 'text-charcoal'} truncate whitespace-normal`}>
+              {item.name}
+            </a>
+            {typeLabel && (
+              <span className="inline-block px-1.5 py-0.5 mt-1 text-[9px] uppercase font-bold tracking-widest border border-border text-secondary rounded bg-white w-max">
+                {typeLabel}
+              </span>
+            )}
+            {item.notes && <p className="text-[11px] text-secondary font-body mt-1 leading-normal italic line-clamp-3">{item.notes}</p>}
+
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              {item.price_estimate && (
+                <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">{item.price_estimate}</span>
+              )}
+
+              {mapUrl && (
+                <a
+                  href={mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-xs font-semibold text-blue-500 hover:text-blue-700 transition-colors"
+                >
+                  Google Maps ↗
+                </a>
+              )}
+
+              {bookUrl && (
+                <a
+                  href={bookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-xs font-semibold text-amber hover:text-amberdark transition-colors"
+                >
+                  Find Tickets ↗
+                </a>
+              )}
+
+              {hotelUrl && (
+                <a
+                  href={hotelUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-xs font-bold text-white bg-amber hover:bg-amberdark px-2 py-0.5 rounded transition-colors"
+                >
+                  Book Hotel ↗
+                </a>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mt-3 pl-6 flex-wrap">
-        {item.price_estimate && (
-          <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">{item.price_estimate}</span>
-        )}
-
-        {mapUrl && (
-          <a
-            href={mapUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-xs font-semibold text-blue-500 hover:text-blue-700 transition-colors"
-          >
-            Google Maps ↗
-          </a>
-        )}
-
-        {bookUrl && (
-          <a
-            href={bookUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-xs font-semibold text-amber hover:text-amberdark transition-colors"
-          >
-            Find Tickets ↗
-          </a>
-        )}
-
-        {hotelUrl && (
-          <a
-            href={hotelUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-xs font-bold text-white bg-amber hover:bg-amberdark px-2 py-0.5 rounded transition-colors"
-          >
-            Book Hotel ↗
-          </a>
-        )}
-      </div>
+      {photoUrl && !isEditing && (
+        <div className="shrink-0 w-36 sm:w-60 relative border-l border-border/50 bg-muted/20">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={photoUrl} 
+            alt={item.name} 
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -626,18 +748,12 @@ function NewActivityCard({ day, onSave, onCancel, city, cityContext }) {
             ))}
           </select>
         </div>
-        <div>
-          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Start Time</label>
-          <select
-            value={editForm.time}
-            onChange={e => setEditForm(f => ({ ...f, time: e.target.value }))}
-            className="w-full text-sm py-1.5 px-2 border border-border rounded-md focus:border-amber focus:outline-none bg-white appearance-none cursor-pointer"
-          >
-            <option value="">— pick a time —</option>
-            {TIME_SLOTS.map(slot => (
-              <option key={slot} value={slot}>{slot}</option>
-            ))}
-          </select>
+        <div className="col-span-2">
+          <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-2 block">Scheduled Time</label>
+          <GridTimePicker 
+            value={editForm.time} 
+            onChange={(t) => setEditForm(f => ({ ...f, time: t }))} 
+          />
         </div>
         <div className="col-span-2">
           <label className="text-[10px] uppercase font-bold text-secondary tracking-widest mb-1 block">Booking Link (URL)</label>

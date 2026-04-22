@@ -209,6 +209,10 @@ export default function SavedItineraryViewer() {
     handleUpdateItem([{ action: 'remove', day: parseInt(dayKey.replace('day', '')), name: itemName }])
   }, [handleUpdateItem])
 
+  const handleAddFromMap = useCallback((item, dayNum) => {
+    handleUpdateItem([{ action: 'add', day: dayNum, ...item }])
+  }, [handleUpdateItem])
+
   const handleSaveToDB = async (customContent = null) => {
     const contentToSave = customContent || itineraryRef.current
     if (!contentToSave || Object.keys(contentToSave).length === 0) return
@@ -691,8 +695,8 @@ export default function SavedItineraryViewer() {
 
       {/* Main content grid (Split View) */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - Itinerary (520px) */}
-        <div className="w-[520px] border-r border-border bg-white flex flex-col shrink-0 min-h-0">
+        {/* Sidebar - Itinerary (600px) */}
+        <div className="w-[600px] border-r border-border bg-white flex flex-col shrink-0 min-h-0">
           <div className="flex-1 overflow-hidden">
             <ItineraryPanel
               itinerary={itinerary}
@@ -726,6 +730,13 @@ export default function SavedItineraryViewer() {
             cityLng={destination?.longitude}
             hideDayTabs={true}
             focusedLocation={focusedLocation}
+            onAddToItinerary={handleAddFromMap}
+            cityContext={{
+              name: destination?.city,
+              country: destination?.country,
+              lat: destination?.latitude,
+              lng: destination?.longitude
+            }}
           />
         </div>
       </div>
