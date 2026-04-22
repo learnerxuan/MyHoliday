@@ -47,12 +47,19 @@ export async function GET(
     return NextResponse.json({ error: itineraryError.message }, { status: 400 })
   }
 
+  const { data: profile } = await supabase
+    .from('traveller_profiles')
+    .select('full_name')
+    .eq('user_id', data.user_id)
+    .single()
+
   const formattedData = {
     ...data,
     city_name: data.destinations?.city || 'Unknown',
     itinerary_title: itinerary?.title || 'Untitled Itinerary',
     itinerary_content: itinerary?.content || null,
-    trip_metadata: itinerary?.trip_metadata || null
+    trip_metadata: itinerary?.trip_metadata || null,
+    traveller_name: profile?.full_name || 'Anonymous Traveller'
   }
 
   return NextResponse.json(formattedData)

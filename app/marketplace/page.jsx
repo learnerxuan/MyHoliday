@@ -8,7 +8,7 @@ import ListingCard from '@/components/ui/ListingCard'
 
 const formatMYR = (amount) => `RM ${Number(amount).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
-const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, offerAmount, onClick }) => {
+const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, offerAmount, onClick, onSubmitOffer }) => {
   // If listing is open and no offer is submitted by me, I can submit an offer
   const isActionable = status === "open" && !offerAmount
   return (
@@ -36,7 +36,12 @@ const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, o
           <div className="text-[12px] text-secondary/80">0 offers submitted</div>
         )}
         {isActionable ? (
-          <button className="bg-amber text-white px-3.5 py-[7px] text-[11px] rounded-lg font-bold hover:bg-amberdark transition-colors">Submit Offer</button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onSubmitOffer && onSubmitOffer(); }}
+            className="bg-amber text-white px-3.5 py-[7px] text-[11px] rounded-lg font-bold hover:bg-amberdark transition-colors"
+          >
+            Submit Offer
+          </button>
         ) : status === 'negotiating' ? (
            <button className="bg-charcoal text-white px-3.5 py-[7px] text-[11px] rounded-lg font-bold hover:bg-black transition-colors">View Chat</button>
         ) : (
@@ -159,6 +164,22 @@ export default function MarketplacePage() {
           )
         }
 
+        const userIds = [...new Set((listingsData || []).map(l => l.user_id).filter(Boolean))]
+        let travellerMap = {}
+
+        if (userIds.length > 0) {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('traveller_profiles')
+            .select('user_id, full_name')
+            .in('user_id', userIds)
+          
+          if (profilesData) {
+            travellerMap = Object.fromEntries(
+              profilesData.map(item => [item.user_id, item.full_name])
+            )
+          }
+        }
+
         const formattedListings = (listingsData || []).map((l) => {
           const itinerary = itineraryMap[l.itinerary_id]
           const rawContent = itinerary?.content
@@ -234,6 +255,7 @@ export default function MarketplacePage() {
             title: itinerary?.title || 'Untitled Itinerary',
             city_name: l.destinations?.city || 'Unknown',
             country_name: l.destinations?.country || 'Destination',
+            travellerName: travellerMap[l.user_id] || 'Anonymous Traveller',
             dates: formattedDateRange,
             days,
             pax,
@@ -248,6 +270,9 @@ export default function MarketplacePage() {
         setListings(formattedListings)
       } catch (err) {
         const errorStr = err?.message || err?.name || String(err)
+        if (errorStr.includes('AbortError') || errorStr.includes('lock request is aborted')) {
+          return // Ignore standard fast-refresh AbortErrors
+        }
         console.error('Marketplace page error:', errorStr, err)
         setError(errorStr.includes('Failed') ? errorStr : 'Failed to load marketplace data: ' + errorStr)
       } finally {
@@ -486,7 +511,15 @@ export default function MarketplacePage() {
                     tags={listing.tags}
                     status={listing.status}
                     offerAmount={myOffer ? formatMYR(myOffer.proposed_price) : null}
-                    onClick={() => router.push(`/marketplace/${listing.id}`)}
+                    onClick={() => {
+                      const isActionable = listing.status === 'open' && !myOffer
+                      if (isActionable) {
+                        router.push(`/marketplace/${listing.id}/offer`)
+                      } else {
+                        router.push(`/marketplace/${listing.id}`)
+                      }
+                    }}
+                    onSubmitOffer={() => router.push(`/marketplace/${listing.id}/offer`)}
                  />
               )
             })}
