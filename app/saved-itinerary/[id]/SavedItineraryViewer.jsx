@@ -24,6 +24,7 @@ export default function SavedItineraryViewer() {
   const [title, setTitle] = useState('')
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('itinerary')
+  const [mobileTab, setMobileTab] = useState('itinerary')
   const [activeDay, setActiveDay] = useState('all')
   const [focusedLocation, setFocusedLocation] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -33,8 +34,18 @@ export default function SavedItineraryViewer() {
   const [revertError, setRevertError] = useState(null)
   const [sessionId, setSessionId] = useState(null)
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
+  const [showMobileActions, setShowMobileActions] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const itineraryRef = useRef(itinerary)
   const isDirtyRef = useRef(false)
+
+  // ── Screen size detection ──────────────────────────────────
+  useEffect(() => {
+    const checkSize = () => setIsMobile(window.innerWidth < 1024)
+    checkSize()
+    window.addEventListener('resize', checkSize)
+    return () => window.removeEventListener('resize', checkSize)
+  }, [])
 
   // Sync refs with state so they are available in effects/back button
   useEffect(() => {
@@ -490,7 +501,10 @@ export default function SavedItineraryViewer() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-warmwhite min-h-[60vh]">
+      <div 
+        className="w-full flex items-center justify-center bg-warmwhite -mt-7 md:-mt-6"
+        style={{ height: isMobile ? 'calc(100dvh - 36px)' : 'calc(100dvh - 40px)' }}
+      >
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-amber border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-sm font-body text-secondary">Loading your trip...</p>
@@ -500,22 +514,25 @@ export default function SavedItineraryViewer() {
   }
 
   return (
-    <div className="w-full flex flex-col bg-warmwhite overflow-hidden" style={{ height: 'calc(100dvh - 96px)' }}>
+    <div 
+      className="w-full flex flex-col bg-warmwhite overflow-hidden -mt-7 md:-mt-6" 
+      style={{ height: isMobile ? 'calc(100dvh - 36px)' : 'calc(100dvh - 40px)' }}
+    >
 
       {/* Header */}
-      <header className="flex items-center justify-between pl-4 pr-6 py-4 border-b border-border bg-white shrink-0 shadow-sm z-30">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between pl-3 sm:pl-4 pr-3 sm:pr-6 py-2.5 sm:py-4 md:pt-[40px] border-b border-border bg-white shrink-0 shadow-sm z-30">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={handleBack}
-            className="p-2 hover:bg-black/5 rounded-full transition-colors text-charcoal/60 hover:text-charcoal"
+            className="p-1.5 sm:p-2 hover:bg-black/5 rounded-full transition-colors text-charcoal/60 hover:text-charcoal shrink-0"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div>
-            <h1 className="text-xl font-bold text-charcoal tracking-tight font-display">
-              Saved Itinerary: <span className="text-amber">{title || destination?.city}</span>
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-charcoal tracking-tight font-display truncate">
+              <span className="text-amber">{title || destination?.city}</span>
             </h1>
             <p className="text-[10px] text-tertiary font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber shadow-[0_0_8px_rgba(196,135,74,0.4)]" />
@@ -524,7 +541,8 @@ export default function SavedItineraryViewer() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Desktop actions */}
+        <div className="hidden lg:flex items-center gap-3">
           {revertError && (
             <div className="bg-red-50 text-red-600 text-xs font-bold px-4 py-2 rounded-lg border border-red-100 animate-in fade-in slide-in-from-right-2 duration-300 max-w-sm">
               {revertError}
@@ -590,7 +608,7 @@ export default function SavedItineraryViewer() {
 
           <div className="h-4 w-px bg-border mx-1" />
 
-          {saveDone && <span className="text-xs font-bold text-success bg-success-bg px-3 py-1.5 rounded-full animate-in fade-in duration-300">✓ Changes Saved</span>}
+          {saveDone && <span className="text-xs font-bold text-success bg-success-bg px-3 py-1.5 rounded-full animate-in fade-in duration-300">✓ Saved</span>}
           <button
             onClick={() => handleSaveToDB()}
             disabled={isSaving}
@@ -599,14 +617,69 @@ export default function SavedItineraryViewer() {
             {isSaving ? 'Saving...' : 'Save Updates'}
           </button>
         </div>
+
+        {/* Mobile actions — compact */}
+        <div className="flex lg:hidden items-center gap-2 shrink-0">
+          {saveDone && <span className="text-[10px] font-bold text-success">✓</span>}
+          <button
+            onClick={() => handleSaveToDB()}
+            disabled={isSaving}
+            className="bg-charcoal text-warmwhite px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:bg-black transition-all active:scale-[0.98] disabled:opacity-50"
+          >
+            {isSaving ? '...' : 'Save'}
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowMobileActions(!showMobileActions)}
+              className="p-1.5 hover:bg-black/5 rounded-full transition-colors text-charcoal/60"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
+              </svg>
+            </button>
+            {showMobileActions && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMobileActions(false)} />
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-border rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-200">
+                  <button
+                    onClick={() => { setShowMobileActions(false); router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`); }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
+                  >
+                    <SearchIcon /> Find Tour Guide
+                  </button>
+                  <button
+                    onClick={() => { setShowMobileActions(false); handleRevertToChat(); }}
+                    disabled={isReverting || !sessionId}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2 disabled:opacity-40"
+                  >
+                    <BackIcon /> {isReverting ? 'Reverting...' : 'Back to AI Chat'}
+                  </button>
+                  <div className="h-px bg-border mx-3 my-1" />
+                  <button
+                    onClick={() => { setShowMobileActions(false); handleDownloadPDF(); }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
+                  >
+                    <FileIcon /> Download PDF
+                  </button>
+                  <button
+                    onClick={() => { setShowMobileActions(false); handleDownloadJSON(); }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
+                  >
+                    <DatabaseIcon /> Download JSON
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </header>
 
       {/* Trip context bar (Ported from planner) */}
       {tripMetadata && (
-        <div className="pl-4 pr-6 py-1.5 border-b border-border/40 bg-white shrink-0 flex items-center gap-4 text-xs font-body text-charcoal font-medium z-10">
+        <div className="pl-3 sm:pl-4 pr-4 sm:pr-6 py-1.5 border-b border-border/40 bg-white shrink-0 flex items-center gap-2 sm:gap-4 text-xs font-body text-charcoal font-medium z-10 overflow-x-auto scrollbar-none">
           {tripMetadata.travel_date_start && tripMetadata.travel_date_end && (
             <span 
-              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
               style={{ backgroundColor: '#F0EBE3' }}
             >
               <CalendarIcon />
@@ -623,7 +696,7 @@ export default function SavedItineraryViewer() {
           )}
           {tripMetadata.trip_days && (
             <span 
-              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
               style={{ backgroundColor: '#F0EBE3' }}
             >
               <span className="pt-[1px]">{tripMetadata.trip_days} Days</span>
@@ -662,12 +735,12 @@ export default function SavedItineraryViewer() {
       )}
 
       {/* Unified Day Bar (Master Navigation) */}
-      <div className="flex items-center gap-1.5 pl-4 pr-6 py-2 border-b border-border bg-white shrink-0 z-10 overflow-x-auto">
+      <div className="flex items-center gap-1.5 pl-3 sm:pl-4 pr-4 sm:pr-6 py-2 border-b border-border bg-white shrink-0 z-10 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveDay('all')}
-          className={`text-xs font-bold font-display px-4 py-1.5 rounded-xl transition-all
+          className={`text-xs font-semibold font-body px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shrink-0
             ${activeDay === 'all'
-              ? 'bg-amber text-charcoal shadow-sm'
+              ? 'bg-charcoal text-warmwhite'
               : 'text-secondary hover:text-charcoal hover:bg-muted'}`}
         >
           All Days
@@ -682,21 +755,24 @@ export default function SavedItineraryViewer() {
             <button
               key={dayKey}
               onClick={() => setActiveDay(num)}
-              className={`text-xs font-bold font-display px-4 py-1.5 rounded-xl transition-all
+              className={`text-xs font-semibold font-body px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shrink-0
                 ${activeDay === num
-                  ? 'bg-amber text-charcoal shadow-sm'
+                  ? 'bg-charcoal text-warmwhite'
                   : 'text-secondary hover:text-charcoal hover:bg-muted'}`}
             >
               Day {num}
             </button>
           )
         })}
-      </div>
+        </div>
 
-      {/* Main content grid (Split View) */}
+      {/* Main content — Split on desktop, tabbed on mobile */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - Itinerary (600px) */}
-        <div className="w-[600px] border-r border-border bg-white flex flex-col shrink-0 min-h-0">
+
+        {/* Itinerary panel */}
+        <div className={`flex-col min-h-0 border-r border-border bg-white
+          lg:flex lg:w-[600px] lg:shrink-0 min-w-0
+          ${(isMobile ? mobileTab === 'itinerary' : true) ? 'flex flex-1' : 'hidden lg:flex'}`}>
           <div className="flex-1 overflow-hidden">
             <ItineraryPanel
               itinerary={itinerary}
@@ -720,8 +796,10 @@ export default function SavedItineraryViewer() {
           </div>
         </div>
 
-        {/* Main - Map */}
-        <div className="flex-1 bg-muted/10 relative">
+        {/* Map panel */}
+        <div className={`flex-col min-h-0 bg-muted/10 min-w-0
+          lg:flex lg:flex-1
+          ${(isMobile ? mobileTab === 'map' : true) ? 'flex flex-1' : 'hidden lg:flex'}`}>
           <MapPanel
             itinerary={itinerary}
             activeDay={activeDay}
@@ -740,6 +818,27 @@ export default function SavedItineraryViewer() {
           />
         </div>
       </div>
+
+      {/* ── Mobile bottom tab bar ── */}
+      <nav className="lg:hidden flex items-stretch border-t border-border bg-white shrink-0 safe-pb">
+        {[{ id: 'itinerary', label: '📋', fullLabel: 'Itinerary' }, { id: 'map', label: '🗺️', fullLabel: 'Map' }].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setMobileTab(tab.id)}
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors relative
+              ${mobileTab === tab.id ? 'text-charcoal' : 'text-secondary'}`}
+          >
+            <span className="text-xl leading-none">{tab.label}</span>
+            <span className={`text-[10px] font-bold uppercase tracking-wide transition-colors
+              ${mobileTab === tab.id ? 'text-charcoal' : 'text-tertiary'}`}>
+              {tab.fullLabel}
+            </span>
+            {mobileTab === tab.id && (
+              <span className="absolute bottom-0 w-8 h-0.5 bg-charcoal rounded-full" />
+            )}
+          </button>
+        ))}
+      </nav>
     </div>
   )
 }

@@ -163,7 +163,7 @@ export default function QuizPage() {
 
   // ── Render ──────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col items-center justify-start -mt-4 md:-mt-6 p-4 sm:p-6 pb-20">
+    <div className="flex-1 flex flex-col items-center justify-start -mt-7 md:-mt-6 p-4 sm:p-6 pb-20">
       <section className="max-w-4xl mx-auto w-full bg-white rounded-[32px] shadow-md border border-border/50 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
         
         {/* Header Area: Progress */}

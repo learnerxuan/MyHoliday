@@ -199,7 +199,7 @@ export default function ItinerariesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col pt-2 pb-24 px-2 sm:px-6">
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20">
       
       {/* ── THE ISLAND CONTAINER ── */}
       <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
@@ -395,8 +395,8 @@ export default function ItinerariesPage() {
 
                       <div className="p-4 flex flex-col flex-1">
                         {/* Title and Dates Row */}
-                        <div className="flex justify-between items-start mb-1">
-                          <h3 className="text-[17px] font-extrabold font-display text-charcoal truncate pr-2 group-hover:text-amber transition-colors">
+                        <div className="flex flex-col sm:flex-row justify-between items-start mb-2 sm:mb-1 gap-1 sm:gap-0">
+                          <h3 className="text-[17px] font-extrabold font-display text-charcoal pr-2 group-hover:text-amber transition-colors line-clamp-2">
                             {itin.title}
                           </h3>
                           {metadata.travel_date_start && (
@@ -444,7 +444,7 @@ export default function ItinerariesPage() {
                           </div>
                         </div>
 
-                        <div className="mt-auto pt-4 border-t border-border flex items-center justify-between gap-4">
+                        <div className="mt-auto pt-4 border-t border-border flex flex-wrap items-center justify-between gap-y-3 gap-x-2">
                           {isListed ? (
                             <>
                               <div className="bg-[#FEF3C7] px-2.5 h-6 rounded-[4px] flex items-center justify-center shrink-0">
@@ -462,16 +462,16 @@ export default function ItinerariesPage() {
                               <div className="bg-[#F0EDE9] px-2.5 h-6 rounded-[4px] flex items-center justify-center shrink-0">
                                 <span className="text-[9px] font-extrabold text-[#888] uppercase tracking-wider leading-none">Draft</span>
                               </div>
-                              <div className="flex gap-2 shrink-0">
+                              <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
                                 <Link 
                                   href={`/saved-itinerary/${itin.id}`}
-                                  className="text-[#666] hover:text-[#1A1A1A] text-[12px] font-semibold px-3 py-2 rounded-lg border border-[#EBEBEB] hover:border-[#D0CCC7] transition-all whitespace-nowrap"
+                                  className="text-[#666] hover:text-[#1A1A1A] text-[12px] font-semibold px-3 py-2 rounded-lg border border-[#EBEBEB] hover:border-[#D0CCC7] transition-all whitespace-nowrap flex-1 sm:flex-none text-center"
                                 >
                                   View & Edit
                                 </Link>
                                 <Link 
                                   href={`/marketplace/new?itinerary=${itin.id}`}
-                                  className="bg-[#C4874A] text-[#FAF9F7] text-[12px] font-semibold px-4 py-2 rounded-lg hover:bg-[#8B6A3E] transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                                  className="bg-[#C4874A] text-[#FAF9F7] text-[12px] font-semibold px-3 sm:px-4 py-2 rounded-lg hover:bg-[#8B6A3E] transition-all shadow-sm active:scale-95 whitespace-nowrap flex-1 sm:flex-none text-center"
                                 >
                                   Post to Marketplace
                                 </Link>

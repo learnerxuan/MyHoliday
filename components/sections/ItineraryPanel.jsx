@@ -573,23 +573,37 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
   return (
     <div
       onClick={() => onFocus && onFocus()}
-      className={`relative flex flex-row overflow-hidden rounded-xl border border-border border-l-4 bg-white shadow-sm hover:shadow-md transition-all group
+      className={`relative flex flex-col sm:flex-row overflow-hidden rounded-xl border border-border border-l-4 bg-white shadow-sm hover:shadow-md transition-all group
         ${borderColor}
         ${(onFocus && item.lat && item.lng) ? 'cursor-pointer hover:border-amber' : ''}
         ${isConflict ? 'bg-red-50 border-red-200' : confirmed ? 'bg-success-bg border-success/20' : ''}`}
     >
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-full flex items-center shadow-sm border border-border/50 z-10">
+      {/* Action buttons — visible on mobile, hover on desktop */}
+      <div className="absolute top-2 right-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-full flex items-center shadow-md border border-border/50 z-20">
         {onUpdate && (
-          <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="p-1.5 text-secondary hover:text-amber transition-colors" title="Edit item">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+          <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="p-2 text-secondary hover:text-amber transition-colors" title="Edit item">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
           </button>
         )}
         {onDelete && (
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 text-secondary hover:text-red-500 transition-colors" title="Remove item">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-2 text-secondary hover:text-red-500 transition-colors" title="Remove item">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         )}
       </div>
+
+      {/* Photo Section — Responsive Order */}
+      {photoUrl && !isEditing && (
+        <div className="order-first sm:order-last shrink-0 w-full h-36 sm:h-auto sm:w-36 lg:w-48 relative border-b sm:border-b-0 sm:border-l border-border/50 bg-muted/20 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={photoUrl} 
+            alt={item.name} 
+            className="sm:absolute sm:inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+          />
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col min-w-0 px-3 py-2.5 pb-3">
         <div className="flex items-center justify-between mb-1 pr-6">
@@ -665,18 +679,6 @@ function ActivityCard({ item, index, isConflict, onDelete, onUpdate, city, tripC
           </div>
         </div>
       </div>
-
-      {photoUrl && !isEditing && (
-        <div className="shrink-0 w-36 sm:w-60 relative border-l border-border/50 bg-muted/20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
-            src={photoUrl} 
-            alt={item.name} 
-            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            loading="lazy"
-          />
-        </div>
-      )}
     </div>
   )
 }

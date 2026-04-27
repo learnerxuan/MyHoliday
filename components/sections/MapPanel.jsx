@@ -41,8 +41,8 @@ function GridTimePicker({ value, onChange }) {
   }
 
   return (
-    <div className="bg-muted/30 p-3 rounded-xl border border-border/50 select-none">
-      <div className="flex flex-wrap gap-1.5 mb-4">
+    <div className="bg-muted/30 pt-2 pb-1.5 px-2 sm:p-3 rounded-xl border border-border/50 select-none">
+      <div className="flex flex-wrap gap-1 mb-2">
         {TIME_LABELS.map(lbl => (
           <button 
             key={lbl} 
@@ -230,14 +230,16 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 function MapUpdater({ focusedLocation }) {
   const map = useMap()
   useEffect(() => {
-    if (focusedLocation?.lat && focusedLocation?.lng) {
-      map.flyTo([focusedLocation.lat, focusedLocation.lng], 15, { animate: true, duration: 1.5 })
+    const lat = Number(focusedLocation?.lat)
+    const lng = Number(focusedLocation?.lng)
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      map.flyTo([lat, lng], 15, { animate: true, duration: 1.5 })
     }
   }, [focusedLocation, map])
   return null
 }
 
-function ItineraryMarker({ item, idx, city, cityContext }) {
+function ItineraryMarker({ item, idx, city, cityContext, isMobile }) {
   const [photoUrl, setPhotoUrl] = useState(item.imageUrl || item.photoUrl || null)
 
   useEffect(() => {
@@ -262,23 +264,23 @@ function ItineraryMarker({ item, idx, city, cityContext }) {
       position={[item.lat, item.lng]}
       icon={makeDivIcon(item.type || 'attraction', String(idx + 1))}
     >
-      <Popup>
-        <div style={{ minWidth: 160 }}>
+      <Popup closeButton={false} minWidth={140} maxWidth={isMobile ? 200 : 300}>
+        <div style={{ minWidth: isMobile ? 140 : 160 }}>
           {photoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img 
               src={photoUrl} 
               alt={item.name} 
-              style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }} 
+              style={{ width: '100%', height: isMobile ? 60 : 90, objectFit: 'cover', borderRadius: 8, marginBottom: 6 }} 
             />
           )}
-          <p style={{ fontWeight: 700, marginBottom: 2, fontSize: 13, color: '#1A1A1A' }}>{item.name}</p>
+          <p style={{ fontWeight: 700, marginBottom: 2, fontSize: isMobile ? 12 : 13, color: '#1A1A1A', lineHeight: 1.2 }}>{item.name}</p>
           {item.time && (
-            <p style={{ color: '#666', fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <p style={{ color: '#666', fontSize: isMobile ? 10 : 12, display: 'flex', alignItems: 'center', gap: '4px' }}>
               🕒 {item.time}
             </p>
           )}
-          {item.notes && (
+          {!isMobile && item.notes && (
             <p style={{ color: '#888', fontSize: 11, marginTop: 4, lineHeight: 1.4, borderTop: '1px solid #EEE', paddingTop: 4 }}>
               {item.notes}
             </p>
@@ -317,15 +319,32 @@ export default function MapPanel({
       ? dayKeys.flatMap(k => getSortedItems(k))
       : getSortedItems(`day${activeDay}`)
 
-  const routeWaypoints = visibleItems.filter(item => item.lat && item.lng && item.type !== 'transport')
-  const pins           = visibleItems.filter(item => item.lat && item.lng)
+  const routeWaypoints = visibleItems.filter(item => {
+    const lat = Number(item.lat)
+    const lng = Number(item.lng)
+    return Number.isFinite(lat) && Number.isFinite(lng) && item.type !== 'transport'
+  })
+  const pins = visibleItems.filter(item => {
+    const lat = Number(item.lat)
+    const lng = Number(item.lng)
+    return Number.isFinite(lat) && Number.isFinite(lng)
+  })
 
-  const centre =
-    pins.length > 0
-      ? [pins.reduce((s, p) => s + p.lat, 0) / pins.length, pins.reduce((s, p) => s + p.lng, 0) / pins.length]
-      : cityLat && cityLng ? [cityLat, cityLng] : [20, 0]
+  const centre = (() => {
+    if (pins.length > 0) {
+      const sumLat = pins.reduce((s, p) => s + Number(p.lat), 0)
+      const sumLng = pins.reduce((s, p) => s + Number(p.lng), 0)
+      return [sumLat / pins.length, sumLng / pins.length]
+    }
+    const cLat = Number(cityLat)
+    const cLng = Number(cityLng)
+    if (Number.isFinite(cLat) && Number.isFinite(cLng)) {
+      return [cLat, cLng]
+    }
+    return [20, 0] // Global fallback
+  })()
 
-  const zoom = pins.length > 0 ? 13 : cityLat ? 11 : 2
+  const zoom = pins.length > 0 ? 13 : Number.isFinite(Number(cityLat)) ? 11 : 2
 
   // ── Map Reference & Nearby Search State ───────────────────
   const mapRef = useRef(null)
@@ -337,6 +356,59 @@ export default function MapPanel({
   const [selectedTime, setSelectedTime]   = useState('9:00 AM')
   const [addSuccess, setAddSuccess]       = useState(null)
   const addSuccessTimer = useRef(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // ── Drawer Drag State ──────────────────────────────────────
+  const [drawerHeight, setDrawerHeight] = useState(45)
+  const isDragging = useRef(false)
+  const dragStartY = useRef(0)
+  const dragStartHeight = useRef(0)
+
+  // ── Screen size detection ──────────────────────────────────
+  useEffect(() => {
+    const checkSize = () => setIsMobile(window.innerWidth < 1024)
+    checkSize()
+    window.addEventListener('resize', checkSize)
+    return () => window.removeEventListener('resize', checkSize)
+  }, [])
+
+  // ── Global Drag Handlers ───────────────────────────────────
+  useEffect(() => {
+    const handlePointerMove = (e) => {
+      if (!isDragging.current) return
+      
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY
+      if (!clientY) return
+
+      const deltaY = dragStartY.current - clientY
+      const deltaPercent = (deltaY / window.innerHeight) * 100
+      
+      let newHeight = dragStartHeight.current + deltaPercent
+      if (newHeight < 20) newHeight = 20
+      if (newHeight > 85) newHeight = 85
+      
+      setDrawerHeight(newHeight)
+    }
+
+    const handlePointerUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false
+        document.body.style.userSelect = ''
+      }
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('touchmove', handlePointerMove, { passive: false })
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('touchend', handlePointerUp)
+    
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('touchmove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('touchend', handlePointerUp)
+    }
+  }, [])
 
   const isSpecificDay = activeDay !== 'all'
 
@@ -418,11 +490,11 @@ export default function MapPanel({
   }
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full relative w-full overflow-hidden">
 
       {/* Day filter bar */}
       {!hideDayTabs && (
-        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border overflow-x-auto flex-shrink-0">
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border overflow-x-auto flex-shrink-0 w-full">
           <button
             onClick={() => onDayChange('all')}
             className={`text-xs font-semibold font-body px-3 py-1 rounded-md whitespace-nowrap transition-colors
@@ -448,7 +520,7 @@ export default function MapPanel({
 
       {/* Category selector — only in a specific day view */}
       {isSpecificDay && (
-        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border bg-white flex-shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border bg-white flex-shrink-0 overflow-x-auto w-full">
           <span className="text-[10px] font-bold uppercase tracking-widest text-tertiary mr-1 shrink-0">Discover:</span>
           {NEARBY_CATEGORIES.map(cat => (
             <button
@@ -478,9 +550,33 @@ export default function MapPanel({
       {/* Map + sidebar layout */}
       <div className="flex flex-1 overflow-hidden relative min-h-0">
 
-        {/* Results sidebar */}
+        {/* Results results — Sidebar on Desktop, bottom drawer-like on Mobile */}
         {showPanel && nearbyPlaces.length > 0 && (
-          <div className="w-64 shrink-0 border-r border-border bg-white flex flex-col min-h-0 shadow-lg z-10">
+          <div 
+            className={`
+              bg-white flex flex-col min-h-0 shadow-lg z-[1000]
+              ${isMobile 
+                ? `absolute bottom-0 left-0 right-0 border-t border-border rounded-t-2xl pt-2 ${isDragging.current ? '' : 'transition-all duration-300'}` 
+                : 'w-64 shrink-0 border-r border-border relative transition-all duration-300'
+              }
+            `}
+            style={isMobile ? { height: `${drawerHeight}%` } : {}}
+          >
+            {/* Mobile Drag Handle */}
+            {isMobile && (
+              <div 
+                className="w-full h-6 flex items-center justify-center shrink-0 cursor-ns-resize -mt-2 touch-none"
+                onPointerDown={(e) => {
+                  isDragging.current = true
+                  dragStartY.current = e.touches ? e.touches[0].clientY : e.clientY
+                  dragStartHeight.current = drawerHeight
+                  document.body.style.userSelect = 'none'
+                }}
+              >
+                <div className="w-10 h-1.5 bg-border rounded-full" />
+              </div>
+            )}
+
             <div className="px-3 py-2 border-b border-border flex items-center justify-between shrink-0">
               <p className="text-xs font-bold text-charcoal">{nearbyPlaces.length} nearby found</p>
               <span className="text-[10px] text-secondary font-body">Day {activeDay}</span>
@@ -505,6 +601,9 @@ export default function MapPanel({
                         }
                       }
                     })
+
+                    // On mobile, hide panel after selecting a place to see map
+                    if (isMobile) setShowPanel(false)
                   }}
                   className="flex gap-2.5 px-3 py-2.5 border-b border-border/60 hover:bg-muted transition-colors cursor-pointer group"
                 >
@@ -563,13 +662,14 @@ export default function MapPanel({
               <MapUpdater focusedLocation={focusedLocation} />
 
               {/* Itinerary pins */}
-              {pins.map((item, idx) => (
-                <ItineraryMarker 
-                  key={`itin-${idx}-${item.name}`} 
-                  item={item} 
-                  idx={idx} 
-                  city={cityContext?.name || ''} 
-                  cityContext={cityContext} 
+              {pins.map((p, idx) => (
+                <ItineraryMarker
+                  key={`${activeDay}-${idx}-${p.name}`}
+                  item={p}
+                  idx={idx}
+                  city={cityContext?.name}
+                  cityContext={cityContext}
+                  isMobile={isMobile}
                 />
               ))}
 
@@ -580,17 +680,21 @@ export default function MapPanel({
                   position={[place.lat, place.lng]}
                   icon={makeNearbyPin()}
                 >
-                  <Popup>
-                    <div style={{ minWidth: 160 }}>
+                  <Popup closeButton={false} minWidth={140} maxWidth={isMobile ? 200 : 300}>
+                    <div style={{ minWidth: isMobile ? 140 : 160 }}>
                       {place.photoUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={place.photoUrl} alt={place.name} style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 6, marginBottom: 6 }} />
+                        <img 
+                          src={place.photoUrl} 
+                          alt={place.name} 
+                          style={{ width: '100%', height: isMobile ? 60 : 80, objectFit: 'cover', borderRadius: 6, marginBottom: 6 }} 
+                        />
                       )}
-                      <p style={{ fontWeight: 700, marginBottom: 2, fontSize: 13 }}>{place.name}</p>
+                      <p style={{ fontWeight: 700, marginBottom: 2, fontSize: isMobile ? 12 : 13, lineHeight: 1.2 }}>{place.name}</p>
                       {place.rating && (
-                        <p style={{ color: '#C4874A', fontSize: 11, fontWeight: 600 }}>★ {place.rating}</p>
+                        <p style={{ color: '#C4874A', fontSize: isMobile ? 10 : 11, fontWeight: 600 }}>★ {place.rating}</p>
                       )}
-                      {place.address && (
+                      {!isMobile && place.address && (
                         <p style={{ color: '#888', fontSize: 11, marginTop: 2, lineHeight: 1.4 }}>{place.address}</p>
                       )}
                     </div>
@@ -623,62 +727,87 @@ export default function MapPanel({
 
             {/* Add success toast */}
             {addSuccess && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-green-600 text-white text-xs font-bold rounded-full px-4 py-1.5 shadow-md z-[1000] flex items-center gap-1.5">
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[10px] sm:text-xs font-bold rounded-full px-4 py-1.5 shadow-md z-[1000] flex items-center gap-1.5 whitespace-nowrap">
                 <span>✓</span> {addSuccess} added to Day {activeDay}!
               </div>
+            )}
+
+            {/* Mobile: View results toggle button */}
+            {isMobile && nearbyPlaces.length > 0 && (
+              <button
+                onClick={() => setShowPanel(!showPanel)}
+                className={`absolute bottom-5 left-1/2 -translate-x-1/2 z-[1100] flex items-center gap-2 px-5 py-2.5 rounded-full shadow-xl font-bold text-xs transition-all
+                  ${showPanel 
+                    ? 'bg-white text-charcoal border border-border' 
+                    : 'bg-violet-600 text-white'
+                  }`}
+              >
+                {showPanel ? '↓ Hide Results' : `🏘 View ${nearbyPlaces.length} results`}
+              </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 px-3 py-2 border-t border-border flex-shrink-0 flex-wrap bg-white">
+      {/* Legend — simplified for mobile */}
+      <div className="flex items-center gap-x-4 gap-y-2 px-3 py-2 border-t border-border flex-shrink-0 flex-wrap bg-white">
         {Object.keys(PIN_EMOJI).map(type => (
-          <span key={type} className="flex items-center gap-1.5 text-xs text-secondary font-body capitalize">
-            <span className={`w-2.5 h-2.5 rounded-full inline-block ${LEGEND_DOT_CLASS[type]}`} />
+          <span key={type} className="flex items-center gap-1.5 text-[10px] sm:text-xs text-secondary font-body capitalize">
+            <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full inline-block ${LEGEND_DOT_CLASS[type]}`} />
             {type}
           </span>
         ))}
         {nearbyPlaces.length > 0 && (
-          <span className="flex items-center gap-1.5 text-xs text-violet-600 font-semibold">
-            <span className="w-2.5 h-2.5 rounded-full inline-block bg-violet-500" />
-            Nearby results
+          <span className="flex items-center gap-1.5 text-[10px] sm:text-xs text-violet-600 font-semibold">
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full inline-block bg-violet-500" />
+            Nearby
           </span>
         )}
       </div>
 
       {/* Add to Itinerary Modal — contained within the MapPanel */}
       {addingPlace && (
-        <div className="absolute inset-0 bg-charcoal/40 backdrop-blur-[2px] flex items-center justify-center z-[2000] p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className={`absolute inset-0 bg-charcoal/40 backdrop-blur-[2px] flex z-[2000] p-0 sm:p-4 
+          ${isMobile ? 'items-end' : 'items-center justify-center'}`}
+        >
+          <div className={`bg-white shadow-2xl overflow-hidden animate-in duration-300
+            ${isMobile 
+              ? 'w-full rounded-t-3xl slide-in-from-bottom max-h-[92vh] overflow-y-auto' 
+              : 'w-full max-w-sm rounded-2xl zoom-in-95'
+            }`}
+          >
             {addingPlace.photoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={addingPlace.photoUrl} alt={addingPlace.name} className="w-full h-36 object-cover" />
+              <img 
+                src={addingPlace.photoUrl} 
+                alt={addingPlace.name} 
+                className={`w-full object-cover ${isMobile ? 'h-64' : 'h-36'}`} 
+              />
             )}
-            <div className="p-5">
-              <h3 className="font-bold text-base text-charcoal mb-0.5">{addingPlace.name}</h3>
+            <div className={`p-4 sm:p-5 ${isMobile ? 'pb-4' : ''}`}>
+              <h3 className="font-bold text-base sm:text-lg text-charcoal mb-0.5">{addingPlace.name}</h3>
               {addingPlace.address && (
-                <p className="text-xs text-secondary font-body mb-4 line-clamp-2">{addingPlace.address}</p>
+                <p className="text-[10px] sm:text-xs text-secondary font-body mb-2 line-clamp-2">{addingPlace.address}</p>
               )}
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary block mb-2">
+              <label className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-secondary block mb-1">
                 Scheduled Time
               </label>
               <GridTimePicker 
                 value={selectedTime} 
                 onChange={setSelectedTime} 
               />
-              <div className="flex gap-3">
+              <div className="flex gap-3 mt-3">
                 <button
                   onClick={() => setAddingPlace(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-secondary hover:border-charcoal transition-colors"
+                  className="flex-1 py-2 sm:py-2.5 rounded-xl border border-border text-xs sm:text-sm font-semibold text-secondary hover:border-charcoal transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmAdd}
-                  className="flex-1 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors shadow-sm"
+                  className="flex-1 py-2 sm:py-2.5 rounded-xl bg-violet-600 text-white text-xs sm:text-sm font-semibold hover:bg-violet-700 transition-colors shadow-sm"
                 >
-                  Confirm Add
+                  Confirm
                 </button>
               </div>
             </div>

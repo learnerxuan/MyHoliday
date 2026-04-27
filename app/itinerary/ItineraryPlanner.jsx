@@ -15,6 +15,13 @@ const TABS = [
   { id: 'map',       label: '🗺️ Map' },
 ]
 
+// Mobile-only tab bar (includes 'chat')
+const MOBILE_TABS = [
+  { id: 'chat',      label: '💬', fullLabel: 'Chat' },
+  { id: 'itinerary', label: '📋', fullLabel: 'Itinerary' },
+  { id: 'map',       label: '🗺️', fullLabel: 'Map' },
+]
+
 // ── Coordinate sanitiser ──────────────────────────────────────
 // Swaps lat/lng if they are obviously reversed, drops (0,0) and out-of-range values
 function sanitiseCoords(item) {
@@ -141,6 +148,7 @@ export default function ItineraryPlanner() {
   const [messages,      setMessages]      = useState([])
   const [itinerary,     setItinerary]     = useState({})
   const [activeTab,     setActiveTab]     = useState('itinerary')
+  const [mobileTab,     setMobileTab]     = useState('chat')
   const [activeDay,     setActiveDay]     = useState('all')
   const [isLoading,     setIsLoading]     = useState(false)
   const [toolStatus,    setToolStatus]    = useState(null)
@@ -155,7 +163,16 @@ export default function ItineraryPlanner() {
   const [resetKey,      setResetKey]      = useState(0)
   const [showIntake,    setShowIntake]    = useState(false)
   const [intakeDone,    setIntakeDone]    = useState(false)
+  const [isMobile,      setIsMobile]      = useState(false)
   const initDone = useRef(false)
+
+  // ── Screen size detection (lg breakpoint) ───────────────────
+  useEffect(() => {
+    const checkSize = () => setIsMobile(window.innerWidth < 1024)
+    checkSize()
+    window.addEventListener('resize', checkSize)
+    return () => window.removeEventListener('resize', checkSize)
+  }, [])
 
   // ── Init: auth + destination + existing session ─────────────
   useEffect(() => {
@@ -570,7 +587,10 @@ export default function ItineraryPlanner() {
   // ── Page loading ────────────────────────────────────────────
   if (!pageReady) {
     return (
-      <div className="w-full flex items-center justify-center bg-warmwhite" style={{ height: 'calc(100dvh - 96px)' }}>
+      <div 
+        className="w-full flex items-center justify-center bg-warmwhite -mt-7 md:-mt-6" 
+        style={{ height: isMobile ? 'calc(100dvh - 36px)' : 'calc(100dvh - 40px)' }}
+      >
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-amber border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-sm font-body text-secondary">Loading your planner...</p>
@@ -580,22 +600,26 @@ export default function ItineraryPlanner() {
   }
 
   return (
-    <div className="w-full flex flex-col bg-warmwhite overflow-hidden" style={{ height: 'calc(100dvh - 96px)' }}>
+    <div 
+      className="w-full flex flex-col bg-warmwhite overflow-hidden -mt-7 md:-mt-6" 
+      style={{ height: isMobile ? 'calc(100dvh - 36px)' : 'calc(100dvh - 40px)' }}
+    >
 
       {/* ── Header bar ── */}
-      <header className="flex items-center justify-between pl-4 pr-5 py-3 border-b border-border bg-white shrink-0">
-          <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between pl-3 sm:pl-4 pr-3 sm:pr-5 py-2.5 sm:py-3 md:pt-[36px] border-b border-border bg-white shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button 
               onClick={() => router.back()}
-              className="p-2 hover:bg-black/5 rounded-full transition-colors text-charcoal/60 hover:text-charcoal"
+              className="p-1.5 sm:p-2 hover:bg-black/5 rounded-full transition-colors text-charcoal/60 hover:text-charcoal shrink-0"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
-            <div>
-              <h1 className="text-xl font-bold text-charcoal tracking-tight font-display">
-                Planning: <span className="text-amber">{destination?.city || 'Your Trip'}</span>, {destination?.country}
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold text-charcoal tracking-tight font-display truncate">
+                Planning: <span className="text-amber">{destination?.city || 'Your Trip'}</span>
+                <span className="hidden sm:inline">, {destination?.country}</span>
               </h1>
               <p className="text-[10px] text-tertiary font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -604,27 +628,27 @@ export default function ItineraryPlanner() {
             </div>
           </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {exportDone && (
-            <span className="text-xs font-semibold font-body text-success bg-success-bg px-3 py-1 rounded-full">
-              ✓ Saved to My Plans
+            <span className="hidden sm:inline text-xs font-semibold font-body text-success bg-success-bg px-3 py-1 rounded-full">
+              ✓ Saved
             </span>
           )}
           <button
             onClick={handleResetChat}
-            className="text-xs font-semibold font-body px-3 py-1.5 rounded-md border border-border text-secondary hover:text-charcoal hover:border-charcoal transition-colors ml-2"
+            className="text-xs font-semibold font-body px-2.5 sm:px-3 py-1.5 rounded-md border border-border text-secondary hover:text-charcoal hover:border-charcoal transition-colors"
           >
-            Reset Chat
+            Reset
           </button>
         </div>
       </header>
 
-      {/* ── Trip context bar (full-width) ── */}
+      {/* ── Trip context bar (scrollable on mobile) ── */}
       {tripContext && (
-        <div className="pl-4 pr-5 py-1.5 border-b border-border/40 bg-white shrink-0 flex items-center gap-4 text-xs font-body text-charcoal font-medium">
+        <div className="pl-3 sm:pl-4 pr-4 sm:pr-5 py-1.5 border-b border-border/40 bg-white shrink-0 flex items-center gap-2 sm:gap-4 text-xs font-body text-charcoal font-medium overflow-x-auto scrollbar-none">
           {tripContext.travel_date_start && tripContext.travel_date_end && (
             <span 
-              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
               style={{ backgroundColor: '#F0EBE3' }}
             >
               <CalendarIcon />
@@ -641,21 +665,21 @@ export default function ItineraryPlanner() {
           )}
           {tripContext.trip_days && (
             <span 
-              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
               style={{ backgroundColor: '#F0EBE3' }}
             >
               <span className="pt-[1px]">{tripContext.trip_days} Days</span>
             </span>
           )}
           {tripContext.budget && (
-            <span className={`flex items-center gap-1.5 px-2 rounded border text-[10px] font-bold uppercase leading-none h-[22px] ${getBudgetStyle(tripContext.budget)}`}>
+            <span className={`flex items-center gap-1.5 px-2 rounded border text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0 ${getBudgetStyle(tripContext.budget)}`}>
               <BudgetIcon />
               <span className="pt-[1px]">{tripContext.budget}</span>
             </span>
           )}
           {tripContext.pace && (
             <span 
-              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
               style={{ backgroundColor: '#F0EBE3' }}
             >
               <PaceIcon />
@@ -664,7 +688,7 @@ export default function ItineraryPlanner() {
           )}
           {tripContext.group_size && (
             <span 
-              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
+              className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
               style={{ backgroundColor: '#F0EBE3' }}
             >
               <GroupIcon />
@@ -674,11 +698,14 @@ export default function ItineraryPlanner() {
         </div>
       )}
 
-      {/* ── Split pane ── */}
+      {/* ── Main layout ── */}
+      {/* Mobile: single active panel, Desktop: 50/50 split */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Left — Chat (50%) */}
-        <div className="w-1/2 border-r border-border flex flex-col min-h-0 bg-subtle/30">
+        {/* Chat panel — always visible on desktop, shown when mobileTab='chat' on mobile */}
+        <div className={`flex-col min-h-0 bg-subtle/30 border-r border-border
+          lg:flex lg:w-1/2 min-w-0
+          ${mobileTab === 'chat' ? 'flex flex-1' : 'hidden lg:flex'}`}>
           <ChatWindow
             messages={messages}
             isLoading={isLoading}
@@ -687,11 +714,13 @@ export default function ItineraryPlanner() {
           />
         </div>
 
-        {/* Right — Tabs (50%) */}
-        <div className="w-1/2 flex flex-col min-h-0">
+        {/* Right panel — always visible on desktop, shown for itinerary/map on mobile */}
+        <div className={`flex-col min-h-0
+          lg:flex lg:w-1/2 min-w-0
+          ${mobileTab !== 'chat' ? 'flex flex-1' : 'hidden lg:flex'}`}>
 
-          {/* Tab switcher */}
-          <div className="flex items-center gap-1 pl-4 pr-4 py-2 border-b border-border bg-white shrink-0">
+          {/* Tab switcher — desktop only */}
+          <div className="hidden lg:flex items-center gap-1 pl-4 pr-4 py-2 border-b border-border bg-white shrink-0">
             {TABS.map(tab => (
               <button
                 key={tab.id}
@@ -702,20 +731,14 @@ export default function ItineraryPlanner() {
                     : 'text-secondary hover:text-charcoal hover:bg-muted'}`}
               >
                 {tab.label}
-                {tab.id === 'options' && pendingOptions.length > 0 && (
-                  <span className="bg-amber text-warmwhite text-xs rounded-full px-1.5 leading-4">
-                    {pendingOptions.length - selectedOptionNames.size > 0
-                      ? pendingOptions.length - selectedOptionNames.size
-                      : '✓'}
-                  </span>
-                )}
               </button>
             ))}
           </div>
 
           {/* Tab content */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {activeTab === 'itinerary' && (
+          <div className="flex-1 min-h-0 overflow-hidden relative">
+            {/* Only render according to isMobile status */}
+            {(isMobile ? mobileTab === 'itinerary' : activeTab === 'itinerary') && (
               <ItineraryPanel
                 itinerary={itinerary}
                 onExport={handleExport}
@@ -732,7 +755,7 @@ export default function ItineraryPlanner() {
                 }}
               />
             )}
-            {activeTab === 'map' && (
+            {(isMobile ? mobileTab === 'map' : activeTab === 'map') && (
               <MapPanel
                 itinerary={itinerary}
                 activeDay={activeDay}
@@ -751,6 +774,27 @@ export default function ItineraryPlanner() {
           </div>
         </div>
       </div>
+
+      {/* ── Mobile bottom tab bar ── */}
+      <nav className="lg:hidden flex items-stretch border-t border-border bg-white shrink-0 safe-pb">
+        {MOBILE_TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setMobileTab(tab.id)}
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors
+              ${mobileTab === tab.id ? 'text-charcoal' : 'text-secondary'}`}
+          >
+            <span className="text-xl leading-none">{tab.label}</span>
+            <span className={`text-[10px] font-bold uppercase tracking-wide transition-colors
+              ${mobileTab === tab.id ? 'text-charcoal' : 'text-tertiary'}`}>
+              {tab.fullLabel}
+            </span>
+            {mobileTab === tab.id && (
+              <span className="absolute bottom-0 w-8 h-0.5 bg-charcoal rounded-full" />
+            )}
+          </button>
+        ))}
+      </nav>
 
       {/* ── Export modal ── */}
       {exportModal && (

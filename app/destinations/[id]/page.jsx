@@ -136,11 +136,11 @@ export default async function DestinationPage({ params }) {
   const nationalities = countBy(historicalTrips, 'traveler_nationality').slice(0, 4)
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col pt-2 pb-24 px-2 sm:px-6">
-      <div className="max-w-7xl mx-auto w-full flex flex-col lg:grid lg:grid-cols-4 lg:gap-6 gap-6 lg:items-start">
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20">
+      <div className="max-w-7xl mx-auto w-full flex flex-col lg:grid lg:grid-cols-4 lg:gap-6 gap-4 lg:items-start">
         
-        {/* ── 1. Hero Island (Row 1, Left) ── */}
-        <div className="lg:col-span-3 order-2 lg:order-none relative bg-charcoal text-warmwhite rounded-3xl overflow-hidden min-h-[320px] md:min-h-[400px] h-full flex flex-col justify-end p-6 md:p-10 shadow-sm w-full">
+        {/* ── 1. Hero Island (shown first on mobile) ── */}
+        <div className="lg:col-span-3 order-1 lg:order-none relative bg-charcoal text-warmwhite rounded-2xl sm:rounded-3xl overflow-hidden min-h-[260px] sm:min-h-[320px] md:min-h-[400px] h-full flex flex-col justify-end p-5 sm:p-6 md:p-10 shadow-sm w-full">
           {heroImageUrl ? (
             <div className="absolute inset-0">
               <Image
@@ -161,13 +161,13 @@ export default async function DestinationPage({ params }) {
             <div className="inline-flex items-center justify-center bg-black/60 backdrop-blur-md text-amber text-xs font-semibold px-4 py-1.5 rounded-full border border-amber-500/50 mb-4 uppercase tracking-[0.15em] leading-none">
               {dest.region ?? dest.country}
             </div>
-            <h1 className="text-5xl md:text-6xl font-extrabold font-display mb-1 drop-shadow-md">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold font-display mb-1 drop-shadow-md">
               {dest.city}
             </h1>
-            <p className="text-lg font-body text-warmwhite/90 drop-shadow-sm">{dest.country}</p>
+            <p className="text-base sm:text-lg font-body text-warmwhite/90 drop-shadow-sm">{dest.country}</p>
 
             {/* Quick badges */}
-            <div className="flex flex-wrap gap-2 mt-6">
+            <div className="flex flex-wrap gap-1.5 mt-4 sm:mt-6">
               {dest.budget_level && (
                 <span className={`text-[10px] font-bold flex items-center gap-1 uppercase px-2 rounded border leading-none h-[22px] ${BUDGET_COLOUR[dest.budget_level] ?? 'bg-muted text-secondary border-transparent'}`}>
                   <BudgetIcon />
@@ -188,10 +188,10 @@ export default async function DestinationPage({ params }) {
         </div>
 
         {/* ── 2. Top Right Islands (Row 1, Right) ── */}
-        <div className="lg:col-span-1 order-1 lg:order-none flex flex-col gap-6 w-full">
+        <div className="lg:col-span-1 order-2 lg:order-none flex flex-col gap-4 sm:gap-6 w-full">
           
           {/* AI Planner Island */}
-          <div className="relative bg-charcoal text-warmwhite rounded-3xl overflow-hidden p-6 shadow-md border border-white/10 flex flex-col gap-4">
+          <div className="relative bg-charcoal text-warmwhite rounded-2xl sm:rounded-3xl overflow-hidden p-5 sm:p-6 shadow-md border border-white/10 flex flex-col gap-3 sm:gap-4">
             {/* Ambient amber glow */}
             <div 
               className="absolute inset-0 pointer-events-none opacity-40"
@@ -200,13 +200,13 @@ export default async function DestinationPage({ params }) {
               }}
             />
             <div className="relative z-10">
-              <h3 className="text-xl font-extrabold font-display mt-1 mb-2">Ready to plan this trip?</h3>
-              <p className="text-sm font-body text-warmwhite/70 leading-relaxed mb-6">
+              <h3 className="text-lg sm:text-xl font-extrabold font-display mt-1 mb-2">Ready to plan this trip?</h3>
+              <p className="text-sm font-body text-warmwhite/70 leading-relaxed mb-4 sm:mb-6">
                 Our AI builds a personalised day-by-day itinerary for you — for free.
               </p>
               <Link
                 href={`/itinerary?city=${dest.id}`}
-                className="block w-full bg-amber text-warmwhite text-sm font-semibold font-body text-center py-4 rounded-2xl hover:bg-amberdark transition-all shadow-[0_0_15px_rgba(196,135,74,0.15)] hover:shadow-[0_0_20px_rgba(196,135,74,0.25)]"
+                className="block w-full bg-amber text-warmwhite text-sm font-semibold font-body text-center py-3.5 sm:py-4 rounded-xl sm:rounded-2xl hover:bg-amberdark transition-all active:scale-[0.98] shadow-[0_0_15px_rgba(196,135,74,0.15)] hover:shadow-[0_0_20px_rgba(196,135,74,0.25)]"
               >
                 Start Planning with AI ✨
               </Link>
@@ -215,9 +215,9 @@ export default async function DestinationPage({ params }) {
 
           {/* Trip Details Island */}
           {(dest.ideal_durations || dest.best_time_to_visit) && (
-            <div className="bg-white rounded-3xl border border-border p-6 shadow-sm flex flex-col gap-5">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-border p-5 sm:p-6 shadow-sm flex flex-row sm:flex-col gap-4 sm:gap-5">
               {dest.ideal_durations && (
-                <div>
+                <div className="flex-1">
                   <p className="text-xs font-semibold font-body text-tertiary mb-1 uppercase tracking-wide">Ideal duration</p>
                   <p className="text-base font-bold font-display text-charcoal">
                     {dest.ideal_durations.min && dest.ideal_durations.max
@@ -231,7 +231,7 @@ export default async function DestinationPage({ params }) {
                 </div>
               )}
               {dest.best_time_to_visit && (
-                <div>
+                <div className="flex-1">
                   <p className="text-xs font-semibold font-body text-tertiary mb-1 uppercase tracking-wide">Best time to visit</p>
                   <p className="text-base font-bold font-display text-charcoal">
                     {dest.best_time_to_visit}
@@ -244,12 +244,12 @@ export default async function DestinationPage({ params }) {
         </div>
 
         {/* ── 3. Main Content Islands (Row 2, Left) ── */}
-        <div className="lg:col-span-3 order-3 lg:order-none flex flex-col gap-6 w-full">
+        <div className="lg:col-span-3 order-3 lg:order-none flex flex-col gap-4 sm:gap-6 w-full">
 
           {/* Description Island */}
           {dest.short_description && (
-            <section className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-border">
-              <h2 className="text-xl font-extrabold font-display mb-3">About {dest.city}</h2>
+            <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 md:p-8 shadow-sm border border-border">
+              <h2 className="text-lg sm:text-xl font-extrabold font-display mb-3">About {dest.city}</h2>
               <p className="text-sm font-body text-secondary leading-relaxed">
                 {dest.short_description}
               </p>
@@ -258,13 +258,13 @@ export default async function DestinationPage({ params }) {
 
           {/* Travel style scores Island */}
           {scores.length > 0 && (
-            <section className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-border">
-              <h2 className="text-xl font-extrabold font-display mb-6">Travel Style</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-8">
+            <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 md:p-8 shadow-sm border border-border">
+              <h2 className="text-lg sm:text-xl font-extrabold font-display mb-5 sm:mb-6">Travel Style</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 sm:gap-y-5 gap-x-8">
                 {scores.map(([key, { label, emoji }]) => (
                   <div key={key} className="flex items-center gap-3">
-                    <span className="text-base flex items-center justify-center w-8 h-8 shrink-0 bg-subtle rounded-full">{emoji}</span>
-                    <span className="text-sm font-semibold font-body text-charcoal w-24 shrink-0">{label}</span>
+                    <span className="text-base flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 shrink-0 bg-subtle rounded-full">{emoji}</span>
+                    <span className="text-xs sm:text-sm font-semibold font-body text-charcoal w-20 sm:w-24 shrink-0">{label}</span>
                     <ScoreBar value={dest[key]} />
                     <span className="text-xs font-semibold font-body text-secondary w-8 text-right shrink-0">{dest[key]}/5</span>
                   </div>
@@ -313,9 +313,9 @@ export default async function DestinationPage({ params }) {
               + ` L ${last.x} ${H - PAD.bottom} L ${first.x} ${H - PAD.bottom} Z`
 
             return (
-              <section className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-border">
-                <h2 className="text-xl font-extrabold font-display mb-4">Weather by Month</h2>
-                <div className="overflow-x-auto overflow-y-hidden w-full">
+              <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 md:p-8 shadow-sm border border-border">
+                <h2 className="text-lg sm:text-xl font-extrabold font-display mb-4">Weather by Month</h2>
+                <div className="overflow-x-auto overflow-y-hidden w-full -mx-1 px-1">
                   <svg
                     viewBox={`0 0 ${W} ${H}`}
                     className="w-full h-auto mt-2 drop-shadow-sm min-w-[500px]"
@@ -381,18 +381,18 @@ export default async function DestinationPage({ params }) {
 
           {/* ── Historical Trips section ── */}
           {hasHistory && (
-            <section className="bg-white rounded-[40px] p-6 md:p-10 shadow-sm border border-border">
-              <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-2xl font-extrabold font-display">Real Traveller Data</h2>
+            <section className="bg-white rounded-2xl sm:rounded-[40px] p-5 sm:p-6 md:p-10 shadow-sm border border-border">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                <h2 className="text-xl sm:text-2xl font-extrabold font-display">Real Traveller Data</h2>
                 <span className="text-xs font-semibold font-body text-secondary bg-muted px-3 py-1 rounded-full border border-border/50">
                   {historicalTrips.length} trip{historicalTrips.length !== 1 ? 's' : ''} recorded
                 </span>
               </div>
-              <p className="text-sm font-body text-tertiary mb-6">
+              <p className="text-xs sm:text-sm font-body text-tertiary mb-5 sm:mb-6">
                 Aggregated from historical trip records for destinations matching &quot;{dest.city}&quot;. Use as a general reference.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
                 {avgDuration !== null && (
                   <div className="bg-subtle rounded-3xl p-5 border border-border/50">
                     <p className="text-xs font-semibold text-tertiary uppercase tracking-wide mb-1 flex items-center justify-between">
@@ -497,8 +497,8 @@ export default async function DestinationPage({ params }) {
 
         {/* ── 4. External Links Island (Row 2, Right) ── */}
         <div className="lg:col-span-1 order-4 lg:order-none w-full">
-          <section className="bg-white rounded-3xl border border-border p-6 shadow-sm flex flex-col gap-4">
-            <h2 className="text-xl font-extrabold font-display">External Resources</h2>
+          <section className="bg-white rounded-2xl sm:rounded-3xl border border-border p-5 sm:p-6 shadow-sm flex flex-col gap-4">
+            <h2 className="text-lg sm:text-xl font-extrabold font-display">External Resources</h2>
             <BookingLinks city={dest.city} />
           </section>
         </div>
