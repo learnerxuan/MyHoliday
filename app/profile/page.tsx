@@ -130,7 +130,11 @@ export default function ProfilePage() {
 
     const { error: err } = await supabase
       .from('tour_guides')
-      .update({ full_name: gForm.full_name, city_id: gForm.city_id || null })
+      .update({ 
+        full_name: gForm.full_name, 
+        city_id: gForm.city_id || null,
+        verification_status: 'pending'
+      })
       .eq('user_id', user.id)
 
     setSaving(false)
@@ -143,6 +147,7 @@ export default function ProfilePage() {
       ...g, 
       full_name: gForm.full_name,
       city_id: gForm.city_id,
+      verification_status: 'pending',
       destinations: selectedDest ? { city: selectedDest.city, country: selectedDest.country } : g.destinations
     }))
     setSaved(true)
@@ -170,12 +175,15 @@ export default function ProfilePage() {
 
     const { error: updateErr } = await supabase
       .from('tour_guides')
-      .update({ document_url: urlData.publicUrl })
+      .update({ 
+        document_url: urlData.publicUrl,
+        verification_status: 'pending'
+      })
       .eq('user_id', user.id)
 
     setUploadingDoc(false)
     if (updateErr) { setError(updateErr.message); return }
-    setGuide((g: any) => ({ ...g, document_url: urlData.publicUrl }))
+    setGuide((g: any) => ({ ...g, document_url: urlData.publicUrl, verification_status: 'pending' }))
     setNewDoc(null)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
@@ -200,9 +208,15 @@ export default function ProfilePage() {
             )}
           </div>
           <div className="flex-1">
-             <div className="inline-flex items-center gap-2 bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-bold px-3 py-1.5 rounded-md mb-2 uppercase tracking-[0.2em] leading-none">
-               {role === 'guide' ? '💼 Verified Guide' : '🌎 Verified Traveller'}
-             </div>
+            <div className={`inline-flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-md mb-2 uppercase tracking-[0.2em] leading-none ${
+              role === 'guide' 
+                ? (guide?.verification_status === 'approved' ? 'bg-[#EAF3DE] text-[#3B6D11]' : guide?.verification_status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700')
+                : 'bg-[#EAF3DE] text-[#3B6D11]'
+            }`}>
+              {role === 'guide' 
+                ? (guide?.verification_status === 'approved' ? '💼 Verified Guide' : guide?.verification_status === 'rejected' ? '🚫 Rejected Guide' : '⏳ Pending Verification') 
+                : '🌎 Verified Traveller'}
+            </div>
              <h1 className="font-display font-extrabold text-[32px] text-charcoal leading-none">
                 {role === 'traveller' ? (tForm.full_name || oauthName || 'Traveller') : (guide?.full_name || oauthName || 'Tour Guide')}
              </h1>
