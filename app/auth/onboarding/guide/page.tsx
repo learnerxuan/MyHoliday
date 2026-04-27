@@ -21,6 +21,14 @@ export default function GuideOnboarding() {
     document: null as File | null,
   })
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  // Filter destinations based on search query
+  const filteredDestinations = destinations.filter(d => 
+    `${d.city} ${d.country}`.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -56,6 +64,10 @@ export default function GuideOnboarding() {
       setError('Please upload your guide licence or ID document.')
       return
     }
+    if (!form.city_id) {
+      setError('Please select a city from the list.')
+      return
+    }
     setSaving(true)
     setError('')
 
@@ -80,7 +92,7 @@ export default function GuideOnboarding() {
         .insert({
           user_id: user.id,
           full_name: form.full_name,
-          city_id: form.city_id || null,
+          city_id: form.city_id,
           document_url: publicUrlData.publicUrl,
           verification_status: 'pending',
         })
@@ -139,11 +151,11 @@ export default function GuideOnboarding() {
 
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-2xl shadow-md border border-border px-8 py-10 space-y-5"
+          className="bg-white rounded-2xl shadow-md border border-border px-8 py-10 space-y-6"
         >
           {/* Full name */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider">
+          <div className="space-y-1.5 text-left">
+            <label className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider block">
               Full Name
             </label>
             <input
@@ -152,28 +164,71 @@ export default function GuideOnboarding() {
               value={form.full_name}
               onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
               placeholder="Your full name"
-              className="w-full py-2.5 px-3.5 rounded-xl border border-border text-sm font-body text-charcoal placeholder:text-tertiary focus:outline-none focus:border-amber transition-colors"
+              className="w-full py-2.5 px-4 rounded-xl border border-border text-sm font-body text-charcoal placeholder:text-tertiary focus:outline-none focus:border-amber transition-colors"
             />
           </div>
 
-          {/* City selection */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider">
+          {/* City selection (Searchable) */}
+          <div className="space-y-1.5 text-left relative">
+            <label className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider block">
               Your City
             </label>
-            <select
-              required
-              value={form.city_id}
-              onChange={e => setForm(f => ({ ...f, city_id: e.target.value }))}
-              className="w-full py-2.5 px-3.5 rounded-xl border border-border text-sm font-body text-charcoal focus:outline-none focus:border-amber transition-colors bg-white"
-            >
-              <option value="" disabled>Select the city you guide in</option>
-              {destinations.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.city}, {d.country}
-                </option>
-              ))}
-            </select>
+            <div className="relative group">
+              <input
+                type="text"
+                placeholder="Type to search city..."
+                value={searchQuery}
+                onFocus={() => setShowDropdown(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setShowDropdown(true)
+                  if (!e.target.value) setForm(f => ({ ...f, city_id: '' }))
+                }}
+                className={`w-full py-2.5 px-4 rounded-xl border border-border text-sm font-body text-charcoal placeholder:text-tertiary focus:outline-none focus:border-amber transition-colors bg-white ${form.city_id ? 'border-green-500/50' : ''}`}
+              />
+              {form.city_id && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                  <span>Selected</span>
+                </div>
+              )}
+            </div>
+
+            {showDropdown && (
+              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-border rounded-xl shadow-xl max-h-60 overflow-y-auto overscroll-contain">
+                {filteredDestinations.length > 0 ? (
+                  filteredDestinations.map(d => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => {
+                        setForm(f => ({ ...f, city_id: d.id }))
+                        setSearchQuery(`${d.city}, ${d.country}`)
+                        setShowDropdown(false)
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-muted transition-colors border-b border-border last:border-none group flex items-center justify-between"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-charcoal group-hover:text-amber transition-colors">{d.city}</span>
+                        <span className="text-[11px] text-secondary">{d.country}</span>
+                      </div>
+                      {form.city_id === d.id && <span className="text-amber">✓</span>}
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-4 text-center text-xs text-tertiary font-body italic">
+                    No matching cities found in our database...
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Click-away overlay */}
+            {showDropdown && (
+              <div 
+                className="fixed inset-0 z-40 bg-transparent" 
+                onClick={() => setShowDropdown(false)} 
+              />
+            )}
           </div>
 
           {/* Document upload */}

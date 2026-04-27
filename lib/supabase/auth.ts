@@ -35,7 +35,12 @@ export async function signUpWithEmail(
   return supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: redirectTo },
+    options: { 
+      emailRedirectTo: redirectTo,
+      data: {
+        role: intent === 'guide' ? 'guide' : 'traveller'
+      }
+    },
   })
 }
 
