@@ -42,12 +42,12 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 w-full z-50 pointer-events-none transition-all duration-300">
+      <header className="fixed top-0 left-0 w-full z-[5000] pointer-events-none transition-all duration-300">
         <div
           className={`mx-auto transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex items-center justify-between border rounded-full ${
             scrolled
-              ? 'mt-4 max-w-4xl bg-white/75 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.06)] border-black/5 px-4 py-2'
-              : 'mt-0 w-full max-w-[1400px] px-6 md:px-12 py-5 bg-transparent border-transparent'
+              ? 'mt-2 max-w-4xl bg-white/75 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.06)] border-black/5 px-4 py-1 md:py-1.5'
+              : 'mt-0 w-full max-w-[1400px] px-4 md:px-12 py-1.5 md:py-2.5 bg-transparent border-transparent'
           }`}
         >
           {/* ── Logo ── */}
@@ -57,7 +57,7 @@ export default function Navbar() {
               alt="MyHoliday"
               width={140}
               height={40}
-              className={`object-contain transition-all duration-300 ${scrolled ? 'h-6' : 'h-8'}`}
+              className={`object-contain transition-all duration-300 ${scrolled ? 'h-5 md:h-6' : 'h-6 md:h-8'}`}
               priority
               unoptimized
             />
@@ -91,7 +91,7 @@ export default function Navbar() {
           {/* ── Desktop Right Auth ── */}
           <div
             className={`hidden md:flex items-center pointer-events-auto transition-all duration-300 rounded-full ${
-              scrolled ? 'gap-4 pr-1 bg-transparent' : 'gap-4 bg-black/5 p-1.5 pl-6'
+              scrolled ? 'gap-4 pr-1 bg-transparent' : 'gap-4 bg-black/5 p-1 pl-6'
             }`}
           >
             {user ? (
@@ -100,7 +100,7 @@ export default function Navbar() {
                 <button
                   onClick={signOut}
                   className={`text-sm font-semibold font-body text-error hover:text-red-700 transition-colors h-full ${
-                    scrolled ? 'py-1.5 px-3 rounded-full hover:bg-red-50' : 'py-2 px-4 rounded-full bg-white shadow-sm hover:bg-red-50'
+                    scrolled ? 'py-1.5 px-3 rounded-full hover:bg-red-50' : 'py-1.5 px-4 rounded-full bg-white shadow-sm hover:bg-red-50'
                   }`}
                 >
                   Sign out
@@ -119,7 +119,7 @@ export default function Navbar() {
                   href="/auth/register"
                   onClick={close}
                   className={`text-sm font-semibold font-body bg-amber text-warmwhite transition-colors tracking-wide shadow-sm flex items-center justify-center ${
-                    scrolled ? 'px-4 py-2 rounded-full hover:bg-amberdark' : 'px-5 py-2 rounded-full hover:bg-amberdark'
+                    scrolled ? 'px-4 py-1.5 rounded-full hover:bg-amberdark' : 'px-5 py-1.5 rounded-full hover:bg-amberdark'
                   }`}
                 >
                   Sign up
@@ -130,7 +130,7 @@ export default function Navbar() {
 
           {/* ── Mobile Hamburger ── */}
           <button
-            className={`md:hidden pointer-events-auto flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
+            className={`md:hidden pointer-events-auto flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
               scrolled ? 'hover:bg-black/5 border border-black/5' : 'bg-black/5 hover:bg-black/10'
             }`}
             onClick={() => setMenuOpen(o => !o)}

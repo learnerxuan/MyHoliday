@@ -187,7 +187,7 @@ export default function ProfilePage() {
   const oauthName = user.user_metadata?.full_name || user.user_metadata?.name || ''
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col pt-2 pb-24 px-2 sm:px-6 font-body">
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20 font-body">
       <section className="max-w-5xl mx-auto w-full p-6 lg:p-12 bg-white rounded-[24px] shadow-sm border border-border/50">
         
         {/* Profile Header */}

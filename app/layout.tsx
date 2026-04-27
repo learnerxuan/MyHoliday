@@ -32,7 +32,7 @@ export default function RootLayout({
       <body className={`${funnelDisplay.variable} ${notoSerif.variable} antialiased min-h-screen flex flex-col bg-warmwhite`}>
         <PageTransitionProvider>
           <Navbar />
-          <main className="flex-1 flex flex-col pt-24 pt-safe">
+          <main className="flex-1 flex flex-col pt-16 pt-safe">
             {children}
           </main>
           <Footer />
