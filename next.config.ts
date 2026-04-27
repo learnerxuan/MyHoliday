@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '*.ggpht.com' },
     ],
   },
+  transpilePackages: ['lucide-react'],
 }
+
 
 export default nextConfig

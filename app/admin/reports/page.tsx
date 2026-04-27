@@ -1,6 +1,7 @@
 import { getUserGrowthData, getDashboardStats } from '@/lib/actions/reports'
 import UserGrowthChart from '@/components/admin/UserGrowthChart'
-import { Users, MapPin, Clock } from 'lucide-react'
+import { Users, MapPin, Clock } from 'lucide-react' // Icons for the stats grid
+
 
 export const dynamic = 'force-dynamic'
 
