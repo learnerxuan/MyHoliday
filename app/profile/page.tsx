@@ -307,7 +307,7 @@ export default function ProfilePage() {
                  <div className="space-y-1.5">
                     <label className="text-[11px] text-[#888] font-bold uppercase tracking-wider mb-1 block">Accessibility Needs</label>
                     <div className={`input-base bg-white flex items-center justify-between border border-[#E5E0DA] ${isEditing ? 'cursor-pointer' : 'opacity-70 cursor-not-allowed'}`} onClick={() => isEditing && setTForm({...tForm, accessibility_needs: !tForm.accessibility_needs})}>
-                       <span className="text-charcoal font-medium text-[14px]">{tForm.accessibility_needs ? 'Yes, I require accommodations' : 'None required'}</span>
+                       <span className="text-charcoal font-medium text-[14px]">{tForm.accessibility_needs ? 'Yes, I have physical accessibility requirements' : 'None required'}</span>
                        <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${tForm.accessibility_needs ? 'bg-[#C4874A] border-[#C4874A]' : 'bg-[#FAF9F7] border-[#D0CCC7]'}`}>
                          {tForm.accessibility_needs && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
                        </div>

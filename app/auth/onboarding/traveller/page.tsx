@@ -83,7 +83,7 @@ export default function TravellerOnboarding() {
   if (!user) return null
 
   return (
-    <main className="min-h-screen bg-warmwhite flex items-center justify-center px-4 py-12">
+    <section className="min-h-screen bg-warmwhite flex flex-col items-center px-4 pt-24 md:pt-32 pb-12">
       <div className="w-full max-w-lg">
 
         <div className="text-center mb-8">
@@ -180,7 +180,7 @@ export default function TravellerOnboarding() {
               className="h-4 w-4 accent-amber"
             />
             <span className="text-sm font-body text-charcoal">
-              I have accessibility needs
+              I have physical accessibility requirements
             </span>
           </label>
 
@@ -202,6 +202,6 @@ export default function TravellerOnboarding() {
           </button>
         </form>
       </div>
-    </main>
+    </section>
   )
 }

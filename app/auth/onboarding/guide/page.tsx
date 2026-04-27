@@ -114,7 +114,7 @@ export default function GuideOnboarding() {
   // Success screen
   if (done) {
     return (
-      <main className="min-h-screen bg-warmwhite flex items-center justify-center px-4">
+      <section className="min-h-screen bg-warmwhite flex flex-col items-center px-4 pt-24 md:pt-32">
         <div className="w-full max-w-md text-center space-y-5">
           <div className="text-6xl">🎉</div>
           <h1 className="text-3xl font-extrabold font-display text-charcoal">
@@ -132,12 +132,12 @@ export default function GuideOnboarding() {
             Back to Home
           </button>
         </div>
-      </main>
+      </section>
     )
   }
 
   return (
-    <main className="min-h-screen bg-warmwhite flex items-center justify-center px-4 py-12">
+    <section className="min-h-screen bg-warmwhite flex flex-col items-center px-4 pt-24 md:pt-32 pb-12">
       <div className="w-full max-w-lg">
 
         <div className="text-center mb-8">
@@ -285,6 +285,6 @@ export default function GuideOnboarding() {
           </button>
         </form>
       </div>
-    </main>
+    </section>
   )
 }
