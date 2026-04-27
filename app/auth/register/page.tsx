@@ -58,7 +58,7 @@ export default function RegisterPage() {
 
     // Email confirmation disabled: Supabase returns a session immediately.
     if (data.session) {
-      router.replace('/')
+      router.replace('/auth/callback' + (role === 'guide' ? '?intent=guide' : ''))
       router.refresh()
       return
     }

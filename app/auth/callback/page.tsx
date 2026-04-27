@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 
 // Handles both OAuth flows:
@@ -12,12 +12,46 @@ import { supabase } from '@/lib/supabase/client'
 
 function CallbackHandler() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-          router.replace('/')
+          const user = session.user
+          const intent = searchParams.get('intent')
+          const role = user.user_metadata?.role
+
+          if (role === 'admin') {
+            router.replace('/admin')
+            return
+          }
+
+          if (intent === 'guide' || role === 'guide') {
+            const { data: guide } = await supabase
+              .from('tour_guides')
+              .select('id, verification_status')
+              .eq('user_id', user.id)
+              .maybeSingle()
+
+            if (!guide) {
+              router.replace('/auth/onboarding/guide')
+            } else {
+              router.replace('/guide')
+            }
+          } else {
+            const { data: traveller } = await supabase
+              .from('traveller_profiles')
+              .select('id')
+              .eq('user_id', user.id)
+              .maybeSingle()
+
+            if (!traveller) {
+              router.replace('/auth/onboarding/traveller')
+            } else {
+              router.replace('/')
+            }
+          }
           router.refresh()
         }
 
@@ -27,10 +61,9 @@ function CallbackHandler() {
       }
     )
 
-    // Safety fallback: if no auth event fires in 5s, redirect to login
     const fallback = setTimeout(() => {
       router.replace('/auth/login?error=auth_failed')
-    }, 5000)
+    }, 10000)
 
     return () => {
       subscription.unsubscribe()
