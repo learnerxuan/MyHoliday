@@ -545,7 +545,7 @@ CREATE TABLE public.user_interactions (
 ```env
 # ── Supabase ──────────────────────────────────────
 NEXT_PUBLIC_SUPABASE_URL=           # Your Supabase project URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=      # Public anon key (safe for browser)
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=      # Public anon key (safe for browser)
 SUPABASE_SERVICE_ROLE_KEY=          # Service role key (server-side only, never expose)
 
 # ── AI Chatbot (choose one) ───────────────────────
