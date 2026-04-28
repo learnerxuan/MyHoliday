@@ -113,11 +113,30 @@ function NewListingContent() {
           .eq('user_id', currentUser.id)
           .order('created_at', { ascending: false })
 
-        if (!plansError && plansData) {
-          setItineraries(plansData)
-        } else {
+        if (plansError) {
           setError('Failed to fetch your saved itineraries.')
+          return
         }
+
+        const { data: listingsData, error: listingsError } = await supabase
+          .from('marketplace_listings')
+          .select('itinerary_id, status')
+          .eq('user_id', currentUser.id)
+
+        if (listingsError) {
+          setError('Failed to check posted listings.')
+          return
+        }
+
+        const postedItineraryIds = (listingsData || [])
+          .filter((listing) => listing.status !== 'closed')
+          .map((listing) => listing.itinerary_id)
+
+        const availablePlans = (plansData || []).filter(
+          (plan) => !postedItineraryIds.includes(plan.id)
+        )
+
+        setItineraries(availablePlans)
       } catch (err) {
         setError('An unexpected error occurred.')
       } finally {

@@ -113,3 +113,42 @@ export async function PATCH(
 
   return NextResponse.json(data)
 }
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const supabase = await createSupabaseServerClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const listingId = (await params).id
+
+  const { data: listing, error: listingError } = await supabase
+    .from('marketplace_listings')
+    .select('id, user_id')
+    .eq('id', listingId)
+    .single()
+
+  if (listingError || !listing) {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+  }
+
+  if (listing.user_id !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { error: deleteError } = await supabase
+    .from('marketplace_listings')
+    .delete()
+    .eq('id', listingId)
+
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 400 })
+  }
+
+  return NextResponse.json({ success: true })
+}
