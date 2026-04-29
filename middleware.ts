@@ -65,6 +65,21 @@ export async function middleware(request: NextRequest) {
 
   const role = user.user_metadata?.role ?? ''
 
+  if (role === 'traveller') {
+    const { data: profile } = await supabase
+      .from('traveller_profiles')
+      .select('is_active')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (profile && profile.is_active === false) {
+      // Forcefully log them out on the client or redirect with a message
+      const loginUrl = new URL('/auth/login', request.url)
+      loginUrl.searchParams.set('error', 'Your account has been deactivated by an administrator.')
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
   // Role-based blocking
   if (ADMIN_ONLY.some(p => pathname.startsWith(p)) && role !== 'admin') {
     return NextResponse.redirect(new URL('/', request.url))

@@ -14,8 +14,19 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
 
   useEffect(() => {
+    // Check for error in URL params (e.g., from deactivated account redirect)
+    const searchParams = new URLSearchParams(window.location.search)
+    const urlError = searchParams.get('error')
+    
+    if (urlError) {
+      setError(urlError)
+      // Clean up the URL without refreshing the page
+      window.history.replaceState(null, '', '/auth/login')
+    }
+
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
+      // Only auto-redirect if there was no error param, preventing infinite loops
+      if (user && !urlError) {
         router.replace('/')
         router.refresh()
       }
@@ -40,8 +51,7 @@ export default function LoginPage() {
       return
     }
 
-    router.replace('/auth/callback')
-    router.refresh()
+    window.location.href = '/auth/callback'
   }
 
   async function handleGoogleSignIn() {

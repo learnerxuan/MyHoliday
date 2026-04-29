@@ -1,10 +1,19 @@
-export default function AdminUsersPage() {
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import UserList from './UserList'
+
+export const dynamic = 'force-dynamic'
+
+export default async function AdminUsersPage() {
+  const supabase = await createSupabaseServerClient()
+
+  const { data: profiles, error } = await supabase
+    .from('traveller_profiles')
+    .select('*')
+  if (error) console.error('Error fetching traveller profiles:', error?.message || error)
+
   return (
-    <main className="min-h-screen bg-warmwhite flex items-center justify-center">
-      <div className="text-center font-body text-charcoal">
-        <h1 className="text-3xl font-display font-extrabold mb-2">Users Directory</h1>
-        <p className="text-secondary text-sm">We&apos;ll build out this page soon.</p>
-      </div>
+    <main className="min-h-screen bg-warmwhite">
+      <UserList profiles={profiles || []} />
     </main>
   )
 }
