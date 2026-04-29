@@ -34,6 +34,8 @@ export default function ListingDetailPage() {
   const [user, setUser] = useState(null)
   const [listing, setListing] = useState(null)
   const [offers, setOffers] = useState([])
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
 
@@ -164,6 +166,34 @@ export default function ListingDetailPage() {
     }
   }
 
+  const handleDeleteListing = async () => {
+    try {
+      setIsDeleting(true)
+
+      const res = await fetch(`/api/marketplace/listings/${listingId}`, {
+        method: 'DELETE'
+      })
+
+      let data = {}
+      try {
+        data = await res.json()
+      } catch {
+        data = {}
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to withdraw listing')
+      }
+
+      router.push('/marketplace')
+    } catch (err) {
+      setError(err.message || 'Failed to withdraw listing')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
+    }
+  }
+
   // --- GUIDE ACTIONS ---
   const handleSubmitOffer = async () => {
     if (!proposedPrice) return
@@ -252,6 +282,14 @@ export default function ListingDetailPage() {
             <span className="text-secondary text-sm">Budget: {formatMYR(listing.desired_budget)}</span>
             <StatusBadge status={displayStatus} />
           </div>
+          {(user?.role === 'traveler' || user?.role === 'traveller') && listing?.status !== 'confirmed' && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="bg-red-600 text-white px-4 py-2 rounded mt-4"
+            >
+              Withdraw Listing
+            </button>
+          )}
         </div>
       </div>
 
@@ -355,7 +393,33 @@ export default function ListingDetailPage() {
           </div>
         </div>
       </div>
+      
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full">
+            <h2 className="text-lg font-bold mb-2">Withdraw Listing?</h2>
+            <p className="text-gray-600 mb-4">
+              This will remove the listing. Your itinerary will remain saved.
+            </p>
 
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border rounded"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleDeleteListing}
+                className="bg-red-600 text-white px-4 py-2 rounded"
+              >
+                Confirm Withdraw
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Accept Offer Modal */}
       {showAcceptModal && selectedOffer && (
         <Modal onClose={() => setShowAcceptModal(false)} title="Confirm Booking">

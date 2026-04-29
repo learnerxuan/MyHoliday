@@ -201,11 +201,14 @@ export default function MarketplacePage() {
             parsedMeta.duration_days ||
             5
 
-          const pax =
-            parsedMeta.group_size
-              ? parseInt(parsedMeta.group_size)
-              : tripMeta.group_size || 2
+          const groupSize =
+            parsedMeta.group_size ||
+            tripMeta.group_size ||
+            parsedMeta.pax ||
+            tripMeta.pax ||
+            1
 
+          const pax = `${groupSize} pax`
           let tags = parsedMeta.preferred_styles || tripMeta.preferred_styles || []
           if (!tags || tags.length === 0) {
             tags = ['Culture', 'Budget']
@@ -273,7 +276,7 @@ export default function MarketplacePage() {
         if (errorStr.includes('AbortError') || errorStr.includes('lock request is aborted')) {
           return // Ignore standard fast-refresh AbortErrors
         }
-        console.error('Marketplace page error:', errorStr, err)
+        console.error('Marketplace page error:', errorStr)
         setError(errorStr.includes('Failed') ? errorStr : 'Failed to load marketplace data: ' + errorStr)
       } finally {
         setLoading(false)
