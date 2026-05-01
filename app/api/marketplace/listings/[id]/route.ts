@@ -102,11 +102,12 @@ export async function PATCH(
 
   const { data, error } = await supabase
     .from('marketplace_listings')
-    .update({ status })
+    .select(`
+      *,
+      destinations(city)
+    `)
     .eq('id', (await params).id)
-    .select()
     .single()
-
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }

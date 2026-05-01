@@ -270,7 +270,11 @@ export default function ListingDetailPage() {
   if (error && !listing) return <div className="py-20 text-center text-error">{error}</div>
 
   const displayStatus = getDisplayStatus(listing.status, offers.length)
-  const isTraveller = user?.role === 'traveler'
+  const isTraveller =
+    user?.role === 'traveler' || user?.role === 'traveller'
+
+  const isGuide = user?.role === 'guide'
+
   const myGuideOffer = isTraveller ? null : offers.find(o => o.guide_id === user?.id)
 
   return (
@@ -307,6 +311,85 @@ export default function ListingDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         {/* LEFT COLUMN: Itinerary & Offers */}
         <div className="flex flex-col gap-8">
+        {/* Itinerary Panel (Traveller View) */}
+        {isTraveller && (
+          <div className="bg-white p-6 rounded-xl border border-border">
+            <h3 className="font-body font-semibold text-charcoal mb-4">
+              Finalized Itinerary
+            </h3>
+
+            <div className="flex flex-col gap-6">
+              {Object.entries(listing?.itinerary_content || {}).map(([dayKey, activities], dayIndex) => (
+                <div key={dayKey} className="border-b border-border pb-5 last:border-b-0">
+                  <div className="inline-block bg-charcoal text-warmwhite px-3 py-1 rounded-md text-xs font-bold mb-4 uppercase">
+                    Day {dayIndex + 1}
+                  </div>
+
+                  <div className="flex flex-col gap-4">
+                    {Array.isArray(activities) && activities.map((activity, index) => (
+                      <div
+                        key={index}
+                        className="bg-warmwhite border border-border rounded-lg p-4"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="text-xl">
+                            {activity.type === 'hotel'
+                              ? '🏨'
+                              : activity.type === 'attraction'
+                              ? '🎯'
+                              : activity.type === 'food_recommendation'
+                              ? '🍜'
+                              : activity.type === 'transport'
+                              ? '🚗'
+                              : '📍'}
+                          </div>
+
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs bg-muted px-2 py-1 rounded uppercase">
+                                {activity.time || 'Activity'}
+                              </span>
+
+                              <span className="text-xs bg-muted px-2 py-1 rounded uppercase">
+                                {activity.type || 'place'}
+                              </span>
+                            </div>
+
+                            <h4 className="font-bold text-charcoal">
+                              {activity.name || activity.title || 'Activity'}
+                            </h4>
+
+                            <p className="text-secondary text-sm mt-1">
+                              {activity.notes || activity.description || ''}
+                            </p>
+
+                            {activity.price_estimate && (
+                              <p className="inline-block mt-3 bg-green-100 text-green-700 text-sm px-3 py-1 rounded">
+                                {activity.price_estimate}
+                              </p>
+                            )}
+
+                            {activity.cost && (
+                              <p className="inline-block mt-3 bg-green-100 text-green-700 text-sm px-3 py-1 rounded">
+                                RM {activity.cost}
+                              </p>
+                            )}
+
+                            {activity.lat && activity.lng && (
+                              <p className="text-xs text-gray-400 mt-2">
+                                📍 {activity.lat}, {activity.lng}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            </div>
+)}
           
           {/* Offers Panel (Traveller View) */}
           {isTraveller && listing.status !== 'confirmed' && (
@@ -342,7 +425,7 @@ export default function ListingDetailPage() {
           )}
 
           {/* Guide Submission Panel (Guide View) */}
-          {!isTraveller && listing.status !== 'confirmed' && (
+          {isGuide && listing.status !== 'confirmed' && (
             <div className="bg-white p-6 rounded-xl border border-border">
               <h3 className="font-body font-semibold text-charcoal mb-4">Your Proposal</h3>
               {!myGuideOffer ? (
