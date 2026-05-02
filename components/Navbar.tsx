@@ -71,7 +71,7 @@ export default function Navbar() {
           >
             {role === 'admin' ? (
               <>
-                <NavLink href="/admin">Dashboard</NavLink>
+                <NavLink href="/admin" exact>Dashboard</NavLink>
                 <NavLink href="/admin/users">Users</NavLink>
                 <NavLink href="/admin/tour-guides">Tour Guide</NavLink>
                 <NavLink href="/admin/marketplace">Marketplace</NavLink>
@@ -157,7 +157,7 @@ export default function Navbar() {
           <div className="flex flex-col space-y-1">
             {role === 'admin' ? (
               <>
-                <MobileNavLink href="/admin" onClick={close}>Dashboard</MobileNavLink>
+                <MobileNavLink href="/admin" onClick={close} exact>Dashboard</MobileNavLink>
                 <MobileNavLink href="/admin/users" onClick={close}>Users</MobileNavLink>
                 <MobileNavLink href="/admin/tour-guides" onClick={close}>Tour Guide</MobileNavLink>
                 <MobileNavLink href="/admin/marketplace" onClick={close}>Marketplace</MobileNavLink>
@@ -210,9 +210,9 @@ export default function Navbar() {
   )
 }
 
-function NavLink({ href, onClick, children }: { href: string; onClick?: () => void; children: React.ReactNode }) {
+function NavLink({ href, exact, onClick, children }: { href: string; exact?: boolean; onClick?: () => void; children: React.ReactNode }) {
   const pathname = usePathname()
-  const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href))
+  const isActive = exact ? pathname === href : (pathname === href || (href !== '/' && pathname?.startsWith(href)))
 
   return (
     <Link
@@ -229,9 +229,9 @@ function NavLink({ href, onClick, children }: { href: string; onClick?: () => vo
   )
 }
 
-function MobileNavLink({ href, onClick, children }: { href: string; onClick?: () => void; children: React.ReactNode }) {
+function MobileNavLink({ href, exact, onClick, children }: { href: string; exact?: boolean; onClick?: () => void; children: React.ReactNode }) {
   const pathname = usePathname()
-  const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href))
+  const isActive = exact ? pathname === href : (pathname === href || (href !== '/' && pathname?.startsWith(href)))
 
   return (
     <Link
