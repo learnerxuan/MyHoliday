@@ -11,8 +11,14 @@ export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient()
   let user = null
 
+  let authErrorMsg = 'auth_failed'
+
   if (code) {
     const { error, data: { session } } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) {
+      console.error('exchangeCodeForSession error:', error)
+      authErrorMsg = error.message
+    }
     if (!error && session?.user) {
       user = session.user
     }
@@ -62,5 +68,5 @@ export async function GET(request: Request) {
 
 
   // If there's an error or no code, redirect to login with an error
-  return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`)
+  return NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent(authErrorMsg)}`)
 }
