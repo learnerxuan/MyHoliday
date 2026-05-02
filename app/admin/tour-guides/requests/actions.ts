@@ -45,3 +45,17 @@ export async function declineGuide(guideId: string) {
 
   revalidatePath('/admin/tour-guides/requests')
 }
+
+export async function deactivateGuide(guideId: string) {
+  const supabase = await getSupabase()
+  const { error } = await supabase
+    .from('tour_guides')
+    .update({ verification_status: 'rejected' })
+    .eq('id', guideId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/admin/tour-guides')
+}

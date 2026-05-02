@@ -77,9 +77,15 @@ export default function Navbar() {
                 <NavLink href="/admin/marketplace">Marketplace</NavLink>
                 <NavLink href="/admin/reports">Reports</NavLink>
               </>
+            ) : role === 'guide' ? (
+              <>
+                <NavLink href="/guide/itinerary">Itinerary</NavLink>
+                <NavLink href="/guide/chats">Chats</NavLink>
+                <NavLink href="/guide/history">History</NavLink>
+              </>
             ) : (
               <>
-                {(role === 'traveller' || !role) && <NavLink href="/quiz">Plan a Trip</NavLink>}
+                <NavLink href="/quiz">Plan a Trip</NavLink>
                 <NavLink href="/destinations">Destinations</NavLink>
                 <NavLink href="/itineraries">Itineraries</NavLink>
                 <NavLink href="/marketplace">Marketplace</NavLink>
@@ -163,9 +169,15 @@ export default function Navbar() {
                 <MobileNavLink href="/admin/marketplace" onClick={close}>Marketplace</MobileNavLink>
                 <MobileNavLink href="/admin/reports" onClick={close}>Reports</MobileNavLink>
               </>
+            ) : role === 'guide' ? (
+              <>
+                <MobileNavLink href="/guide/itinerary" onClick={close}>Itinerary</MobileNavLink>
+                <MobileNavLink href="/guide/chats" onClick={close}>Chats</MobileNavLink>
+                <MobileNavLink href="/guide/history" onClick={close}>History</MobileNavLink>
+              </>
             ) : (
               <>
-                {(role === 'traveller' || !role) && <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>}
+                <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>
                 <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
                 <MobileNavLink href="/itineraries" onClick={close}>Itineraries</MobileNavLink>
                 <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
