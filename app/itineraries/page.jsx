@@ -106,6 +106,7 @@ export default function ItinerariesPage() {
   const [sessions, setSessions] = useState([])
   const [itineraries, setItineraries] = useState([])
   const [error, setError] = useState(null)
+  const [userRole, setUserRole] = useState(null)
 
   useEffect(() => {
     async function fetchData() {
@@ -114,6 +115,7 @@ export default function ItinerariesPage() {
         router.push('/auth/login')
         return
       }
+      setUserRole(user.user_metadata?.role || 'traveller')
 
       // Fetch Ongoing Sessions
       const { data: sessionData } = await supabase
@@ -469,12 +471,14 @@ export default function ItinerariesPage() {
                                 >
                                   View & Edit
                                 </Link>
-                                <Link 
-                                  href={`/marketplace/new?itinerary=${itin.id}`}
-                                  className="bg-[#C4874A] text-[#FAF9F7] text-[12px] font-semibold px-3 sm:px-4 py-2 rounded-lg hover:bg-[#8B6A3E] transition-all shadow-sm active:scale-95 whitespace-nowrap flex-1 sm:flex-none text-center"
-                                >
-                                  Post to Marketplace
-                                </Link>
+                                {userRole !== 'guide' && (
+                                  <Link 
+                                    href={`/marketplace/new?itinerary=${itin.id}`}
+                                    className="bg-[#C4874A] text-[#FAF9F7] text-[12px] font-semibold px-3 sm:px-4 py-2 rounded-lg hover:bg-[#8B6A3E] transition-all shadow-sm active:scale-95 whitespace-nowrap flex-1 sm:flex-none text-center"
+                                  >
+                                    Post to Marketplace
+                                  </Link>
+                                )}
                               </div>
                             </>
                           )}

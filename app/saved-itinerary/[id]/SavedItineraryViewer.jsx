@@ -36,6 +36,7 @@ export default function SavedItineraryViewer() {
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
   const [showMobileActions, setShowMobileActions] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [userRole, setUserRole] = useState(null)
   const itineraryRef = useRef(itinerary)
   const isDirtyRef = useRef(false)
 
@@ -59,6 +60,11 @@ export default function SavedItineraryViewer() {
   useEffect(() => {
     async function fetchItinerary() {
       if (!id) return
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserRole(user.user_metadata?.role || 'traveller')
+      }
 
       const { data, error } = await supabase
         .from('itineraries')
@@ -549,16 +555,20 @@ export default function SavedItineraryViewer() {
             </div>
           )}
           
-          <button
-            onClick={() => router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`)}
-            className="text-xs font-bold text-amber hover:text-amberdark px-3 py-2 rounded-lg border border-amber/30 hover:border-amber bg-amber/5 transition-all flex items-center gap-2"
-            title="Post this itinerary to the marketplace to find a local tour guide"
-          >
-            <SearchIcon />
-            <span>Find a Tour Guide</span>
-          </button>
+          {userRole !== 'guide' && (
+            <>
+              <button
+                onClick={() => router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`)}
+                className="text-xs font-bold text-amber hover:text-amberdark px-3 py-2 rounded-lg border border-amber/30 hover:border-amber bg-amber/5 transition-all flex items-center gap-2"
+                title="Post this itinerary to the marketplace to find a local tour guide"
+              >
+                <SearchIcon />
+                <span>Find a Tour Guide</span>
+              </button>
 
-          <div className="h-4 w-px bg-border mx-1" />
+              <div className="h-4 w-px bg-border mx-1" />
+            </>
+          )}
 
           <button
             onClick={handleRevertToChat}
@@ -641,12 +651,14 @@ export default function SavedItineraryViewer() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowMobileActions(false)} />
                 <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-border rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-200">
-                  <button
-                    onClick={() => { setShowMobileActions(false); router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`); }}
-                    className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
-                  >
-                    <SearchIcon /> Find Tour Guide
-                  </button>
+                  {userRole !== 'guide' && (
+                    <button
+                      onClick={() => { setShowMobileActions(false); router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`); }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
+                    >
+                      <SearchIcon /> Find Tour Guide
+                    </button>
+                  )}
                   <button
                     onClick={() => { setShowMobileActions(false); handleRevertToChat(); }}
                     disabled={isReverting || !sessionId}
