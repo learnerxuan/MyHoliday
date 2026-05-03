@@ -5,6 +5,7 @@ import { useAppRouter as useRouter } from '@/components/providers/PageTransition
 import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
 import ListingCard from '@/components/ui/ListingCard'
+import Modal from '@/components/ui/Modal'
 
 const formatMYR = (amount) => `RM ${Number(amount).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
@@ -61,6 +62,8 @@ export default function MarketplacePage() {
   const [listings, setListings] = useState([])
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all') // 'all' for traveller, 'requests' initialized for guide
+  const [listingToDelete, setListingToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     const getAuthUserWithRetry = async (retries = 3) => {
@@ -208,7 +211,13 @@ export default function MarketplacePage() {
             tripMeta.pax ||
             1
 
-          const pax = `${groupSize} pax`
+          let pax = ''
+          const gsStr = String(groupSize).toLowerCase()
+          if (gsStr.includes('solo')) pax = '1 pax'
+          else if (gsStr.includes('couple')) pax = '2 pax'
+          else if (gsStr.includes('small group')) pax = 'Small Group'
+          else if (gsStr.includes('large group')) pax = 'Large Group'
+          else pax = `${groupSize} pax`
           let tags = parsedMeta.preferred_styles || tripMeta.preferred_styles || []
           if (!tags || tags.length === 0) {
             tags = ['Culture', 'Budget']
@@ -231,8 +240,8 @@ export default function MarketplacePage() {
             }
           }
 
-          const startDate = parsedMeta.start_date || tripMeta.start_date || tripMeta.travel_dates?.start
-          const endDate = parsedMeta.end_date || tripMeta.end_date || tripMeta.travel_dates?.end
+          const startDate = parsedMeta.start_date || tripMeta.travel_date_start || tripMeta.start_date || tripMeta.travel_dates?.start
+          const endDate = parsedMeta.end_date || tripMeta.travel_date_end || tripMeta.end_date || tripMeta.travel_dates?.end
 
           let formattedDateRange = `${days} Days`
           if (startDate && endDate) {
@@ -240,15 +249,8 @@ export default function MarketplacePage() {
               const start = new Date(startDate)
               const end = new Date(endDate)
               if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-                const sMonth = start.toLocaleDateString('en-US', { month: 'short' })
-                const eMonth = end.toLocaleDateString('en-US', { month: 'short' })
-                if (sMonth === eMonth && start.getFullYear() === end.getFullYear()) {
-                  formattedDateRange = `${start.getDate()} - ${end.getDate()} ${sMonth} ${start.getFullYear()}`
-                } else if (start.getFullYear() === end.getFullYear()) {
-                  formattedDateRange = `${start.getDate()} ${sMonth} - ${end.getDate()} ${eMonth} ${start.getFullYear()}`
-                } else {
-                  formattedDateRange = `${start.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                }
+                const formatStr = (d) => d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+                formattedDateRange = `${formatStr(start)} - ${formatStr(end)} (${days} days)`
               }
             } catch (err) {}
           }
@@ -288,6 +290,29 @@ export default function MarketplacePage() {
 
   const isGuide = user?.role === 'guide'
 
+  const confirmDelete = async () => {
+    if (!listingToDelete) return
+    setIsDeleting(true)
+    try {
+      const { error: deleteError } = await supabase
+        .from('marketplace_listings')
+        .delete()
+        .eq('id', listingToDelete.id)
+
+      if (deleteError) throw deleteError
+
+      setListings(prev => prev.filter(l => String(l.id) !== String(listingToDelete.id)))
+      setTimeout(() => {
+        setListingToDelete(null)
+      }, 100)
+    } catch (err) {
+      console.error('Failed to delete listing:', err)
+      alert('Failed to delete listing: ' + (err.message || 'Unknown error'))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   // Refine Guide vs Traveller filters
   const filteredListings = listings.filter(item => {
     if (isGuide) {
@@ -305,7 +330,7 @@ export default function MarketplacePage() {
       if (filter === 'all') return true
       if (filter === 'open') return item.status === 'open' || item.status === 'awaiting' || item.status === 'has_offers'
       if (filter === 'has_offers') return item.displayStatus === 'has_offers' || item.offerCount > 0
-      if (filter === 'my') return item.user_id === user?.id
+      if (filter === 'settled') return item.status === 'confirmed'
       return true
     }
   })
@@ -342,79 +367,98 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="w-full bg-warmwhite min-h-screen font-body pb-24 pt-8 sm:pt-12 px-4 sm:px-6 lg:px-8">
-    <section className="max-w-5xl mx-auto p-6 lg:p-12 bg-white rounded-[24px] shadow-sm border border-border/50">
+    <div className="min-h-screen bg-warmwhite flex flex-col pt-6 sm:pt-10 px-4 sm:px-6 pb-20 font-body">
+    <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
       
       {/* ── TRAVELLER VIEW ── */}
       {!isGuide ? (
         <>
-          {/* Hero Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 text-[#d48c44] text-[11px] font-bold py-1.5 rounded-md mb-4 uppercase tracking-[0.2em] leading-none">
-                Marketplace
-              </div>
-              <h1 className="font-display font-extrabold text-[44px] text-charcoal leading-tight mb-4 tracking-tight">
-                Find a Tour Guide
-              </h1>
-              <p className="text-secondary text-[16px] leading-relaxed mb-8 max-w-lg">
-                Post your saved itinerary. Verified local guides browse and send their best offer. Negotiate and confirm your booking.
-              </p>
-              <div>
+          {/* Hero Layout (Dark Island Header) */}
+          <div 
+            className="text-warmwhite relative overflow-hidden pt-8 sm:pt-10 px-4 sm:px-10 pb-8 sm:pb-10"
+            style={{ background: '#0f0f0f' }}
+          >
+            <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(196,135,74,0.22) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 20% 80%, rgba(196,135,74,0.10) 0%, transparent 65%)' }} />
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+
+            <div className="relative flex flex-col md:flex-row md:items-start justify-between gap-6">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-2 bg-white/10 text-amber text-xs font-semibold px-3 py-1 rounded-full border border-amber/20 mb-3 uppercase tracking-widest">
+                  Marketplace
+                </div>
+                <h1 className="text-3xl sm:text-5xl font-extrabold font-display mb-4 text-warmwhite leading-tight">
+                  Find a Tour Guide
+                </h1>
+                <p className="text-sm sm:text-[15px] font-body text-warmwhite/80 leading-relaxed max-w-lg mb-8">
+                  Post your saved itinerary. Verified local guides browse and send their best offer. Negotiate and confirm your booking.
+                </p>
                 <button 
                   onClick={() => router.push('/marketplace/new')} 
-                  className="bg-[#1A1A1A] hover:bg-black text-white text-[15px] px-8 py-3.5 rounded-[10px] transition-colors font-bold tracking-wide shadow-lg shadow-black/10"
+                  className="bg-amber hover:bg-amberdark text-white text-[15px] px-8 py-3.5 rounded-[10px] transition-colors font-bold tracking-wide shadow-lg shadow-black/10"
                 >
                   Post My Itinerary
                 </button>
               </div>
-            </div>
 
-            {/* Right Info Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {[["📋", "Post itinerary as listing"], ["💬", "Guides send price offers"], ["🤝", "Negotiate via chat"], ["🟩", "Confirm and book"]].map(([icon, label]) => (
-                <div key={label} className="bg-[#FAF9F7] border border-border/60 rounded-2xl p-5 shadow-sm">
-                  <div className="text-[26px] mb-3">{icon}</div>
-                  <div className="text-[13.5px] text-secondary font-medium leading-snug">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {error && <p className="text-error mb-4">{error}</p>}
-
-          {/* Filter Bar */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
-            <div className="flex gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide pb-1">
-              {['all', 'open', 'has_offers', 'my'].map((f) => {
-                const labels = {
-                  'all': 'All Listings',
-                  'open': 'Open',
-                  'has_offers': 'Has Offers',
-                  'my': 'My Listings'
-                }
-                const isActive = filter === f
-                return (
-                  <button 
-                    key={f}
-                    onClick={() => setFilter(f)} 
-                    className={`px-5 py-2.5 rounded-lg border text-[13px] transition-all whitespace-nowrap flex-1 md:flex-none tracking-wide ${
-                        isActive 
-                        ? 'bg-[#F0EBE3] border-[#1A1A1A] text-[#1A1A1A] font-bold' 
-                        : 'bg-transparent border-[#E5E0DA] text-[#888] font-semibold hover:border-[#1A1A1A]'
-                    }`}
-                  >
-                    {labels[f]}
-                  </button>
-                )
-              })}
+              {/* Right Info Grid */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-6 md:mt-0 max-w-sm w-full">
+                {[["📋", "Post itinerary as listing"], ["💬", "Guides send price offers"], ["🤝", "Negotiate via chat"], ["🟩", "Confirm and book"]].map(([icon, label]) => (
+                  <div key={label} className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-sm hover:bg-white/10 transition-colors">
+                    <div className="text-[22px] sm:text-[26px] mb-2 sm:mb-3">{icon}</div>
+                    <div className="text-[12px] sm:text-[13px] text-warmwhite/90 font-medium leading-snug">{label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+
+          <div className="px-4 sm:px-10 pt-6 sm:pt-10 pb-12 sm:pb-16 bg-[#FAFAFA] flex-1">
+            {error && <p className="text-error mb-4">{error}</p>}
+
+            {/* Filter Bar */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+              <div className="flex gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide pb-1">
+                {['all', 'open', 'has_offers', 'settled'].map((f) => {
+                  const labels = {
+                    'all': 'All Listings',
+                    'open': 'Open',
+                    'has_offers': 'Has Offers',
+                    'settled': 'Settled'
+                  }
+                  const isActive = filter === f
+                  const hasNotification = f === 'has_offers' && listings.some(l => l.offerCount > 0)
+                  return (
+                    <button 
+                      key={f}
+                      onClick={() => setFilter(f)} 
+                      className={`px-5 py-2.5 rounded-full border text-[13px] transition-all whitespace-nowrap flex-1 md:flex-none tracking-wide font-semibold flex items-center justify-center gap-2 ${
+                          isActive 
+                          ? 'bg-charcoal border-charcoal text-white shadow-sm' 
+                          : 'bg-white border-[#E5E0DA] text-[#888] hover:border-amber/50 hover:bg-[#FDFBF7]'
+                      }`}
+                    >
+                      {labels[f]}
+                      {hasNotification && (
+                        <span className="w-2 h-2 rounded-full bg-error" title="New offers received!" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
           {/* Listing Grid */}
           {filteredListings.length === 0 ? (
             <div className="text-center py-24 bg-[#FAF9F7] border border-border/60 rounded-2xl">
-              <p className="text-secondary/60 font-medium">You haven't posted any listings yet for this filter.</p>
+              <p className="text-secondary/60 font-medium">
+                {filter === 'settled' 
+                  ? "You don't have any settled bookings yet." 
+                  : filter === 'has_offers'
+                  ? "You haven't received any guide offers yet."
+                  : filter === 'open'
+                  ? "You don't have any open listings."
+                  : "You haven't posted any listings yet."}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -425,20 +469,24 @@ export default function MarketplacePage() {
                     country={listing.country_name}
                     budget={listing.desired_budget} 
                     displayStatus={listing.displayStatus}
+                    dates={listing.dates}
                     days={listing.days}
                     pax={listing.pax}
                     tags={listing.tags}
                     guideInfo={listing.guideInfo}
+                    onDelete={() => setListingToDelete(listing)}
                   />
                 </div>
               ))}
             </div>
           )}
+          </div>
         </>
       ) : (
         <>
           {/* ── GUIDE VIEW ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16 items-center">
+          <div className="px-4 sm:px-10 pt-8 pb-12 sm:pb-16 flex-1">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16 items-center">
             <div>
               <div className="inline-flex items-center gap-2 bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-bold px-3 py-1.5 rounded-md mb-4 uppercase tracking-widest leading-none">
                 <span className="text-[13px]">💼</span> Tour Guide Workspace
@@ -527,7 +575,33 @@ export default function MarketplacePage() {
               )
             })}
           </div>
-        </>
+                  </div>
+                </>
+              )}
+
+      {/* Delete Confirmation Modal */}
+      {listingToDelete && (
+        <Modal title="Withdraw Listing" onClose={() => !isDeleting && setListingToDelete(null)}>
+          <p className="text-secondary mb-6 text-[15px] leading-relaxed">
+            Are you sure you want to withdraw your listing for <strong>{listingToDelete.city_name}, {listingToDelete.country_name}</strong>? This action cannot be undone, but your itinerary will remain in your saved list.
+          </p>
+          <div className="flex justify-end gap-3 mt-4">
+            <button 
+              onClick={() => setListingToDelete(null)}
+              className="px-5 py-2.5 rounded-xl text-secondary font-bold hover:bg-[#F0EBE3] transition-colors text-[13px]"
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={confirmDelete}
+              className="px-5 py-2.5 rounded-xl bg-error text-white font-bold hover:bg-red-600 transition-colors text-[13px] border border-transparent flex items-center justify-center min-w-[100px]"
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Spinner className="w-4 h-4 border-t-white" /> : 'Withdraw'}
+            </button>
+          </div>
+        </Modal>
       )}
 
     </section>

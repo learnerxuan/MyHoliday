@@ -93,10 +93,24 @@ function NewListingContent() {
   const [postBudget, setPostBudget] = useState('')
 
   useEffect(() => {
+    const getAuthUserWithRetry = async (retries = 3) => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (error) throw error
+        return user
+      } catch (err) {
+        if (retries > 0 && (err.name === 'AbortError' || err.name === 'LockAcquireTimeoutError' || (err.message && err.message.includes('Lock')))) {
+          await new Promise(resolve => setTimeout(resolve, 300))
+          return getAuthUserWithRetry(retries - 1)
+        }
+        throw err
+      }
+    }
+
     const init = async () => {
       try {
-        const { data: { user: currentUser }, error: sessionError } = await supabase.auth.getUser()
-        if (sessionError || !currentUser) {
+        const currentUser = await getAuthUserWithRetry()
+        if (!currentUser) {
           router.push('/auth/login')
           return
         }
@@ -107,21 +121,25 @@ function NewListingContent() {
           return
         }
 
-        const { data: plansData, error: plansError } = await supabase
-          .from('itineraries')
-          .select('id, title, created_at, trip_metadata, destination_id, destinations(city, country)')
-          .eq('user_id', currentUser.id)
-          .order('created_at', { ascending: false })
+        const [
+          { data: plansData, error: plansError },
+          { data: listingsData, error: listingsError }
+        ] = await Promise.all([
+          supabase
+            .from('itineraries')
+            .select('id, title, created_at, trip_metadata, destination_id, destinations(city, country)')
+            .eq('user_id', currentUser.id)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('marketplace_listings')
+            .select('itinerary_id, status')
+            .eq('user_id', currentUser.id)
+        ])
 
         if (plansError) {
           setError('Failed to fetch your saved itineraries.')
           return
         }
-
-        const { data: listingsData, error: listingsError } = await supabase
-          .from('marketplace_listings')
-          .select('itinerary_id, status')
-          .eq('user_id', currentUser.id)
 
         if (listingsError) {
           setError('Failed to check posted listings.')
@@ -138,6 +156,7 @@ function NewListingContent() {
 
         setItineraries(availablePlans)
       } catch (err) {
+        console.error("Failed to load new listings logic", err)
         setError('An unexpected error occurred.')
       } finally {
         setLoading(false)

@@ -109,70 +109,88 @@ export default function ItinerariesPage() {
   const [userRole, setUserRole] = useState(null)
 
   useEffect(() => {
+    const getAuthUserWithRetry = async (retries = 3) => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (error) throw error
+        return user
+      } catch (err) {
+        if (retries > 0 && (err.name === 'AbortError' || err.name === 'LockAcquireTimeoutError' || (err.message && err.message.includes('Lock')))) {
+          await new Promise(resolve => setTimeout(resolve, 300))
+          return getAuthUserWithRetry(retries - 1)
+        }
+        throw err
+      }
+    }
+
     async function fetchData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/login')
-        return
-      }
-      setUserRole(user.user_metadata?.role || 'traveller')
-
-      // Fetch Ongoing Sessions
-      const { data: sessionData } = await supabase
-        .from('chat_sessions')
-        .select(`
-          id,
-          created_at,
-          destination_id,
-          planner_state,
-          destinations ( city, country )
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-
-      // Fetch Exported Itineraries
-      const { data: itinData, error: itinError } = await supabase
-        .from('itineraries')
-        .select(`*, destinations ( city, country )`)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-
-      if (itinError) {
-        console.error('Error fetching itineraries:', itinError)
-        setError(itinError.message)
-      }
-
-      // Fetch Marketplace Listings separately to avoid join errors
-      const { data: listingsData } = await supabase
-        .from('marketplace_listings')
-        .select(`id, itinerary_id, status, marketplace_offers ( id )`)
-        .eq('user_id', user.id)
-
-      // Filter sessions to show only the MOST RECENT one per destination_id
-      const uniqueSessions = []
-      const seenCities = new Set()
-      const sortedSessions = (sessionData || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-
-      for (const s of sortedSessions) {
-        if (!seenCities.has(s.destination_id)) {
-          uniqueSessions.push(s)
-          seenCities.add(s.destination_id)
+      try {
+        const user = await getAuthUserWithRetry()
+        if (!user) {
+          router.push('/auth/login')
+          return
         }
-      }
+        setUserRole(user.user_metadata?.role || 'traveller')
 
-      setSessions(uniqueSessions)
-      
-      // Merge listing status into itineraries
-      const enrichedItineraries = (itinData || []).map(itin => {
-        const listing = (listingsData || []).find(l => l.itinerary_id === itin.id)
-        return {
-          ...itin,
-          marketplace_listings: listing ? [listing] : []
+        const [
+          { data: sessionData },
+          { data: itinData, error: itinError },
+          { data: listingsData }
+        ] = await Promise.all([
+          supabase
+            .from('chat_sessions')
+            .select(`
+              id,
+              created_at,
+              destination_id,
+              planner_state,
+              destinations ( city, country )
+            `)
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('itineraries')
+            .select(`*, destinations ( city, country )`)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('marketplace_listings')
+            .select(`id, itinerary_id, status, marketplace_offers ( id )`)
+            .eq('user_id', user.id)
+        ])
+
+        if (itinError) {
+          console.error('Error fetching itineraries:', itinError)
+          setError(itinError.message)
         }
-      })
-      setItineraries(enrichedItineraries)
-      setLoading(false)
+
+        const uniqueSessions = []
+        const seenCities = new Set()
+        const sortedSessions = (sessionData || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+        for (const s of sortedSessions) {
+          if (!seenCities.has(s.destination_id)) {
+            uniqueSessions.push(s)
+            seenCities.add(s.destination_id)
+          }
+        }
+
+        setSessions(uniqueSessions)
+        
+        const enrichedItineraries = (itinData || []).map(itin => {
+          const listing = (listingsData || []).find(l => l.itinerary_id === itin.id)
+          return {
+            ...itin,
+            marketplace_listings: listing ? [listing] : []
+          }
+        })
+        setItineraries(enrichedItineraries)
+      } catch (err) {
+        console.error("Itineraries page error:", err)
+      } finally {
+        setLoading(false)
+      }
     }
 
     fetchData()
@@ -201,7 +219,7 @@ export default function ItinerariesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20">
+    <div className="min-h-screen bg-warmwhite flex flex-col pt-6 sm:pt-10 px-4 sm:px-6 pb-20">
       
       {/* ── THE ISLAND CONTAINER ── */}
       <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">

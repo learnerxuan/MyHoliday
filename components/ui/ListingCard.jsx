@@ -1,25 +1,40 @@
+import { Trash2 } from 'lucide-react'
+
 export default function ListingCard({
   city,
   country = 'Destination',
   budget,
+  dates,
   days = 3,
   pax = 2,
   tags = ['Culture', 'Budget'],
   displayStatus,
-  guideInfo = null
+  guideInfo = null,
+  onDelete
 }) {
   return (
-    <div className="bg-white p-6 rounded-[20px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col h-full cursor-pointer group">
+    <div className="bg-white p-6 rounded-[20px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col h-full cursor-pointer group relative">
       
       {/* Top Header Row */}
       <div className="flex justify-between items-start gap-4 mb-2">
         <div className="flex-1">
           <h3 className="font-display font-bold text-[22px] text-charcoal leading-tight mb-1 truncate">{city}, {country}</h3>
-          <p className="text-secondary text-sm font-medium tracking-wide">{days} days · {pax} pax</p>
+          <p className="text-secondary text-sm font-medium tracking-wide">{dates || `${days} days`} · {pax}</p>
         </div>
-        <div className="text-right whitespace-nowrap">
-          <p className="font-display font-bold text-2xl text-[#d48c44]">RM {Number(budget).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-          <p className="text-[11px] text-[#d48c44]/70 font-semibold tracking-wider relative -top-1">desired budget</p>
+        <div className="flex items-start gap-3">
+          <div className="text-right whitespace-nowrap">
+            <p className="font-display font-bold text-2xl text-[#d48c44]">RM {Number(budget).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+            <p className="text-[11px] text-[#d48c44]/70 font-semibold tracking-wider relative -top-1">desired budget</p>
+          </div>
+          {onDelete && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="text-secondary/50 hover:text-error hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+              title="Withdraw Listing"
+            >
+              <Trash2 className="w-[18px] h-[18px]" />
+            </button>
+          )}
         </div>
       </div>
 
