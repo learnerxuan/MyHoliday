@@ -71,15 +71,21 @@ export default function Navbar() {
           >
             {role === 'admin' ? (
               <>
-                <NavLink href="/admin">Dashboard</NavLink>
+                <NavLink href="/admin" exact>Dashboard</NavLink>
                 <NavLink href="/admin/users">Users</NavLink>
                 <NavLink href="/admin/tour-guides">Tour Guide</NavLink>
                 <NavLink href="/admin/marketplace">Marketplace</NavLink>
                 <NavLink href="/admin/reports">Reports</NavLink>
               </>
+            ) : role === 'guide' ? (
+              <>
+                <NavLink href="/guide/itinerary">Itinerary</NavLink>
+                <NavLink href="/guide/chats">Chats</NavLink>
+                <NavLink href="/guide/history">History</NavLink>
+              </>
             ) : (
               <>
-                {(role === 'traveller' || !role) && <NavLink href="/quiz">Plan a Trip</NavLink>}
+                <NavLink href="/quiz">Plan a Trip</NavLink>
                 <NavLink href="/destinations">Destinations</NavLink>
                 <NavLink href="/itineraries">Itineraries</NavLink>
                 <NavLink href="/marketplace">Marketplace</NavLink>
@@ -157,15 +163,21 @@ export default function Navbar() {
           <div className="flex flex-col space-y-1">
             {role === 'admin' ? (
               <>
-                <MobileNavLink href="/admin" onClick={close}>Dashboard</MobileNavLink>
+                <MobileNavLink href="/admin" onClick={close} exact>Dashboard</MobileNavLink>
                 <MobileNavLink href="/admin/users" onClick={close}>Users</MobileNavLink>
                 <MobileNavLink href="/admin/tour-guides" onClick={close}>Tour Guide</MobileNavLink>
                 <MobileNavLink href="/admin/marketplace" onClick={close}>Marketplace</MobileNavLink>
                 <MobileNavLink href="/admin/reports" onClick={close}>Reports</MobileNavLink>
               </>
+            ) : role === 'guide' ? (
+              <>
+                <MobileNavLink href="/guide/itinerary" onClick={close}>Itinerary</MobileNavLink>
+                <MobileNavLink href="/guide/chats" onClick={close}>Chats</MobileNavLink>
+                <MobileNavLink href="/guide/history" onClick={close}>History</MobileNavLink>
+              </>
             ) : (
               <>
-                {(role === 'traveller' || !role) && <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>}
+                <MobileNavLink href="/quiz" onClick={close}>Plan a Trip ✨</MobileNavLink>
                 <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
                 <MobileNavLink href="/itineraries" onClick={close}>Itineraries</MobileNavLink>
                 <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
@@ -210,9 +222,9 @@ export default function Navbar() {
   )
 }
 
-function NavLink({ href, onClick, children }: { href: string; onClick?: () => void; children: React.ReactNode }) {
+function NavLink({ href, exact, onClick, children }: { href: string; exact?: boolean; onClick?: () => void; children: React.ReactNode }) {
   const pathname = usePathname()
-  const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href))
+  const isActive = exact ? pathname === href : (pathname === href || (href !== '/' && pathname?.startsWith(href)))
 
   return (
     <Link
@@ -229,9 +241,9 @@ function NavLink({ href, onClick, children }: { href: string; onClick?: () => vo
   )
 }
 
-function MobileNavLink({ href, onClick, children }: { href: string; onClick?: () => void; children: React.ReactNode }) {
+function MobileNavLink({ href, exact, onClick, children }: { href: string; exact?: boolean; onClick?: () => void; children: React.ReactNode }) {
   const pathname = usePathname()
-  const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href))
+  const isActive = exact ? pathname === href : (pathname === href || (href !== '/' && pathname?.startsWith(href)))
 
   return (
     <Link

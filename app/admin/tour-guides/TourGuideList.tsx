@@ -1,10 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { deactivateGuide } from './requests/actions'
 
 export default function TourGuideList({ guides }: { guides: any[] }) {
   const [search, setSearch] = useState('')
+  const [isPending, startTransition] = useTransition()
+  const [deactivateId, setDeactivateId] = useState<string | null>(null)
+
+  const handleDeactivate = () => {
+    if (!deactivateId) return
+    startTransition(async () => {
+      await deactivateGuide(deactivateId)
+      setDeactivateId(null)
+    })
+  }
 
   const filteredGuides = guides.filter(guide => {
     const fullName = guide.full_name?.toLowerCase() || ''
@@ -14,7 +25,7 @@ export default function TourGuideList({ guides }: { guides: any[] }) {
   })
 
   return (
-    <div className="w-full max-w-6xl mx-auto py-10 px-6">
+    <div className="w-full max-w-6xl mx-auto py-10 px-6 relative">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-display font-extrabold text-charcoal mb-1">Certified Tour Guides</h1>
@@ -53,20 +64,32 @@ export default function TourGuideList({ guides }: { guides: any[] }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredGuides.map(guide => (
-            <div key={guide.id} className="bg-white rounded-3xl border border-border p-6 shadow-sm hover:shadow-md transition-shadow group">
-               <div className="flex items-center gap-4 mb-5">
-                 <div className="w-14 h-14 rounded-full bg-amber/10 flex items-center justify-center text-amber font-display font-bold text-2xl group-hover:scale-105 transition-transform">
-                   {guide.full_name?.charAt(0) || '?'}
+            <div key={guide.id} className="bg-white rounded-3xl border border-border p-6 shadow-sm hover:shadow-md transition-shadow group flex flex-col">
+               <div className="flex justify-between items-start mb-5">
+                 <div className="flex items-center gap-4">
+                   <div className="w-14 h-14 rounded-full bg-amber/10 flex items-center justify-center text-amber font-display font-bold text-2xl group-hover:scale-105 transition-transform">
+                     {guide.full_name?.charAt(0) || '?'}
+                   </div>
+                   <div>
+                     <h3 className="font-bold text-charcoal text-lg font-display leading-tight">{guide.full_name}</h3>
+                     <p className="text-sm text-secondary font-body mt-0.5">
+                       {guide.destinations?.city || 'Unknown City'}, {guide.destinations?.country}
+                     </p>
+                   </div>
                  </div>
-                 <div>
-                   <h3 className="font-bold text-charcoal text-lg font-display leading-tight">{guide.full_name}</h3>
-                   <p className="text-sm text-secondary font-body mt-0.5">
-                     {guide.destinations?.city || 'Unknown City'}, {guide.destinations?.country}
-                   </p>
-                 </div>
+                 <button
+                   onClick={() => setDeactivateId(guide.id)}
+                   className="text-tertiary hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50"
+                   aria-label="Deactivate Guide"
+                   title="Deactivate Guide"
+                 >
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                   </svg>
+                 </button>
                </div>
                
-               <div className="border-t border-border pt-4 mt-2">
+               <div className="border-t border-border pt-4 mt-auto">
                  <div className="flex justify-between items-center text-sm font-body mb-2">
                    <span className="text-tertiary">Joined</span>
                    <span className="font-semibold text-charcoal">
@@ -99,6 +122,39 @@ export default function TourGuideList({ guides }: { guides: any[] }) {
                )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {deactivateId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200 border border-black/5">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-5 mx-auto">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-display font-extrabold text-charcoal text-center mb-2">Deactivate Guide?</h3>
+            <p className="text-secondary text-sm font-body text-center mb-8">
+              This action will revoke the tour guide's certification and move them to a rejected state. Are you sure you want to proceed?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeactivateId(null)}
+                disabled={isPending}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-charcoal font-semibold text-sm hover:bg-black/5 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeactivate}
+                disabled={isPending}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors flex items-center justify-center disabled:opacity-50"
+              >
+                {isPending ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : 'Deactivate'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

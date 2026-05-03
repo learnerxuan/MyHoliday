@@ -208,11 +208,13 @@ export default function ListingDetailPage() {
           proposed_price: parseFloat(proposedPrice)
         })
       })
-      if (res.ok) {
-        window.location.reload()
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to submit offer')
       }
+      window.location.reload()
     } catch (err) {
-      setError('Failed to submit offer.')
+      setError(err.message || 'Failed to submit offer.')
       setIsSubmittingOffer(false)
     }
   }
@@ -279,6 +281,17 @@ export default function ListingDetailPage() {
 
   return (
     <section className="py-20 max-w-5xl mx-auto px-12">
+      <div className="mb-6">
+        <button 
+          onClick={() => router.back()} 
+          className="text-sm font-semibold text-secondary hover:text-charcoal transition-colors flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Return to Marketplace
+        </button>
+      </div>
       <div className="flex justify-between items-start mb-8">
         <div>
           <PageHeader tag="Listing Detail" title={`${listing.city_name} Trip`} />
