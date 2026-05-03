@@ -189,7 +189,7 @@ function NewListingContent() {
       if (insertError) {
         throw new Error(insertError.message || 'Failed to create listing')
       }
-      router.push(`/marketplace/${newListing.id}`)
+      router.push(`/marketplace/${newListing.id}?success=true`)
     } catch (err) {
       setError(err.message)
       setIsSubmitting(false)
