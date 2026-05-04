@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { deactivateGuide } from './requests/actions'
 
-export default function TourGuideList({ guides }: { guides: any[] }) {
+export default function TourGuideList({ guides, pendingCount = 0 }: { guides: any[], pendingCount?: number }) {
   const [search, setSearch] = useState('')
   const [isPending, startTransition] = useTransition()
   const [deactivateId, setDeactivateId] = useState<string | null>(null)
@@ -33,7 +33,7 @@ export default function TourGuideList({ guides }: { guides: any[] }) {
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           <Link href="/admin/tour-guides/requests" className="hidden sm:flex text-sm font-semibold font-body bg-black/5 hover:bg-black/10 transition-colors px-4 py-2.5 rounded-xl border border-black/5 items-center gap-2 text-charcoal whitespace-nowrap">
-             <span className="w-2 h-2 rounded-full bg-amber animate-pulse"></span>
+             <span className={`w-2 h-2 rounded-full ${pendingCount > 0 ? 'bg-amber animate-pulse' : 'bg-gray-400'}`}></span>
              Pending Requests
           </Link>
           <div className="relative flex-1 md:flex-none">

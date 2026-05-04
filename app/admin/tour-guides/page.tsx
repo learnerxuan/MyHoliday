@@ -28,9 +28,19 @@ export default async function AdminTourGuidesPage() {
     console.error('Error fetching tour guides:', error)
   }
 
+  // Fetch pending count
+  const { count: pendingCount, error: countError } = await supabase
+    .from('tour_guides')
+    .select('*', { count: 'exact', head: true })
+    .eq('verification_status', 'pending')
+
+  if (countError) {
+    console.error('Error fetching pending count:', countError)
+  }
+
   return (
     <main className="min-h-screen bg-warmwhite">
-      <TourGuideList guides={guides || []} />
+      <TourGuideList guides={guides || []} pendingCount={pendingCount || 0} />
     </main>
   )
 }
