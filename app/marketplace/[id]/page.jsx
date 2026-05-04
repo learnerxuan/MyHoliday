@@ -382,7 +382,7 @@ export default function ListingDetailPage() {
               <div>
                 <div className="flex justify-between items-start mb-6">
                   <div className="bg-[#F0EBE3] px-3.5 py-1.5 text-[#7A7367] text-[11px] font-extrabold tracking-widest rounded-lg uppercase">
-                    {listing.city_name}, MY
+                    {listing.city_name}{listing.country_name ? `, ${listing.country_name}` : ''}
                   </div>
                   <div className="text-right">
                     <p className="text-[#888] text-[10px] font-bold tracking-widest uppercase mb-1">TARGET BUDGET</p>

@@ -17,7 +17,7 @@ export async function GET(
     .from('marketplace_listings')
     .select(`
       *,
-      destinations(city)
+      destinations(city,country)
     `)
     .eq('id', (await params).id)
     .single()
@@ -104,7 +104,7 @@ export async function PATCH(
     .from('marketplace_listings')
     .select(`
       *,
-      destinations(city)
+      destinations(city,country)
     `)
     .eq('id', (await params).id)
     .single()
