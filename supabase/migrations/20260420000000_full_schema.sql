@@ -128,7 +128,7 @@ CREATE TABLE public.marketplace_offers (
 -- ============================================================
 CREATE TABLE public.marketplace_messages (
     id          UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    listing_id  UUID          NOT NULL REFERENCES public.marketplace_listings(id) ON DELETE CASCADE,
+    offer_id    UUID          NOT NULL REFERENCES public.marketplace_offers(id) ON DELETE CASCADE,
     sender_type VARCHAR(20)   NOT NULL CHECK (sender_type IN ('traveler', 'guide')),
     sender_id   UUID          NOT NULL,
     content     TEXT          NOT NULL,
@@ -195,7 +195,7 @@ CREATE INDEX idx_listings_user            ON public.marketplace_listings(user_id
 CREATE INDEX idx_listings_dest            ON public.marketplace_listings(destination_id);
 CREATE INDEX idx_offers_listing           ON public.marketplace_offers(listing_id);
 CREATE INDEX idx_offers_guide             ON public.marketplace_offers(guide_id);
-CREATE INDEX idx_messages_listing         ON public.marketplace_messages(listing_id);
+CREATE INDEX idx_messages_offer           ON public.marketplace_messages(offer_id);
 
 -- ============================================================
 -- ROW LEVEL SECURITY
