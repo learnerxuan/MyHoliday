@@ -16,7 +16,7 @@ export default function ItineraryTimeline({ listing, isEditable = false, onSugge
                onClick={onSuggestEdits}
                className="text-[13px] font-extrabold text-white tracking-widest uppercase border border-amber px-4 py-2 rounded-lg bg-amber hover:bg-[#E08A1E] transition-colors shadow-sm"
              >
-               Suggest Edits (Coming Soon)
+               Suggest Edits
              </button>
           )}
           <div className="text-[13px] font-extrabold text-secondary tracking-widest uppercase border border-border px-4 py-2 rounded-lg bg-white shadow-sm">

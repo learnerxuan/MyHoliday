@@ -429,6 +429,7 @@ export default function ChatsPage() {
                     trip_metadata: activeThread.trip_metadata || {},
                     city_name: activeThread.city_name
                   }} 
+                  isEditable={true}
                 />
               </div>
             ) : (
