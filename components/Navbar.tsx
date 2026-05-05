@@ -51,7 +51,7 @@ export default function Navbar() {
           }`}
         >
           {/* ── Logo ── */}
-          <Link href="/" className="pointer-events-auto flex items-center shrink-0 pl-2" onClick={close}>
+          <a href="/" className="pointer-events-auto flex items-center shrink-0 pl-2" onClick={close}>
             <Image
               src="/logo.png?v=2"
               alt="MyHoliday"
@@ -61,7 +61,7 @@ export default function Navbar() {
               priority
               unoptimized
             />
-          </Link>
+          </a>
 
           {/* ── Desktop Middle Nav ── */}
           <nav
@@ -114,14 +114,14 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Link
+                <a
                   href="/auth/login"
                   onClick={close}
                   className="text-sm font-semibold font-body text-charcoal hover:text-amber transition-colors px-2"
                 >
                   Login
-                </Link>
-                <Link
+                </a>
+                <a
                   href="/auth/register"
                   onClick={close}
                   className={`text-sm font-semibold font-body bg-amber text-warmwhite transition-colors tracking-wide shadow-sm flex items-center justify-center ${
@@ -129,7 +129,7 @@ export default function Navbar() {
                   }`}
                 >
                   Sign up
-                </Link>
+                </a>
               </>
             )}
           </div>
@@ -198,20 +198,20 @@ export default function Navbar() {
                 </>
               ) : (
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                  <Link
+                  <a
                     href="/auth/login"
                     onClick={close}
                     className="flex items-center justify-center text-sm font-semibold font-body text-charcoal border border-black/10 bg-white px-4 py-3 rounded-xl hover:bg-black/5 transition-colors"
                   >
                     Login
-                  </Link>
-                  <Link
+                  </a>
+                  <a
                     href="/auth/register"
                     onClick={close}
                     className="flex items-center justify-center text-sm font-semibold font-body bg-amber text-warmwhite px-4 py-3 rounded-xl hover:bg-amberdark transition-colors shadow-sm"
                   >
                     Sign up
-                  </Link>
+                  </a>
                 </div>
               )}
             </div>
@@ -227,7 +227,7 @@ function NavLink({ href, exact, onClick, children }: { href: string; exact?: boo
   const isActive = exact ? pathname === href : (pathname === href || (href !== '/' && pathname?.startsWith(href)))
 
   return (
-    <Link
+    <a
       href={href}
       onClick={onClick}
       className={`text-sm font-body tracking-wide transition-colors ${
@@ -237,7 +237,7 @@ function NavLink({ href, exact, onClick, children }: { href: string; exact?: boo
       }`}
     >
       {children}
-    </Link>
+    </a>
   )
 }
 
@@ -246,7 +246,7 @@ function MobileNavLink({ href, exact, onClick, children }: { href: string; exact
   const isActive = exact ? pathname === href : (pathname === href || (href !== '/' && pathname?.startsWith(href)))
 
   return (
-    <Link
+    <a
       href={href}
       onClick={onClick}
       className={`block text-base font-body transition-colors px-4 py-3 rounded-xl hover:bg-black/5 ${
@@ -256,6 +256,6 @@ function MobileNavLink({ href, exact, onClick, children }: { href: string; exact
       }`}
     >
       {children}
-    </Link>
+    </a>
   )
 }

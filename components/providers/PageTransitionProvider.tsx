@@ -94,11 +94,11 @@ export function useAppRouter() {
     ...router,
     push: (href: string, options?: any) => {
       if (triggerTransition) triggerTransition()
-      router.push(href, options)
+      window.location.href = href
     },
     replace: (href: string, options?: any) => {
       if (triggerTransition) triggerTransition()
-      router.replace(href, options)
+      window.location.replace(href)
     }
   }
 }
