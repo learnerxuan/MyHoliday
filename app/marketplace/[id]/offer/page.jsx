@@ -176,31 +176,55 @@ export default function SubmitOfferPage() {
   const indicator = getTargetIndicator();
 
   return (
-    <div className="min-h-screen bg-[#F4F4F4] pt-8 sm:pt-12 pb-24 font-body px-4 sm:px-6 lg:px-8 flex justify-center items-start">
-      
-      <div className="w-full max-w-5xl">
-        {/* Back Button */}
-        <button 
-          onClick={() => router.push('/marketplace')} 
-          className="text-[#555] hover:text-[#111] text-[11px] font-bold tracking-widest uppercase transition-colors flex items-center gap-1 mb-6"
-        >
-          ← Back to Marketplace
-        </button>
+    <div className="min-h-screen bg-warmwhite flex flex-col pt-6 sm:pt-10 px-4 sm:px-6 pb-20 font-body">
+      <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
+        <div className="px-4 sm:px-10 pt-8 sm:pt-12 pb-12 sm:pb-16 bg-white flex flex-col items-center">
+          <div className="w-full max-w-[1100px]">
+            {/* Top Navigation */}
+            <div className="mb-8">
+              <button 
+                onClick={() => router.push('/marketplace')} 
+                className="text-[12px] font-bold text-secondary uppercase tracking-widest hover:text-charcoal transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Return to Marketplace
+              </button>
+            </div>
 
-        {/* The Main Split Card Component */}
-        <div className="bg-white rounded-[24px] shadow-sm overflow-hidden flex flex-col">
-          
-          {/* Black Header Area */}
-          <div className="bg-[#101010] p-10 md:p-14 text-white">
-            <h1 className="font-display font-extrabold text-[44px] tracking-tight leading-tight mb-2">
-              Submit an Offer
-            </h1>
-            <p className="text-white/70 text-[16px]">
-              You are bidding on a confirmed itinerary request. Craft a competitive proposal to win this client.
-            </p>
-          </div>
-
-          <div className="flex flex-col md:flex-row relative">
+            {/* Dark Header */}
+            <div 
+              className="text-warmwhite relative overflow-hidden pt-10 sm:pt-12 px-6 sm:px-12 pb-8 sm:pb-10 rounded-t-[32px] shadow-sm z-10"
+              style={{ background: '#0f0f0f' }}
+            >
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background:
+                    'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(196,135,74,0.22) 0%, transparent 70%),' +
+                    'radial-gradient(ellipse 40% 40% at 20% 80%, rgba(196,135,74,0.10) 0%, transparent 65%)',
+                }}
+              />
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+                  backgroundSize: '28px 28px',
+                }}
+              />
+              <div className="relative z-10">
+                <h1 className="text-3xl sm:text-[40px] font-extrabold text-white font-display mb-2 tracking-tight leading-tight">
+                  Submit an Offer
+                </h1>
+                <p className="text-sm sm:text-[15px] font-body text-white/60 max-w-2xl leading-relaxed mt-2">
+                  You are bidding on a confirmed itinerary request. Craft a competitive proposal to win this client.
+                </p>
+              </div>
+            </div>
+            
+            {/* Body: Two Panes */}
+            <div className="bg-white flex flex-col md:flex-row border-x border-b border-[#E5E0DA] rounded-b-[32px] overflow-hidden shadow-xl shadow-black/5 mb-16">
             
             {/* LEFT COLUMN: Trip Details */}
             <div className="md:w-[45%] p-10 md:p-14 border-r border-border/40 flex flex-col relative z-0">
@@ -352,10 +376,76 @@ export default function SubmitOfferPage() {
                   </button>
                </div>
             </div>
-            
+          </div>
+          
+{/* POLISHED ITINERARY VIEW */}
+      <div className="mb-16 w-full">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-[26px] font-display font-extrabold text-charcoal">{listing?.travellerName ? `${listing.travellerName}'s Itinerary Plan` : "Traveller's Itinerary Plan"}</h3>
+            <div className="text-[13px] font-extrabold text-secondary tracking-widest uppercase border border-border px-4 py-2 rounded-lg bg-white shadow-sm">
+              {Object.keys(listing?.itinerary_content || {}).length} Days Total
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {Object.entries(listing?.itinerary_content || {}).map(([dayKey, activities], dayIndex) => (
+              <div key={dayKey} className="bg-[#FAFAFA] border border-border/60 rounded-[24px] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+                <div className="bg-charcoal px-7 py-5 flex justify-between items-center">
+                  <h4 className="text-white font-bold tracking-widest text-[15px]">DAY {dayIndex + 1}</h4>
+                  <span className="text-white/70 text-[11px] font-bold uppercase tracking-widest">
+                    {Array.isArray(activities) && activities[0]?.name ? (activities[0].name.length > 25 ? activities[0].name.slice(0, 25) + '...' : activities[0].name) : 'Activities'}
+                  </span>
+                </div>
+                <div className="p-7 flex flex-col gap-6">
+                  {Array.isArray(activities) && activities.map((activity, index) => {
+                    const isLast = index === activities.length - 1;
+                    const icon = activity.type === 'hotel' ? '🏨' : activity.type === 'attraction' ? '🎯' : activity.type === 'food_recommendation' ? '🍜' : activity.type === 'transport' ? '🚗' : '📍';
+                    
+                    return (
+                      <div key={index} className="flex gap-5">
+                        <div className="flex flex-col items-center mt-1">
+                          <div className="w-9 h-9 rounded-full bg-white border border-border text-charcoal flex items-center justify-center text-sm font-bold shadow-sm">
+                            {index + 1}
+                          </div>
+                          {!isLast && <div className="w-px h-full bg-border mt-3"></div>}
+                        </div>
+                        <div className={`flex-1 ${!isLast ? 'pb-5 border-b border-border/60' : ''}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <h5 className="font-extrabold text-charcoal text-[16px]">{activity.name || activity.title || 'Activity'}</h5>
+                            {(activity.time || activity.duration) && (
+                              <span className="text-[11px] font-black tracking-widest text-[#D48C44] bg-[#FFF9E5] border border-[#FDE68A] px-2.5 py-1 rounded-md">
+                                {activity.time || activity.duration}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[14px] text-secondary/80 leading-relaxed mb-4">
+                            {activity.notes || activity.description || 'No description provided.'}
+                          </p>
+                          <div className="flex gap-2">
+                            <span className="text-[10px] font-bold tracking-widest uppercase bg-white border border-border px-2.5 py-1.5 rounded-lg text-secondary">
+                              {icon} {activity.type || 'place'}
+                            </span>
+                            {(activity.price_estimate || activity.cost) && (
+                              <span className="text-[10px] font-bold tracking-widest uppercase bg-[#EDFDF3] border border-[#BCE7D0] px-2.5 py-1.5 rounded-lg text-[#036A38]">
+                                {activity.price_estimate || `RM ${activity.cost}`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+
+
+
+        </div>
+        </div>
+      </section>
     </div>
   )
 }
