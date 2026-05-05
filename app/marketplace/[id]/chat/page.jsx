@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
 import Avatar from '@/components/ui/Avatar'
-
+import Modal from '@/components/ui/Modal'
+import ItineraryTimeline from '@/components/ui/ItineraryTimeline'
 // Reusable Dark Header matching the Mockup
 function DarkHeader({ tag, title, description, children }) {
   return (
@@ -72,7 +73,7 @@ export default function ChatPage() {
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMsg, setIsSendingMsg] = useState(false)
   const [error, setError] = useState('')
-
+  const [showItineraryModal, setShowItineraryModal] = useState(false)
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -203,8 +204,10 @@ export default function ChatPage() {
   const isOfferPriceMessage = (msg) => typeof msg?.content === 'string' && msg.content.startsWith('__OFFER_PRICE__:')
 
   return (
-    <main className="bg-[#FAF9F7] min-h-screen pt-24 pb-24 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="min-h-screen bg-warmwhite flex flex-col pt-6 sm:pt-10 px-4 sm:px-6 pb-20 font-body">
+      <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
+        <div className="px-4 sm:px-10 pt-8 sm:pt-12 pb-12 sm:pb-16 bg-white flex flex-col items-center">
+          <div className="w-full max-w-[1100px] animate-in fade-in slide-in-from-bottom-4 duration-700">
         
         <div className="mb-6">
           <Link href={`/marketplace/${listingId}`} className="text-[12px] text-secondary font-bold hover:text-charcoal transition-colors tracking-wide uppercase">
@@ -215,7 +218,6 @@ export default function ChatPage() {
         <DarkHeader 
           tag={activeOffer.status === 'pending' ? 'In Progress' : activeOffer.status} 
           title="Chat with Tour Guide" 
-          description="Communicate securely to finalize trip details and negotiate the final pricing." 
         />
 
         <div className="bg-white flex flex-col md:flex-row border-x border-b border-[#E5E0DA] rounded-b-[32px] overflow-hidden shadow-xl shadow-black/5">
@@ -260,31 +262,39 @@ export default function ChatPage() {
                     </div>
                   </div>
                </div>
-               {isTraveller && activeOffer.status === 'pending' && (
+               <div className="flex items-center gap-2">
                  <button
-                   onClick={async () => {
-                     await fetch(`/api/marketplace/offers/${activeOffer.id}`, {
-                       method: 'PATCH',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify({ status: 'accepted' })
-                     })
-                     await fetch(`/api/marketplace/listings/${listingId}`, {
-                       method: 'PATCH',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify({ status: 'confirmed' })
-                     })
-                     router.push(`/marketplace/${listingId}`)
-                   }}
-                   className="px-5 py-2.5 bg-amber hover:bg-[#E08A1E] text-white text-[12px] font-bold rounded-lg shadow-sm transition-all focus:ring-2 focus:ring-amber/40 outline-none"
+                   onClick={() => setShowItineraryModal(true)}
+                   className="px-4 py-2.5 border border-[#E5E0DA] bg-white text-charcoal hover:bg-[#FAF9F7] text-[12px] font-bold rounded-lg shadow-sm transition-all"
                  >
-                   Accept {formatMYR(activeOffer.proposed_price)}
+                   View Itinerary
                  </button>
-               )}
-               {isGuide && activeOffer.status === 'pending' && (
-                 <button className="px-5 py-2.5 bg-[#F0EBE3] text-charcoal text-[12px] font-bold rounded-lg shadow-sm transition-all">
-                   Offer Pending
-                 </button>
-               )}
+                 {isTraveller && activeOffer.status === 'pending' && (
+                   <button
+                     onClick={async () => {
+                       await fetch(`/api/marketplace/offers/${activeOffer.id}`, {
+                         method: 'PATCH',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({ status: 'accepted' })
+                       })
+                       await fetch(`/api/marketplace/listings/${listingId}`, {
+                         method: 'PATCH',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({ status: 'confirmed' })
+                       })
+                       router.push(`/marketplace/${listingId}`)
+                     }}
+                     className="px-5 py-2.5 bg-amber hover:bg-[#E08A1E] text-white text-[12px] font-bold rounded-lg shadow-sm transition-all focus:ring-2 focus:ring-amber/40 outline-none"
+                   >
+                     Accept {formatMYR(activeOffer.proposed_price)}
+                   </button>
+                 )}
+                 {isGuide && activeOffer.status === 'pending' && (
+                   <button className="px-5 py-2.5 bg-[#F0EBE3] text-charcoal text-[12px] font-bold rounded-lg shadow-sm transition-all">
+                     Offer Pending
+                   </button>
+                 )}
+               </div>
              </div>
 
              {/* Chat Messages */}
@@ -351,7 +361,25 @@ export default function ChatPage() {
              </div>
            </div>
         </div>
-      </div>
-    </main>
+           </div>
+        </div>
+      </section>
+
+      {showItineraryModal && (
+        <Modal 
+          title="Itinerary Details" 
+          onClose={() => setShowItineraryModal(false)}
+          maxWidth="max-w-5xl"
+        >
+          <ItineraryTimeline 
+            listing={listing} 
+            isEditable={isGuide} 
+            onSuggestEdits={() => {
+              alert("Edit mode coming soon!")
+            }}
+          />
+        </Modal>
+      )}
+    </div>
   )
 }

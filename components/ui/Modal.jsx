@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-export default function Modal({ title, children, onClose }) {
+export default function Modal({ title, children, onClose, maxWidth = 'max-w-md' }) {
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = 'unset' }
@@ -13,7 +13,7 @@ export default function Modal({ title, children, onClose }) {
         onClick={onClose}
       />
       
-      <div className="relative bg-white rounded-2xl shadow-xl shadow-charcoal/10 border border-border w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className={`relative bg-white rounded-2xl shadow-xl shadow-charcoal/10 border border-border w-full ${maxWidth} overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col`}>
         <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-warmwhite/50">
           <h3 className="font-display font-bold text-lg text-charcoal">{title}</h3>
           <button 
@@ -25,7 +25,7 @@ export default function Modal({ title, children, onClose }) {
             </svg>
           </button>
         </div>
-        <div className="p-6 text-charcoal">
+        <div className="p-6 text-charcoal overflow-y-auto">
           {children}
         </div>
       </div>

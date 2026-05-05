@@ -126,7 +126,7 @@ export default function MarketplacePage() {
             status,
             created_at,
             destinations ( city, country ),
-            marketplace_offers ( id, status, guide_id, proposed_price )
+            marketplace_offers ( id, status, guide_id, proposed_price, tour_guides ( full_name ) )
           `)
           .order('created_at', { ascending: false })
 
@@ -233,10 +233,14 @@ export default function MarketplacePage() {
           }
 
           let guideInfo = null
-          if (offers.length > 0) {
+          const acceptedOffer = offers.find(o => o.status === 'accepted')
+          const primaryOffer = acceptedOffer || (offers.length > 0 ? offers[0] : null)
+          
+          if (primaryOffer) {
             guideInfo = {
-              name: 'Ahmad R.',
-              location: l.destinations?.city || 'City'
+              name: primaryOffer.tour_guides?.full_name || 'Ahmad R.',
+              location: l.destinations?.city || 'City',
+              status: primaryOffer.status === 'accepted' ? 'Accepted' : 'Offer received'
             }
           }
 

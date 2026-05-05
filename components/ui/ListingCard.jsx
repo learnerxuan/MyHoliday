@@ -67,7 +67,7 @@ export default function ListingCard({
                 <p className="text-[11px] font-medium text-secondary/80">Certified · {guideInfo.location || city}</p>
               </div>
             </div>
-            <p className="font-bold text-[#d48c44] text-xs tracking-wide">Offer received</p>
+            <p className={`font-bold ${guideInfo.status === 'Accepted' ? 'text-[#059669]' : 'text-[#d48c44]'} text-xs tracking-wide`}>{guideInfo.status || 'Offer received'}</p>
           </div>
         ) : (
           <p className="text-[13px] text-secondary/50 font-medium w-full text-left">Awaiting guide offers...</p>
