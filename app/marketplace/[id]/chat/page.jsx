@@ -160,6 +160,34 @@ export default function ChatPage() {
     }
   }, [messages])
 
+  useEffect(() => {
+    if (!activeOffer?.id) return
+
+    const channel = supabase.channel(`messages_${activeOffer.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'marketplace_messages', filter: `offer_id=eq.${activeOffer.id}` },
+        (payload) => {
+          const newMsg = payload.new
+          
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev
+            return [...prev, newMsg]
+          })
+          
+          if (newMsg.content && newMsg.content.startsWith('__OFFER_PRICE__:')) {
+            const newPrice = parseFloat(newMsg.content.split(':')[1])
+            setActiveOffer(prev => prev ? { ...prev, proposed_price: newPrice } : prev)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [activeOffer?.id])
+
   const handleSendMessage = async () => {
     if (!chatMessage.trim() || !user || !activeOffer) return
     setIsSendingMsg(true)

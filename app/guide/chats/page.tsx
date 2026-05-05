@@ -67,6 +67,9 @@ export default function ChatsPage() {
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showItineraryModal, setShowItineraryModal] = useState(false)
+  const [showEditPriceModal, setShowEditPriceModal] = useState(false)
+  const [editPrice, setEditPrice] = useState('')
+  const [isUpdatingPrice, setIsUpdatingPrice] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const filteredThreads = useMemo(() => {
@@ -215,6 +218,34 @@ export default function ChatsPage() {
   }, [activeOfferId])
 
   useEffect(() => {
+    if (!activeOfferId) return
+
+    const channel = supabase.channel(`guide_msgs_${activeOfferId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'marketplace_messages', filter: `offer_id=eq.${activeOfferId}` },
+        (payload) => {
+          const newMsg = payload.new
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev
+            return [...prev, newMsg]
+          })
+          
+          setThreads(prev => prev.map(t => 
+            t.offer_id === activeOfferId 
+              ? { ...t, last_message: newMsg.content, last_message_at: newMsg.created_at }
+              : t
+          ))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [activeOfferId])
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
@@ -246,10 +277,56 @@ export default function ChatsPage() {
       )
       setNewMessage('')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to send message.'
-      setError(message)
+      setError((err as Error).message)
     } finally {
       setIsSending(false)
+    }
+  }
+
+  const handleUpdatePrice = async () => {
+    const priceNum = parseFloat(editPrice)
+    if (isNaN(priceNum) || priceNum <= 0) return
+
+    setIsUpdatingPrice(true)
+    setError('')
+
+    try {
+      const { error: updateError } = await supabase
+        .from('marketplace_offers')
+        .update({ proposed_price: priceNum })
+        .eq('id', activeOfferId)
+
+      if (updateError) throw updateError
+
+      const msgRes = await fetch('/api/marketplace/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offer_id: activeOfferId,
+          sender_id: guideUserId,
+          sender_type: 'guide',
+          content: `${offerCardToken}${priceNum}`
+        })
+      })
+
+      if (!msgRes.ok) throw new Error('Failed to update price message')
+
+      setThreads(prev => prev.map(t => 
+        t.offer_id === activeOfferId 
+          ? { ...t, proposed_price: priceNum, last_message: `Offer: ${formatMYR(priceNum)}`, last_message_at: new Date().toISOString() }
+          : t
+      ))
+      
+      const newMsg = await msgRes.json()
+      setMessages(prev => [...prev, newMsg])
+      
+      setShowEditPriceModal(false)
+      setEditPrice('')
+      setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    } catch (err: unknown) {
+      setError((err as Error).message)
+    } finally {
+      setIsUpdatingPrice(false)
     }
   }
 
@@ -354,6 +431,14 @@ export default function ChatsPage() {
                 >
                   View Itinerary
                 </button>
+                {activeThread?.status !== 'accepted' && (
+                  <button
+                    onClick={() => { setEditPrice(activeThread?.proposed_price?.toString() || ''); setShowEditPriceModal(true) }}
+                    className="px-4 py-2 border border-[#D48C44] bg-[#D48C44] text-white hover:bg-[#C27E3B] text-[12px] font-bold rounded-lg shadow-sm transition-all"
+                  >
+                    Edit Offer Price
+                  </button>
+                )}
                 <div className="text-right border-l border-border/60 pl-4 hidden sm:block">
                   <p className="text-[11px] font-bold text-secondary uppercase tracking-widest">Offer</p>
                   <p className="text-[13px] font-extrabold text-amber">{formatMYR(activeThread?.proposed_price || 0)}</p>
@@ -435,6 +520,41 @@ export default function ChatsPage() {
             ) : (
               <p className="p-8 text-center text-secondary">No itinerary available.</p>
             )}
+          </Modal>
+        )}
+
+        {/* Edit Price Modal */}
+        {showEditPriceModal && (
+          <Modal 
+            onClose={() => setShowEditPriceModal(false)}
+            title="Edit Offer Price"
+          >
+            <div className="p-6">
+              <label className="block text-sm font-bold text-charcoal mb-2">New Proposed Price (RM)</label>
+              <input
+                type="number"
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)}
+                placeholder="Enter new price"
+                className="w-full px-4 py-3 rounded-xl border border-border/70 focus:outline-none focus:ring-2 focus:ring-amber/30 focus:border-amber transition-all mb-4"
+              />
+              {error && <p className="text-error text-sm mb-4">{error}</p>}
+              <div className="flex gap-3 justify-end">
+                <button 
+                  onClick={() => setShowEditPriceModal(false)}
+                  className="px-5 py-2.5 rounded-xl font-bold text-secondary hover:bg-[#F5F5F5] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleUpdatePrice}
+                  disabled={isUpdatingPrice || !editPrice}
+                  className="px-5 py-2.5 rounded-xl font-bold bg-amber text-white hover:bg-[#D48C44] transition-colors disabled:opacity-50"
+                >
+                  {isUpdatingPrice ? 'Updating...' : 'Save New Price'}
+                </button>
+              </div>
+            </div>
           </Modal>
         )}
 
