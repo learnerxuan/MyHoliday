@@ -372,6 +372,14 @@ export default function ListingDetailPage() {
 
   const listingTitle = listing?.itinerary_title || `${listing?.city_name} Trip`
 
+  console.log("DEBUGGING DATA:", {
+    user,
+    isTraveller,
+    offersCount: offers.length,
+    myGuideOffer,
+    listingStatus: listing?.status
+  })
+
   return (
     <div className="min-h-screen bg-warmwhite flex flex-col pt-6 sm:pt-10 px-4 sm:px-6 pb-20 font-body">
       <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
@@ -611,10 +619,33 @@ export default function ListingDetailPage() {
               <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber to-[#FBAE3C]"></div>
               
               {listing.status === 'confirmed' ? (
-                <div className="h-full flex flex-col justify-center text-center">
-                  <h3 className="text-[22px] font-display font-extrabold text-charcoal mb-2">Listing Closed</h3>
-                  <p className="text-secondary text-[13.5px]">This listing has been confirmed and is no longer accepting offers.</p>
-                </div>
+                myGuideOffer?.status === 'accepted' ? (
+                  <div className="h-full flex flex-col justify-center text-center items-center">
+                    <div className="w-16 h-16 rounded-full bg-[#ECFDF5] flex items-center justify-center mb-4">
+                      <span className="text-[28px]">🎉</span>
+                    </div>
+                    <h3 className="text-[22px] font-display font-extrabold text-charcoal mb-2">
+                      Your offer has been accepted by {listing?.traveller_name || 'Traveller'}!
+                    </h3>
+                    <p className="text-secondary text-[13.5px] mb-8">
+                      Get ready for the trip. You can now coordinate directly with the traveller.
+                    </p>
+                    <button 
+                      onClick={() => window.location.href = `/marketplace/${listingId}/chat?guide=${myGuideOffer.guide_id}`} 
+                      className="px-8 py-3.5 bg-charcoal text-white rounded-xl font-bold text-[14px] shadow-md hover:bg-black transition-colors"
+                    >
+                      Chat with Traveller
+                    </button>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col justify-center text-center">
+                    <h3 className="text-[22px] font-display font-extrabold text-charcoal mb-2">Listing Closed</h3>
+                    <p className="text-secondary text-[13.5px]">This listing has been confirmed and is no longer accepting offers.</p>
+                    <div className="mt-4 text-xs text-red-500 text-left bg-red-50 p-2 rounded">
+                      DEBUG: user.id={user?.id}, myGuideOffer={myGuideOffer ? JSON.stringify(myGuideOffer) : 'null'}, offersCount={offers.length}, isTraveller={isTraveller}
+                    </div>
+                  </div>
+                )
               ) : (!myGuideOffer || isEditingOffer) ? (
                 <div className="space-y-6">
                   <div>

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
+import Modal from '@/components/ui/Modal'
+import ItineraryTimeline from '@/components/ui/ItineraryTimeline'
 
 type MarketplaceOffer = {
   id: string
@@ -20,6 +22,8 @@ type ListingRecord = {
   itinerary_title?: string
   traveller_name?: string
   city_name?: string
+  itinerary_content?: Record<string, unknown>[]
+  trip_metadata?: Record<string, unknown>
 }
 
 type MarketplaceMessage = {
@@ -40,6 +44,8 @@ type ChatThread = {
   status: string
   last_message: string
   last_message_at: string
+  itinerary_content?: Record<string, unknown>[]
+  trip_metadata?: Record<string, unknown>
 }
 
 const formatMYR = (amount: number | string) =>
@@ -59,7 +65,19 @@ export default function ChatsPage() {
   const [newMessage, setNewMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showItineraryModal, setShowItineraryModal] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  const filteredThreads = useMemo(() => {
+    if (!searchQuery.trim()) return threads
+    const lowerQuery = searchQuery.toLowerCase()
+    return threads.filter(
+      (t) =>
+        t.traveller_name.toLowerCase().includes(lowerQuery) ||
+        t.title.toLowerCase().includes(lowerQuery)
+    )
+  }, [threads, searchQuery])
 
   const activeThread = useMemo(
     () => threads.find((thread) => thread.offer_id === activeOfferId) || null,
@@ -149,7 +167,9 @@ export default function ChatsPage() {
         proposed_price: offer.proposed_price,
         status: offer.status,
         last_message: latestMessage?.content || `Offer: ${formatMYR(offer.proposed_price)}`,
-        last_message_at: latestMessage?.created_at || offer.created_at
+        last_message_at: latestMessage?.created_at || offer.created_at,
+        itinerary_content: listing?.itinerary_content,
+        trip_metadata: listing?.trip_metadata
       }
     })
 
@@ -272,115 +292,151 @@ export default function ChatsPage() {
           Back to Marketplace
         </button>
 
-        <section className="w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-[35%_65%] min-h-[640px]">
-            <aside className="border-r border-border/70 bg-[#FBFBFB] flex flex-col">
-              <div className="text-warmwhite relative overflow-hidden pt-8 sm:pt-10 px-4 sm:px-6 pb-7 sm:pb-8 bg-[#0f0f0f]">
-                <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(59,109,17,0.22) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 20% 80%, rgba(59,109,17,0.10) 0%, transparent 65%)' }} />
-                <div className="relative">
-                  <div className="inline-flex px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-[#EAF3DE]/20 text-[#EAF3DE] border border-[#EAF3DE]/30 mb-3">
-                    Tour Guide
-                  </div>
-                  <h2 className="text-3xl sm:text-[40px] font-display font-extrabold text-white leading-tight">Chats</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-[35%_minmax(0,1fr)] gap-6 min-h-[640px]">
+          {/* Left Pane - Chats List */}
+          <aside className="bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
+            <div className="text-warmwhite relative overflow-hidden pt-8 sm:pt-10 px-4 sm:px-6 pb-7 sm:pb-8 bg-[#0f0f0f]">
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(59,109,17,0.22) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 20% 80%, rgba(59,109,17,0.10) 0%, transparent 65%)' }} />
+              <div className="relative">
+                <div className="inline-flex px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-[#EAF3DE]/20 text-[#EAF3DE] border border-[#EAF3DE]/30 mb-3">
+                  Tour Guide
                 </div>
+                <h2 className="text-3xl sm:text-[40px] font-display font-extrabold text-white leading-tight">Chats</h2>
               </div>
+            </div>
 
-              <div className="px-6 py-5 border-b border-border/60 bg-[#FBFBFB]">
-                <div className="h-[42px] rounded-lg border border-border/70 bg-white px-3 flex items-center text-[13px] text-secondary">
-                  Search traveller chats...
-                </div>
-              </div>
-              <div className="divide-y divide-border/60">
-                {threads.map((thread) => (
-                  <button
-                    key={thread.offer_id}
-                    onClick={() => setActiveOfferId(thread.offer_id)}
-                    className={`w-full px-5 py-4 text-left hover:bg-white transition-colors ${
-                      activeOfferId === thread.offer_id ? 'bg-white border-l-4 border-l-amber' : 'border-l-4 border-l-transparent'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-1">
-                      <p className="text-[14px] font-bold text-charcoal">{thread.traveller_name}</p>
-                      <p className="text-[11px] text-secondary">
-                        {new Date(thread.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                    <p className="text-[12px] font-semibold text-[#8A7A67] mb-1">{thread.title}</p>
-                    <p className="text-[12px] text-secondary truncate">
-                      {thread.last_message?.startsWith(offerCardToken)
-                        ? `Offer submitted: ${formatMYR(thread.last_message.split(':')[1])}`
-                        : thread.last_message}
+            <div className="px-6 py-5 border-b border-border/60 bg-[#FBFBFB]">
+              <input
+                type="text"
+                placeholder="Search traveller chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-[42px] rounded-lg border border-border/70 bg-white px-3 flex items-center text-[13px] text-charcoal focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber transition-all placeholder:text-secondary"
+              />
+            </div>
+            <div className="divide-y divide-border/60 overflow-y-auto flex-1">
+              {filteredThreads.map((thread) => (
+                <button
+                  key={thread.offer_id}
+                  onClick={() => setActiveOfferId(thread.offer_id)}
+                  className={`w-full px-5 py-4 text-left hover:bg-[#FDFCFB] transition-colors ${
+                    activeOfferId === thread.offer_id ? 'bg-[#FDFCFB] border-l-4 border-l-amber' : 'border-l-4 border-l-transparent'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-1">
+                    <p className="text-[14px] font-bold text-charcoal">{thread.traveller_name}</p>
+                    <p className="text-[11px] text-secondary">
+                      {new Date(thread.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
-                  </button>
-                ))}
-              </div>
-            </aside>
+                  </div>
+                  <p className="text-[12px] font-semibold text-[#8A7A67] mb-1">{thread.title}</p>
+                  <p className="text-[12px] text-secondary truncate">
+                    {thread.last_message?.startsWith(offerCardToken)
+                      ? `Offer submitted: ${formatMYR(thread.last_message.split(':')[1])}`
+                      : thread.last_message}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </aside>
 
-            <div className="flex flex-col bg-[#FCFBF9]">
-              <header className="h-[80px] border-b border-border/70 px-8 py-5 bg-white flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-charcoal text-[14px]">{activeThread?.traveller_name || 'Traveller'}</p>
-                  <p className="text-[12px] text-secondary">{activeThread?.title}</p>
-                </div>
-                <div className="text-right">
+          {/* Right Pane - Chat Window */}
+          <div className="flex flex-col bg-[#FCFBF9] bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden">
+            <header className="h-[80px] border-b border-border/70 px-8 py-5 bg-white flex items-center justify-between shrink-0">
+              <div>
+                <p className="font-bold text-charcoal text-[14px]">{activeThread?.traveller_name || 'Traveller'}</p>
+                <p className="text-[12px] text-secondary">{activeThread?.title}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowItineraryModal(true)}
+                  className="px-4 py-2 border border-[#E5E0DA] bg-white text-charcoal hover:bg-[#FAF9F7] text-[12px] font-bold rounded-lg shadow-sm transition-all"
+                >
+                  View Itinerary
+                </button>
+                <div className="text-right border-l border-border/60 pl-4 hidden sm:block">
                   <p className="text-[11px] font-bold text-secondary uppercase tracking-widest">Offer</p>
                   <p className="text-[13px] font-extrabold text-amber">{formatMYR(activeThread?.proposed_price || 0)}</p>
                 </div>
-              </header>
+              </div>
+            </header>
 
-              <main ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6">
-            {messages.length === 0 ? (
-              <p className="text-center text-sm text-secondary/60 mt-10">No messages yet.</p>
-            ) : (
-              messages.map((msg, idx) => {
-                const isMine = msg.sender_type === 'guide'
-                const isOfferCard = typeof msg.content === 'string' && msg.content.startsWith(offerCardToken)
-                if (isOfferCard) {
-                  const amount = msg.content.split(':')[1]
-                  return (
-                    <div key={msg.id || idx} className="flex justify-center">
-                      <div className="bg-[#FFFDF5] border border-amber/20 px-4 py-2 rounded-xl text-[12px] text-amberdark font-medium">
-                        Offer submitted: {formatMYR(amount)}
-                      </div>
-                    </div>
-                  )
-                }
-
+            <main ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6">
+          {messages.length === 0 ? (
+            <p className="text-center text-sm text-secondary/60 mt-10">No messages yet.</p>
+          ) : (
+            messages.map((msg, idx) => {
+              const isMine = msg.sender_type === 'guide'
+              const isOfferCard = typeof msg.content === 'string' && msg.content.startsWith(offerCardToken)
+              if (isOfferCard) {
+                const amount = msg.content.split(':')[1]
                 return (
-                  <div key={msg.id || idx} className={`flex gap-3 max-w-[85%] ${isMine ? 'self-end ms-auto flex-row-reverse' : ''}`}>
-                    <div
-                      className={`${isMine ? 'bg-charcoal text-white rounded-tr-sm' : 'bg-white border border-[#E5E0DA] text-charcoal rounded-tl-sm'} rounded-2xl px-5 py-3.5 text-[14px] leading-relaxed shadow-sm`}
-                    >
-                      {msg.content}
+                  <div key={msg.id || idx} className="flex justify-center">
+                    <div className="bg-[#FFFDF5] border border-amber/20 px-4 py-2 rounded-xl text-[12px] text-amberdark font-medium">
+                      Offer submitted: {formatMYR(amount)}
                     </div>
                   </div>
                 )
-              })
-            )}
-              </main>
+              }
 
-              <footer className="border-t border-border/70 bg-white p-5">
-            <div className="relative">
-              <input
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                type="text"
-                placeholder={`Reply to ${activeThread?.traveller_name || 'traveller'}...`}
-                className="w-full bg-[#FAF9F7] border border-[#E5E0DA] rounded-xl pl-5 pr-14 py-3.5 text-[14px] text-charcoal focus:outline-none focus:border-amber focus:ring-2 focus:ring-amber/10 transition-all placeholder:text-secondary/60"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={isSending || !newMessage.trim() || !activeOfferId}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-charcoal hover:bg-black/5 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {isSending ? <Spinner className="w-4 h-4 border-2" /> : <span className="text-[20px] leading-none mb-1">↗</span>}
-              </button>
-            </div>
-              </footer>
-            </div>
+              return (
+                <div key={msg.id || idx} className={`flex gap-3 max-w-[85%] ${isMine ? 'self-end ms-auto flex-row-reverse' : ''}`}>
+                  <div
+                    className={`${isMine ? 'bg-charcoal text-white rounded-tr-sm' : 'bg-white border border-[#E5E0DA] text-charcoal rounded-tl-sm'} rounded-2xl px-5 py-3.5 text-[14px] leading-relaxed shadow-sm`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              )
+            })
+          )}
+            </main>
+
+            <footer className="border-t border-border/70 bg-white p-5">
+          <div className="relative">
+            <input
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              type="text"
+              placeholder={`Reply to ${activeThread?.traveller_name || 'traveller'}...`}
+              className="w-full bg-[#FAF9F7] border border-[#E5E0DA] rounded-xl pl-5 pr-14 py-3.5 text-[14px] text-charcoal focus:outline-none focus:border-amber focus:ring-2 focus:ring-amber/10 transition-all placeholder:text-secondary/60"
+            />
+            <button
+              onClick={sendMessage}
+              disabled={isSending || !newMessage.trim() || !activeOfferId}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-charcoal hover:bg-black/5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {isSending ? <Spinner className="w-4 h-4 border-2" /> : <span className="text-[20px] leading-none mb-1">↗</span>}
+            </button>
+          </div>
+            </footer>
+          </div>
         </div>
-        </section>
+
+        {/* View Itinerary Modal */}
+        {showItineraryModal && (
+          <Modal 
+            onClose={() => setShowItineraryModal(false)}
+            title={`${activeThread?.traveller_name || 'Traveller'}'s Itinerary`}
+            maxWidth="max-w-5xl"
+          >
+            {activeThread ? (
+              <div className="bg-[#FAF9F7] p-4 sm:p-6 lg:p-8 rounded-b-2xl">
+                <ItineraryTimeline 
+                  listing={{
+                    itinerary_content: activeThread.itinerary_content || [],
+                    trip_metadata: activeThread.trip_metadata || {},
+                    city_name: activeThread.city_name
+                  }} 
+                />
+              </div>
+            ) : (
+              <p className="p-8 text-center text-secondary">No itinerary available.</p>
+            )}
+          </Modal>
+        )}
+
     </div>
   )
 }

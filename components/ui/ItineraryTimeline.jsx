@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function ItineraryTimeline({ listing, isEditable = false, onSuggestEdits }) {
+export default function ItineraryTimeline({ listing, isEditable = false, onSuggestEdits = () => {} }) {
   const itineraryContent = listing?.itinerary_content || {};
   const travellerName = listing?.travellerName || listing?.traveller_name || "Traveller";
 

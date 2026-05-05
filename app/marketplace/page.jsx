@@ -59,6 +59,12 @@ export default function MarketplacePage() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [guideProfile, setGuideProfile] = useState(null)
+  const [guideAnalytics, setGuideAnalytics] = useState({
+    offersSent: 0,
+    offersAccepted: 0,
+    completedTrips: 0,
+    totalEarnings: 0
+  })
   const [listings, setListings] = useState([])
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all') // 'all' for traveller, 'requests' initialized for guide
@@ -107,6 +113,22 @@ export default function MarketplacePage() {
           gProfile = guideData
           setGuideProfile(guideData)
           setFilter('requests')
+
+          const { data: myOffersData } = await supabase
+            .from('marketplace_offers')
+            .select('status, proposed_price, marketplace_listings(status)')
+            .eq('guide_id', guideData.id)
+
+          if (myOffersData) {
+            const offersAccepted = myOffersData.filter(o => o.status === 'accepted').length
+            const offersSent = myOffersData.length - offersAccepted
+            const completedTrips = myOffersData.filter(o => o.status === 'accepted' && o.marketplace_listings?.status === 'completed').length
+            const totalEarnings = myOffersData
+              .filter(o => o.status === 'accepted' && o.marketplace_listings?.status === 'completed')
+              .reduce((sum, o) => sum + (Number(o.proposed_price) || 0), 0)
+            
+            setGuideAnalytics({ offersSent, offersAccepted, completedTrips, totalEarnings })
+          }
         }
 
         setUser({
@@ -357,7 +379,7 @@ export default function MarketplacePage() {
            <h2 className="text-3xl font-display font-extrabold text-charcoal mb-4">Awaiting Admin Approval</h2>
            <p className="text-secondary leading-relaxed px-8 text-[15px]">
               Your tour guide account is currently being reviewed securely by our administrators. 
-              Once your verification is approved, you'll be able to browse traveller itineraries in your city and submit offers.
+              Once your verification is approved, you&apos;ll be able to browse traveller itineraries in your city and submit offers.
            </p>
            {guideProfile?.verification_status === 'rejected' && (
              <div className="mt-8 bg-error-bg text-error px-6 py-4 rounded-xl text-sm border border-error/20 inline-block mx-8">
@@ -496,7 +518,7 @@ export default function MarketplacePage() {
             <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(59,109,17,0.22) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 20% 80%, rgba(59,109,17,0.10) 0%, transparent 65%)' }} />
             <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
 
-            <div className="relative flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div className="relative flex flex-col md:flex-row md:items-stretch justify-between gap-6">
               <div className="max-w-2xl">
                 <div className="inline-flex items-center gap-2 bg-[#EAF3DE]/20 text-[#EAF3DE] text-xs font-semibold px-3 py-1 rounded-full border border-[#EAF3DE]/30 mb-3 uppercase tracking-widest">
                   💼 Tour Guide Workspace
@@ -517,11 +539,16 @@ export default function MarketplacePage() {
               </div>
 
               {/* Right Info Grid */}
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-6 md:mt-0 max-w-sm w-full">
-                {[["🔍", "Browse open listings"], ["💸", "Submit price offers"], ["💬", "Chat with travellers"], ["📅", "Manage bookings"]].map(([icon, label]) => (
-                  <div key={label} className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-sm hover:bg-white/10 transition-colors">
-                    <div className="text-[22px] sm:text-[26px] mb-2 sm:mb-3">{icon}</div>
-                    <div className="text-[12px] sm:text-[13px] text-warmwhite/90 font-medium leading-snug">{label}</div>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-6 md:mt-0 max-w-sm w-full self-stretch">
+                {[
+                  { label: "Offers Sent", value: guideAnalytics.offersSent },
+                  { label: "Offers Accepted", value: guideAnalytics.offersAccepted },
+                  { label: "Completed Trips", value: guideAnalytics.completedTrips },
+                  { label: "Total Earnings", value: `RM ${guideAnalytics.totalEarnings.toLocaleString('en-MY')}` }
+                ].map((stat) => (
+                  <div key={stat.label} className="bg-warmwhite/5 border border-warmwhite/10 rounded-2xl p-4 flex flex-col justify-center gap-2 h-full">
+                    <span className="text-[28px] font-display font-extrabold text-white leading-none">{stat.value}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-warmwhite/60">{stat.label}</span>
                   </div>
                 ))}
               </div>
