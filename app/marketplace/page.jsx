@@ -485,36 +485,46 @@ export default function MarketplacePage() {
       ) : (
         <>
           {/* ── GUIDE VIEW ── */}
-          <div className="px-4 sm:px-10 pt-8 pb-12 sm:pb-16 flex-1">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-bold px-3 py-1.5 rounded-md mb-4 uppercase tracking-widest leading-none">
-                <span className="text-[13px]">💼</span> Tour Guide Workspace
-              </div>
-              <h1 className="font-display font-extrabold text-[44px] text-charcoal leading-tight mb-4 tracking-tight">
-                Find your next client
-              </h1>
-              <p className="text-secondary text-[16px] leading-relaxed mb-8 max-w-lg">
-                Browse itineraries posted by travellers visiting your certified city. Submit competitive price offers and secure bookings.
-              </p>
-              <div className="flex items-center gap-4 bg-[#FAF9F7] border border-border/50 py-3 px-5 rounded-xl inline-flex w-fit">
-                <div className="font-bold text-[13px] text-charcoal flex gap-2 items-center">
-                   Status: <span className="bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Verified</span>
-                </div>
-                <div className="w-[1px] h-4 bg-border"></div>
-                <div className="text-[13px] text-secondary font-medium">Assigned to: <strong className="text-charcoal ml-1">{guideProfile?.destinations?.city}, {guideProfile?.destinations?.country}</strong></div>
-              </div>
-            </div>
+          <div 
+            className="text-warmwhite relative overflow-hidden pt-8 sm:pt-10 px-4 sm:px-10 pb-8 sm:pb-10"
+            style={{ background: '#0f0f0f' }}
+          >
+            <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(59,109,17,0.22) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 20% 80%, rgba(59,109,17,0.10) 0%, transparent 65%)' }} />
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
 
-            <div className="grid grid-cols-2 gap-4">
-              {[["🔍", "Browse open listings"], ["💸", "Submit price offers"], ["💬", "Chat with travellers"], ["📅", "Manage bookings"]].map(([icon, label]) => (
-                <div key={label} className="bg-[#FAF9F7] border border-border/60 rounded-2xl p-5 shadow-sm">
-                  <div className="text-[26px] mb-3">{icon}</div>
-                  <div className="text-[13.5px] text-secondary font-medium leading-snug">{label}</div>
+            <div className="relative flex flex-col md:flex-row md:items-start justify-between gap-6">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-2 bg-[#EAF3DE]/20 text-[#EAF3DE] text-xs font-semibold px-3 py-1 rounded-full border border-[#EAF3DE]/30 mb-3 uppercase tracking-widest">
+                  💼 Tour Guide Workspace
                 </div>
-              ))}
+                <h1 className="text-3xl sm:text-5xl font-extrabold font-display mb-4 text-warmwhite leading-tight">
+                  Find your next client
+                </h1>
+                <p className="text-sm sm:text-[15px] font-body text-warmwhite/80 leading-relaxed max-w-lg mb-8">
+                  Browse itineraries posted by travellers visiting your certified city. Submit competitive price offers and secure bookings.
+                </p>
+                <div className="flex flex-wrap items-center gap-4 bg-white/5 border border-white/10 py-3 px-5 rounded-xl inline-flex w-fit backdrop-blur-sm">
+                  <div className="font-bold text-[13px] text-warmwhite flex gap-2 items-center">
+                     Status: <span className="bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Verified</span>
+                  </div>
+                  <div className="hidden sm:block w-[1px] h-4 bg-white/20"></div>
+                  <div className="text-[13px] text-warmwhite/80 font-medium">Assigned to: <strong className="text-warmwhite ml-1">{guideProfile?.destinations?.city}, {guideProfile?.destinations?.country}</strong></div>
+                </div>
+              </div>
+
+              {/* Right Info Grid */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-6 md:mt-0 max-w-sm w-full">
+                {[["🔍", "Browse open listings"], ["💸", "Submit price offers"], ["💬", "Chat with travellers"], ["📅", "Manage bookings"]].map(([icon, label]) => (
+                  <div key={label} className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-sm hover:bg-white/10 transition-colors">
+                    <div className="text-[22px] sm:text-[26px] mb-2 sm:mb-3">{icon}</div>
+                    <div className="text-[12px] sm:text-[13px] text-warmwhite/90 font-medium leading-snug">{label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+          
+          <div className="px-4 sm:px-10 pt-6 sm:pt-10 pb-12 sm:pb-16 bg-[#FAFAFA] flex-1">
           
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
             <div className="flex gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide pb-1">

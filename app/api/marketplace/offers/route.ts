@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { listing_id, proposed_price } = body
+  const { listing_id, proposed_price, intro_message } = body
 
   if (!listing_id || listing_id === 'undefined' || !proposed_price) {
     return NextResponse.json({ error: 'Missing required fields or invalid listing_id passed as text "undefined"' }, { status: 400 })
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
         listing_id,
         guide_id: guideData.id,
         proposed_price,
+        intro_message,
         status: 'pending'
       }
     ])

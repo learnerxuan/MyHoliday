@@ -46,9 +46,14 @@ export async function PATCH(
 
   const body = await request.json()
 
+  const updatePayload: any = {}
+  if (body.status !== undefined) updatePayload.status = body.status
+  if (body.proposed_price !== undefined) updatePayload.proposed_price = body.proposed_price
+  if (body.intro_message !== undefined) updatePayload.intro_message = body.intro_message
+
   const { data, error } = await supabase
     .from('marketplace_offers')
-    .update({ status: body.status })
+    .update(updatePayload)
     .eq('id', (await params).id)
     .select()
 

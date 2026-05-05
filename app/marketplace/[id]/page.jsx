@@ -43,6 +43,8 @@ export default function ListingDetailPage() {
 
   // Action states
   const [proposedPrice, setProposedPrice] = useState('')
+  const [introMessage, setIntroMessage] = useState('')
+  const [isEditingOffer, setIsEditingOffer] = useState(false)
   const [isSubmittingOffer, setIsSubmittingOffer] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMsg, setIsSendingMsg] = useState(false)
@@ -201,14 +203,23 @@ export default function ListingDetailPage() {
     if (!proposedPrice) return
     setIsSubmittingOffer(true)
     try {
-      const res = await fetch('/api/marketplace/offers', {
-        method: 'POST',
+      const url = isEditingOffer ? `/api/marketplace/offers/${myGuideOffer.id}` : '/api/marketplace/offers'
+      const method = isEditingOffer ? 'PATCH' : 'POST'
+      
+      const payload = isEditingOffer ? {
+        proposed_price: parseFloat(proposedPrice),
+        intro_message: introMessage
+      } : {
+        listing_id: listingId,
+        guide_id: user.id,
+        proposed_price: parseFloat(proposedPrice),
+        intro_message: introMessage
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listing_id: listingId,
-          guide_id: user.id,
-          proposed_price: parseFloat(proposedPrice)
-        })
+        body: JSON.stringify(payload)
       })
       if (!res.ok) {
         const data = await res.json()
@@ -219,6 +230,12 @@ export default function ListingDetailPage() {
       setError(err.message || 'Failed to submit offer.')
       setIsSubmittingOffer(false)
     }
+  }
+
+  const handleEditOfferClick = () => {
+    setProposedPrice(myGuideOffer.proposed_price || '')
+    setIntroMessage(myGuideOffer.intro_message || '')
+    setIsEditingOffer(true)
   }
 
   const handleWithdrawOffer = async (offerId) => {
@@ -591,7 +608,7 @@ export default function ListingDetailPage() {
             {listing.status !== 'confirmed' && (
               <div className="bg-white p-6 rounded-xl border border-border">
                 <h3 className="font-body font-semibold text-charcoal mb-4">Your Proposal</h3>
-                {!myGuideOffer ? (
+                {(!myGuideOffer || isEditingOffer) ? (
                   <div className="flex flex-col gap-4">
                     <Input 
                       type="number" 
@@ -599,19 +616,45 @@ export default function ListingDetailPage() {
                       value={proposedPrice}
                       onChange={(e) => setProposedPrice(e.target.value)}
                     />
-                    <Button variant="primary" onClick={handleSubmitOffer} disabled={isSubmittingOffer || !proposedPrice}>
-                      {isSubmittingOffer ? <Spinner /> : 'Submit Offer'}
-                    </Button>
+                    <textarea
+                      placeholder="Introductory message (optional)... e.g. Hi, I'm a local expert in this area!"
+                      value={introMessage}
+                      onChange={(e) => setIntroMessage(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-border bg-white text-charcoal font-body focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber resize-none h-24 text-[14px]"
+                    />
+                    <div className="flex gap-3">
+                      {isEditingOffer && (
+                        <Button variant="ghost" onClick={() => setIsEditingOffer(false)} className="flex-1">
+                          Cancel
+                        </Button>
+                      )}
+                      <Button variant="primary" onClick={handleSubmitOffer} disabled={isSubmittingOffer || !proposedPrice} className="flex-1">
+                        {isSubmittingOffer ? <Spinner /> : isEditingOffer ? 'Update Offer' : 'Submit Offer'}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between p-4 bg-warmwhite rounded-lg border border-border">
-                    <div>
-                      <p className="text-sm text-secondary">Submitted Quote</p>
-                      <p className="text-amber font-bold text-lg">{formatMYR(myGuideOffer.proposed_price)}</p>
-                      <StatusBadge status={myGuideOffer.status} />
+                  <div className="flex flex-col gap-4">
+                    <div className="p-4 bg-warmwhite rounded-lg border border-border flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-secondary">Submitted Quote</p>
+                          <p className="text-amber font-bold text-lg">{formatMYR(myGuideOffer.proposed_price)}</p>
+                        </div>
+                        <StatusBadge status={myGuideOffer.status} />
+                      </div>
+                      {myGuideOffer.intro_message && (
+                        <div className="pt-3 border-t border-border/50">
+                          <p className="text-[11px] font-bold text-secondary uppercase tracking-widest mb-1">Intro Message</p>
+                          <p className="text-[13px] text-charcoal leading-relaxed">{myGuideOffer.intro_message}</p>
+                        </div>
+                      )}
                     </div>
                     {myGuideOffer.status === 'pending' && (
-                      <Button variant="ghost" onClick={() => handleWithdrawOffer(myGuideOffer.id)}>Withdraw Offer</Button>
+                      <div className="flex gap-3">
+                        <Button variant="ghost" onClick={handleEditOfferClick} className="flex-1 border border-border/50">Edit Offer</Button>
+                        <Button variant="ghost" onClick={() => handleWithdrawOffer(myGuideOffer.id)} className="flex-1 text-error hover:bg-red-50 hover:text-red-700">Withdraw Offer</Button>
+                      </div>
                     )}
                   </div>
                 )}
