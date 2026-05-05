@@ -208,7 +208,7 @@ function NewListingContent() {
     return (
       <div className="max-w-md mx-auto text-center py-20">
         <p className="text-secondary mb-6">You need to save an itinerary first.</p>
-        <Button variant="primary" onClick={() => router.push('/itinerary')}>
+        <Button variant="primary" onClick={() => router.push('/quiz')}>
           Create an Itinerary
         </Button>
       </div>

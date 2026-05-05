@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         if (!guide) {
           return NextResponse.redirect(`${origin}/auth/onboarding/guide`)
         } else {
-          return NextResponse.redirect(`${origin}/guide`)
+          return NextResponse.redirect(`${origin}/`)
         }
       } else {
         const { data: traveller } = await supabase
