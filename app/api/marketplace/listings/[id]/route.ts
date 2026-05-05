@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { Client } from 'pg'
 
 export async function GET(
   request: Request,
@@ -47,11 +48,21 @@ export async function GET(
     return NextResponse.json({ error: itineraryError.message }, { status: 400 })
   }
 
-  const { data: profile } = await supabase
-    .from('traveller_profiles')
-    .select('full_name')
-    .eq('user_id', data.user_id)
-    .single()
+  let travellerName = 'Anonymous Traveller'
+  try {
+    const client = new Client({ connectionString: process.env.DATABASE_URL })
+    await client.connect()
+    const profileResult = await client.query(
+      'SELECT full_name FROM public.traveller_profiles WHERE user_id = $1::uuid LIMIT 1',
+      [data.user_id]
+    )
+    await client.end()
+    if (profileResult.rows?.[0]?.full_name) {
+      travellerName = profileResult.rows[0].full_name
+    }
+  } catch {
+    travellerName = 'Anonymous Traveller'
+  }
 
   const formattedData = {
     ...data,
@@ -59,7 +70,7 @@ export async function GET(
     itinerary_title: itinerary?.title || 'Untitled Itinerary',
     itinerary_content: itinerary?.content || null,
     trip_metadata: itinerary?.trip_metadata || null,
-    traveller_name: profile?.full_name || 'Anonymous Traveller'
+    traveller_name: travellerName
   }
 
   return NextResponse.json(formattedData)
@@ -102,6 +113,7 @@ export async function PATCH(
 
   const { data, error } = await supabase
     .from('marketplace_listings')
+    .update({ status })
     .select(`
       *,
       destinations(city,country)

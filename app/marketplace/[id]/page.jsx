@@ -81,11 +81,6 @@ export default function ListingDetailPage() {
           setOffers(offersData)
         }
 
-        const msgRes = await fetch(`/api/marketplace/messages/${listingId}`)
-        if (msgRes.ok) {
-          const msgData = await msgRes.json()
-          setMessages(msgData)
-        }
       } catch (err) {
         setError(err.message || 'Failed to load data.')
       } finally {
@@ -225,7 +220,43 @@ export default function ListingDetailPage() {
         const data = await res.json()
         throw new Error(data.error || 'Failed to submit offer')
       }
-      window.location.reload()
+      const offerResponse = await res.json()
+      const currentOfferId = isEditingOffer ? myGuideOffer.id : offerResponse.id
+      const currentGuideId = isEditingOffer ? myGuideOffer.guide_id : offerResponse.guide_id
+
+      const offerCardRes = await fetch('/api/marketplace/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offer_id: currentOfferId,
+          sender_id: user.id,
+          sender_type: user.role,
+          content: `__OFFER_PRICE__:${parseFloat(proposedPrice)}`
+        })
+      })
+      if (!offerCardRes.ok) {
+        const cardErr = await offerCardRes.json().catch(() => ({}))
+        throw new Error(cardErr.error || 'Failed to write offer card to chat.')
+      }
+
+      if (introMessage?.trim()) {
+        const introRes = await fetch('/api/marketplace/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            offer_id: currentOfferId,
+            sender_id: user.id,
+            sender_type: user.role,
+            content: introMessage.trim()
+          })
+        })
+        if (!introRes.ok) {
+          const introErr = await introRes.json().catch(() => ({}))
+          throw new Error(introErr.error || 'Failed to send intro message to chat.')
+        }
+      }
+
+      router.push(`/marketplace/${listingId}/chat?guide=${currentGuideId}`)
     } catch (err) {
       setError(err.message || 'Failed to submit offer.')
       setIsSubmittingOffer(false)
@@ -261,7 +292,7 @@ export default function ListingDetailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          listing_id: listingId,
+          offer_id: myGuideOffer?.id,
           sender_id: user.id,
           sender_type: user.role, // 'traveler' or 'guide'
           content: chatMessage
@@ -668,7 +699,7 @@ export default function ListingDetailPage() {
                    )}
                    {myGuideOffer.status !== 'withdrawn' && (
                      <div className="pt-4">
-                       <button onClick={() => window.location.href = `/marketplace/${listingId}/chat`} className="w-full py-3.5 bg-charcoal text-white rounded-xl font-bold text-[14px] shadow-md hover:bg-black transition-colors">
+                       <button onClick={() => window.location.href = `/marketplace/${listingId}/chat?guide=${myGuideOffer.guide_id}`} className="w-full py-3.5 bg-charcoal text-white rounded-xl font-bold text-[14px] shadow-md hover:bg-black transition-colors">
                          Open Chat
                        </button>
                      </div>

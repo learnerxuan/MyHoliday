@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
 import Avatar from '@/components/ui/Avatar'
-import StatusBadge from '@/components/ui/StatusBadge'
 
 // Reusable Dark Header matching the Mockup
 function DarkHeader({ tag, title, description, children }) {
@@ -68,7 +67,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [listing, setListing] = useState(null)
-  const [offer, setOffer] = useState(null)
+  const [activeOffer, setActiveOffer] = useState(null)
   const [messages, setMessages] = useState([])
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMsg, setIsSendingMsg] = useState(false)
@@ -87,36 +86,63 @@ export default function ChatPage() {
         const role = currentUser.user_metadata?.role || 'traveler'
         setUser({ id: currentUser.id, role })
 
-        // Guide viewing their own chat vs Traveller viewing a specific guide's chat
-        const guideIdToFetch = role === 'guide' ? currentUser.id : targetGuideId
-
-        if (!guideIdToFetch) {
-           throw new Error('Guide ID is required to open a chat.')
+        let guideIdToFetch = targetGuideId
+        if (role === 'guide') {
+          const { data: guideData, error: guideErr } = await supabase
+            .from('tour_guides')
+            .select('id')
+            .eq('user_id', currentUser.id)
+            .single()
+          if (guideErr || !guideData?.id) throw new Error('Guide profile not found.')
+          guideIdToFetch = guideData.id
         }
 
-        const [listingRes, offersRes, msgRes] = await Promise.all([
-           fetch(`/api/marketplace/listings/${listingId}`),
-           fetch(`/api/marketplace/offers/${listingId}`),
-           fetch(`/api/marketplace/messages/${listingId}`)
+        const [listingRes, offersRes] = await Promise.all([
+          fetch(`/api/marketplace/listings/${listingId}`),
+          fetch(`/api/marketplace/offers/${listingId}`)
         ])
 
         if (!listingRes.ok) throw new Error('Failed to load listing')
         const listingData = await listingRes.json()
+
+        if ((!listingData?.traveller_name || listingData.traveller_name === 'Anonymous Traveller') && listingData?.user_id) {
+          const profileRes = await fetch('/api/marketplace/profiles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userIds: [listingData.user_id] })
+          })
+          if (profileRes.ok) {
+            const profileRows = await profileRes.json()
+            if (Array.isArray(profileRows) && profileRows[0]?.full_name) {
+              listingData.traveller_name = profileRows[0].full_name
+            }
+          }
+        }
         setListing(listingData)
 
-        if (offersRes.ok) {
-           const offersData = await offersRes.json()
-           const matchedOffer = offersData.find(o => o.guide_id === guideIdToFetch)
-           if (matchedOffer) setOffer(matchedOffer)
+        if (!offersRes.ok) throw new Error('Failed to load offers')
+        const offersData = await offersRes.json()
+
+        let chosenOffer = null
+        if (role === 'guide') {
+          chosenOffer = offersData.find(o => o.guide_id === guideIdToFetch)
+        } else if (guideIdToFetch) {
+          chosenOffer = offersData.find(o => o.guide_id === guideIdToFetch)
+        } else {
+          chosenOffer = offersData.find(o => o.status === 'pending') || offersData[0]
         }
 
+        if (!chosenOffer) {
+          throw new Error('No active offer found for this chat.')
+        }
+
+        setActiveOffer(chosenOffer)
+
+        const msgRes = await fetch(`/api/marketplace/messages/${chosenOffer.id}`)
         if (msgRes.ok) {
-           const msgData = await msgRes.json()
-           // Filter messages to only show those between this listing + this guide
-           const filteredMsgs = msgData.filter(m => m.guide_id === guideIdToFetch)
-           setMessages(filteredMsgs)
+          const msgData = await msgRes.json()
+          setMessages(msgData || [])
         }
-
       } catch (err) {
         setError(err.message || 'Failed to load data.')
       } finally {
@@ -134,17 +160,17 @@ export default function ChatPage() {
   }, [messages])
 
   const handleSendMessage = async () => {
-    if (!chatMessage.trim() || !user || !offer) return
+    if (!chatMessage.trim() || !user || !activeOffer) return
     setIsSendingMsg(true)
     try {
       const res = await fetch('/api/marketplace/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          listing_id: listingId,
-          guide_id: offer.guide_id,
+          offer_id: activeOffer.id,
           sender_id: user.id,
-          message: chatMessage.trim()
+          sender_type: user.role,
+          content: chatMessage.trim()
         })
       })
       if (!res.ok) throw new Error('Failed to send message')
@@ -170,9 +196,11 @@ export default function ChatPage() {
     return <div className="py-20 flex justify-center text-error">{error}</div>
   }
 
-  if (!offer) {
+  if (!activeOffer) {
      return <div className="py-20 flex justify-center text-secondary">No active offer found for this chat.</div>
   }
+
+  const isOfferPriceMessage = (msg) => typeof msg?.content === 'string' && msg.content.startsWith('__OFFER_PRICE__:')
 
   return (
     <main className="bg-[#FAF9F7] min-h-screen pt-24 pb-24 px-4 sm:px-6 lg:px-8">
@@ -185,7 +213,7 @@ export default function ChatPage() {
         </div>
 
         <DarkHeader 
-          tag={offer.status === 'pending' ? 'In Progress' : offer.status} 
+          tag={activeOffer.status === 'pending' ? 'In Progress' : activeOffer.status} 
           title="Chat with Tour Guide" 
           description="Communicate securely to finalize trip details and negotiate the final pricing." 
         />
@@ -198,14 +226,14 @@ export default function ChatPage() {
                  Current Offer
                </div>
                <h3 className="font-display font-extrabold text-[24px] text-charcoal leading-tight mb-6">
-                 {formatMYR(offer.proposed_price)}
+                 {formatMYR(activeOffer.proposed_price)}
                </h3>
 
                <div className="space-y-4 mb-8">
                  <div>
                    <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Tour Guide</div>
                    <div className="text-[14px] font-bold text-charcoal flex items-center gap-2">
-                     {offer.guide_name || 'Guide'} <span className="bg-[#EAF3DE] text-[#3B6D11] px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider font-extrabold">Verified</span>
+                     {activeOffer.guide_name || 'Guide'} <span className="bg-[#EAF3DE] text-[#3B6D11] px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider font-extrabold">Verified</span>
                    </div>
                  </div>
                  <div>
@@ -224,20 +252,35 @@ export default function ChatPage() {
              {/* Chat header */}
              <div className="px-8 py-5 border-b border-[#E5E0DA] bg-white flex justify-between items-center z-10">
                <div className="flex items-center gap-3">
-                  <Avatar name={offer.guide_name || 'Guide'} size="md" />
+                 <Avatar name={isGuide ? listing?.traveller_name || 'Traveller' : activeOffer.guide_name || 'Guide'} size="md" />
                   <div>
-                    <div className="font-bold text-[14px] text-charcoal leading-tight">{offer.guide_name || 'Tour Guide'}</div>
+                   <div className="font-bold text-[14px] text-charcoal leading-tight">{isGuide ? listing?.traveller_name || 'Traveller' : activeOffer.guide_name || 'Tour Guide'}</div>
                     <div className="text-[11px] text-[#059669] font-medium flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#059669]"></span> Available
                     </div>
                   </div>
                </div>
-               {isTraveller && offer.status === 'pending' && (
-                 <button className="px-5 py-2.5 bg-amber hover:bg-[#E08A1E] text-white text-[12px] font-bold rounded-lg shadow-sm transition-all focus:ring-2 focus:ring-amber/40 outline-none">
-                   Accept {formatMYR(offer.proposed_price)}
+               {isTraveller && activeOffer.status === 'pending' && (
+                 <button
+                   onClick={async () => {
+                     await fetch(`/api/marketplace/offers/${activeOffer.id}`, {
+                       method: 'PATCH',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({ status: 'accepted' })
+                     })
+                     await fetch(`/api/marketplace/listings/${listingId}`, {
+                       method: 'PATCH',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({ status: 'confirmed' })
+                     })
+                     router.push(`/marketplace/${listingId}`)
+                   }}
+                   className="px-5 py-2.5 bg-amber hover:bg-[#E08A1E] text-white text-[12px] font-bold rounded-lg shadow-sm transition-all focus:ring-2 focus:ring-amber/40 outline-none"
+                 >
+                   Accept {formatMYR(activeOffer.proposed_price)}
                  </button>
                )}
-               {isGuide && offer.status === 'pending' && (
+               {isGuide && activeOffer.status === 'pending' && (
                  <button className="px-5 py-2.5 bg-[#F0EBE3] text-charcoal text-[12px] font-bold rounded-lg shadow-sm transition-all">
                    Offer Pending
                  </button>
@@ -255,12 +298,22 @@ export default function ChatPage() {
                 ) : (
                   messages.map((msg, idx) => {
                     const isMine = msg.sender_id === user?.id
+                    if (isOfferPriceMessage(msg)) {
+                      const amount = msg.content.split(':')[1]
+                      return (
+                        <div key={msg.id || idx} className="flex justify-center my-2">
+                          <div className="bg-[#FFFDF5] border border-amber/20 px-4 py-2 rounded-xl text-[12px] text-amberdark font-medium">
+                            Offer submitted: {formatMYR(amount)}
+                          </div>
+                        </div>
+                      )
+                    }
                     return (
-                      <div key={idx} className={`flex gap-3 max-w-[85%] ${isMine ? 'self-end ms-auto flex-row-reverse' : ''}`}>
-                        <Avatar name={isMine ? 'Me' : (isGuide ? 'Traveller' : offer.guide_name)} size="sm" />
+                      <div key={msg.id || idx} className={`flex gap-3 max-w-[85%] ${isMine ? 'self-end ms-auto flex-row-reverse' : ''}`}>
+                        <Avatar name={isMine ? 'Me' : (isGuide ? 'Traveller' : activeOffer.guide_name)} size="sm" />
                         <div className={`flex flex-col ${isMine ? 'items-end' : ''}`}>
                           <div className={`${isMine ? 'bg-charcoal text-white rounded-tr-sm' : 'bg-white border border-[#E5E0DA] text-charcoal rounded-tl-sm'} rounded-2xl px-5 py-3.5 text-[14px] leading-relaxed shadow-sm`}>
-                            {msg.message}
+                            {msg.content}
                           </div>
                           <div className="text-[10px] text-secondary/60 font-medium mt-1.5 px-1 flex items-center gap-1">
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -280,13 +333,13 @@ export default function ChatPage() {
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    disabled={isSendingMsg || offer.status === 'withdrawn'}
-                    placeholder={offer.status === 'withdrawn' ? "Offer is withdrawn." : "Type your message..."} 
+                    disabled={isSendingMsg || activeOffer.status === 'withdrawn'}
+                    placeholder={activeOffer.status === 'withdrawn' ? "Offer is withdrawn." : "Type your message..."} 
                     className="w-full bg-[#FAF9F7] border border-[#E5E0DA] rounded-xl pl-5 pr-14 py-3.5 text-[14px] text-charcoal focus:outline-none focus:border-amber focus:ring-2 focus:ring-amber/10 transition-all placeholder:text-secondary/60 disabled:opacity-50"
                   />
                   <button 
                     onClick={handleSendMessage}
-                    disabled={isSendingMsg || !chatMessage.trim() || offer.status === 'withdrawn'}
+                    disabled={isSendingMsg || !chatMessage.trim() || activeOffer.status === 'withdrawn'}
                     className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-amber hover:text-amberdark hover:bg-amber/10 rounded-lg transition-colors disabled:opacity-50"
                   >
                     {isSendingMsg ? <Spinner className="w-4 h-4 border-2" /> : <span className="text-[20px] leading-none mb-1">↗</span>}

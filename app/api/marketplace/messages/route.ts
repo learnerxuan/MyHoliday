@@ -12,19 +12,24 @@ export async function POST(request: Request) {
 
   const body = await request.json()
 
-  const { listing_id, sender_id, sender_type, content } = body
+  const { offer_id, sender_id, sender_type, content } = body
 
-  if (!listing_id || !sender_id || !sender_type || !content) {
+  if (!offer_id || !sender_type || !content) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+  }
+
+  const normalizedSenderType = sender_type === 'traveller' ? 'traveler' : sender_type
+  if (!['traveler', 'guide'].includes(normalizedSenderType)) {
+    return NextResponse.json({ error: 'Invalid sender_type' }, { status: 400 })
   }
 
   const { data, error } = await supabase
     .from('marketplace_messages')
     .insert([
       {
-        listing_id,
-        sender_id,
-        sender_type,
+        offer_id,
+        sender_id: sender_id || user.id,
+        sender_type: normalizedSenderType,
         content
       }
     ])

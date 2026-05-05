@@ -71,8 +71,8 @@ export default async function GuideLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-warmwhite pt-24 px-4 sm:px-8 font-body">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-warmwhite pt-6 sm:pt-10 px-4 sm:px-6 pb-20 font-body">
+      <div className="max-w-7xl mx-auto">
         {children}
       </div>
     </div>

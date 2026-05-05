@@ -1,6 +1,44 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+export async function GET(request: Request) {
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const scope = searchParams.get('scope')
+
+  if (scope === 'mine') {
+    const { data: guideData, error: guideError } = await supabase
+      .from('tour_guides')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (guideError || !guideData?.id) {
+      return NextResponse.json({ error: 'Tour guide profile not found' }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from('marketplace_offers')
+      .select('*')
+      .eq('guide_id', guideData.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json(data || [])
+  }
+
+  return NextResponse.json({ error: 'Unsupported scope' }, { status: 400 })
+}
+
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient()
 

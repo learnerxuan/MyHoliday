@@ -108,14 +108,16 @@ export default function SubmitOfferPage() {
     setIsSubmitting(true)
 
     try {
+      const normalizedMessage = message.trim()
+
       // 1. Submit Offer
       const offerRes = await fetch('/api/marketplace/offers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listing_id: listingId,
-          guide_id: user.id,
-          proposed_price: parseFloat(proposedPrice)
+          proposed_price: parseFloat(proposedPrice),
+          intro_message: normalizedMessage || null
         })
       })
 
@@ -124,22 +126,44 @@ export default function SubmitOfferPage() {
          throw new Error(errData.error || 'Failed to submit offer.')
       }
 
-      // 2. Submit Introductory Message (if any)
-      if (message.trim()) {
-        await fetch('/api/marketplace/messages', {
+      const offerData = await offerRes.json()
+
+      // 2. Seed chat with offer price card
+      const offerCardRes = await fetch('/api/marketplace/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offer_id: offerData.id,
+          sender_id: user.id,
+          sender_type: user.role,
+          content: `__OFFER_PRICE__:${parseFloat(proposedPrice)}`
+        })
+      })
+      if (!offerCardRes.ok) {
+        const cardErr = await offerCardRes.json().catch(() => ({}))
+        throw new Error(cardErr.error || 'Failed to write offer card to chat.')
+      }
+
+      // 3. Submit Introductory Message (if any)
+      if (normalizedMessage) {
+        const introRes = await fetch('/api/marketplace/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            listing_id: listingId,
+            offer_id: offerData.id,
             sender_id: user.id,
             sender_type: user.role,
-            content: message.trim()
+            content: normalizedMessage
           })
         })
+        if (!introRes.ok) {
+          const introErr = await introRes.json().catch(() => ({}))
+          throw new Error(introErr.error || 'Failed to write intro message to chat.')
+        }
       }
 
-      // Redirect back to marketplace or listing details
-      router.push(`/marketplace/${listingId}`)
+      // Redirect guide directly into this offer's chat thread
+      router.push(`/marketplace/${listingId}/chat?guide=${offerData.guide_id}`)
 
     } catch (err) {
       setError(err.message)
