@@ -146,6 +146,7 @@ export default function MarketplacePage() {
             destination_id,
             desired_budget,
             status,
+            is_suspended,
             created_at,
             destinations ( city, country ),
             marketplace_offers ( id, status, guide_id, proposed_price, tour_guides ( full_name ) )
@@ -205,7 +206,9 @@ export default function MarketplacePage() {
           }
         }
 
-        const formattedListings = (listingsData || []).map((l) => {
+        const formattedListings = (listingsData || [])
+          .filter(l => !(role === 'guide' && l.is_suspended))
+          .map((l) => {
           const itinerary = itineraryMap[l.itinerary_id]
           const rawContent = itinerary?.content
 
@@ -250,7 +253,9 @@ export default function MarketplacePage() {
           const offers = l.marketplace_offers || []
 
           let displayStatus = l.status
-          if (l.status === 'open') {
+          if (l.is_suspended) {
+            displayStatus = 'suspended'
+          } else if (l.status === 'open') {
             displayStatus = offers.length > 0 ? 'has_offers' : 'awaiting'
           }
 

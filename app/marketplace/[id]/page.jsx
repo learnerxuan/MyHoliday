@@ -74,6 +74,10 @@ export default function ListingDetailPage() {
           throw new Error(listingData.error || 'Failed to load listing')
         }
 
+        if (currentUser.user_metadata?.role === 'guide' && listingData.is_suspended) {
+          throw new Error('This listing is no longer available.')
+        }
+
         setListing(listingData)
 
         const offersRes = await fetch(`/api/marketplace/offers/${listingId}`)
@@ -322,7 +326,7 @@ export default function ListingDetailPage() {
   if (loading) return <div className="py-20 flex justify-center"><Spinner /></div>
   if (error && !listing) return <div className="py-20 text-center text-error">{error}</div>
 
-  const displayStatus = getDisplayStatus(listing.status, offers.length)
+  const displayStatus = listing.is_suspended ? 'suspended' : getDisplayStatus(listing.status, offers.length)
   const isTraveller =
     user?.role === 'traveler' || user?.role === 'traveller'
 
@@ -403,6 +407,17 @@ export default function ListingDetailPage() {
       {/* --- TRAVELLER REDESIGN HEADER --- */}
       {isTraveller ? (
         <>
+          {listing.is_suspended && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-5 sm:p-6 mb-8 flex items-start gap-4 shadow-sm">
+              <div className="text-3xl mt-1">⚠️</div>
+              <div>
+                <h3 className="text-error font-bold text-lg mb-1 tracking-tight">Listing Suspended</h3>
+                <p className="text-error/80 text-[14px] leading-relaxed">
+                  This listing has been suspended by an administrator and is no longer visible to tour guides. Please contact support for more information.
+                </p>
+              </div>
+            </div>
+          )}
           {/* Success Banner */}
           {showSuccess && (
             <div className="bg-[#EDFDF3] border border-[#BCE7D0] rounded-2xl p-5 sm:p-6 mb-8 flex items-start gap-4 shadow-sm">
@@ -426,8 +441,8 @@ export default function ListingDetailPage() {
               }}
             />
             <h2 className="text-white font-display font-extrabold text-2xl sm:text-[26px] relative z-10 tracking-wide">Listing Status</h2>
-            <div className="relative z-10 px-4 py-1.5 rounded-lg border border-[#D48C44]/40 bg-[#D48C44]/10 text-[#D48C44] text-[12px] font-black tracking-widest uppercase shadow-[0_0_15px_rgba(212,140,68,0.15)]">
-              {displayStatus === 'awaiting' ? 'AWAITING OFFERS' : displayStatus === 'has_offers' ? 'OFFERS RECEIVED' : displayStatus === 'negotiating' ? 'NEGOTIATING' : displayStatus}
+            <div className={`relative z-10 px-4 py-1.5 rounded-lg border text-[12px] font-black tracking-widest uppercase ${displayStatus === 'suspended' ? 'border-red-400/40 bg-red-400/10 text-error shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 'border-[#D48C44]/40 bg-[#D48C44]/10 text-[#D48C44] shadow-[0_0_15px_rgba(212,140,68,0.15)]'}`}>
+              {displayStatus === 'suspended' ? 'SUSPENDED' : displayStatus === 'awaiting' ? 'AWAITING OFFERS' : displayStatus === 'has_offers' ? 'OFFERS RECEIVED' : displayStatus === 'negotiating' ? 'NEGOTIATING' : displayStatus}
             </div>
           </div>
 

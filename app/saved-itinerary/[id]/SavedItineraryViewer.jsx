@@ -157,11 +157,11 @@ export default function SavedItineraryViewer() {
   const getBudgetStyle = (budget) => {
     if (!budget) return 'bg-white text-secondary border-border/50';
     const b = budget.toLowerCase();
-    if (b.includes('economy') || b.includes('budget')) 
+    if (b.includes('economy') || b.includes('budget'))
       return 'bg-success-bg text-success border-success/10';
-    if (b.includes('mid-range') || b.includes('balanced') || b.includes('midrange')) 
+    if (b.includes('mid-range') || b.includes('balanced') || b.includes('midrange'))
       return 'bg-warning-bg text-warning border-warning/10';
-    if (b.includes('luxury')) 
+    if (b.includes('luxury'))
       return 'bg-muted text-amberdark border-amberdark/10';
     return 'bg-white text-secondary border-border/50';
   }
@@ -263,11 +263,18 @@ export default function SavedItineraryViewer() {
     return () => handleUnload()
   }, [])
 
+  const searchParams = require('next/navigation').useSearchParams()
+  const isAdmin = searchParams.get('admin') === 'true'
+
   const handleBack = async () => {
     if (isDirty) {
       await handleSaveToDB()
     }
-    router.push('/itineraries')
+    if (isAdmin) {
+      router.push('/admin/marketplace')
+    } else {
+      router.push('/itineraries')
+    }
   }
 
   const handleRevertToChat = async () => {
@@ -300,7 +307,7 @@ export default function SavedItineraryViewer() {
         .from('chat_sessions')
         .update({ status: 'active' })
         .eq('id', sessionId)
-      
+
       if (sessionError) throw sessionError
 
       // 3. Delete this saved itinerary record
@@ -308,7 +315,7 @@ export default function SavedItineraryViewer() {
         .from('itineraries')
         .delete()
         .eq('id', id)
-      
+
       if (deleteError) throw deleteError
 
       // 4. Redirect to Planner
@@ -321,11 +328,11 @@ export default function SavedItineraryViewer() {
   }
 
   const handleDownloadJSON = () => {
-    const data = JSON.stringify({ 
-      title, 
+    const data = JSON.stringify({
+      title,
       destination: { city: destination?.city, country: destination?.country },
-      itinerary, 
-      trip_metadata: tripMetadata 
+      itinerary,
+      trip_metadata: tripMetadata
     }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -339,7 +346,7 @@ export default function SavedItineraryViewer() {
 
   const handleDownloadPDF = () => {
     setShowDownloadMenu(false);
-    
+
     // Sort days numerically
     const dayKeys = Object.keys(itinerary).sort((a, b) => {
       const numA = parseInt(a.replace('day', ''));
@@ -448,12 +455,12 @@ export default function SavedItineraryViewer() {
               Group Size: ${tripMetadata.group_size}<br/>
               ${tripMetadata.travel_date_start ? `
                 Dates: ${(() => {
-                  const [y, m, d] = tripMetadata.travel_date_start.split('-').map(Number);
-                  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-                })()} - ${(() => {
-                  const [y, m, d] = tripMetadata.travel_date_end.split('-').map(Number);
-                  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-                })()}
+            const [y, m, d] = tripMetadata.travel_date_start.split('-').map(Number);
+            return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+          })()} - ${(() => {
+            const [y, m, d] = tripMetadata.travel_date_end.split('-').map(Number);
+            return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+          })()}
               ` : ''}
             ` : ''}
           </div>
@@ -507,7 +514,7 @@ export default function SavedItineraryViewer() {
 
   if (loading) {
     return (
-      <div 
+      <div
         className="w-full flex items-center justify-center bg-warmwhite -mt-7 md:-mt-6"
         style={{ height: isMobile ? 'calc(100dvh - 36px)' : 'calc(100dvh - 40px)' }}
       >
@@ -520,8 +527,8 @@ export default function SavedItineraryViewer() {
   }
 
   return (
-    <div 
-      className="w-full flex flex-col bg-warmwhite overflow-hidden -mt-7 md:-mt-6" 
+    <div
+      className="w-full flex flex-col bg-warmwhite overflow-hidden -mt-7 md:-mt-6"
       style={{ height: isMobile ? 'calc(100dvh - 36px)' : 'calc(100dvh - 40px)' }}
     >
 
@@ -554,7 +561,7 @@ export default function SavedItineraryViewer() {
               {revertError}
             </div>
           )}
-          
+
           {userRole !== 'guide' && (
             <>
               <button
@@ -592,8 +599,8 @@ export default function SavedItineraryViewer() {
             </button>
             {showDownloadMenu && (
               <>
-                <div 
-                  className="fixed inset-0 z-40" 
+                <div
+                  className="fixed inset-0 z-40"
                   onClick={() => setShowDownloadMenu(false)}
                 />
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-border rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-200">
@@ -690,7 +697,7 @@ export default function SavedItineraryViewer() {
       {tripMetadata && (
         <div className="pl-3 sm:pl-4 pr-4 sm:pr-6 py-1.5 border-b border-border/40 bg-white shrink-0 flex items-center gap-2 sm:gap-4 text-xs font-body text-charcoal font-medium z-10 overflow-x-auto scrollbar-none">
           {tripMetadata.travel_date_start && tripMetadata.travel_date_end && (
-            <span 
+            <span
               className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
               style={{ backgroundColor: '#F0EBE3' }}
             >
@@ -707,7 +714,7 @@ export default function SavedItineraryViewer() {
             </span>
           )}
           {tripMetadata.trip_days && (
-            <span 
+            <span
               className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
               style={{ backgroundColor: '#F0EBE3' }}
             >
@@ -721,7 +728,7 @@ export default function SavedItineraryViewer() {
             </span>
           )}
           {tripMetadata.pace && (
-            <span 
+            <span
               className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
               style={{ backgroundColor: '#F0EBE3' }}
             >
@@ -730,7 +737,7 @@ export default function SavedItineraryViewer() {
             </span>
           )}
           {tripMetadata.group_size && (
-            <span 
+            <span
               className="flex items-center gap-1.5 px-2 rounded border border-border/40 text-secondary text-[10px] font-bold uppercase leading-none h-[22px]"
               style={{ backgroundColor: '#F0EBE3' }}
             >
@@ -776,7 +783,7 @@ export default function SavedItineraryViewer() {
             </button>
           )
         })}
-        </div>
+      </div>
 
       {/* Main content — Split on desktop, tabbed on mobile */}
       <div className="flex flex-1 overflow-hidden">

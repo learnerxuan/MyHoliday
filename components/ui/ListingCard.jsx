@@ -45,6 +45,7 @@ export default function ListingCard({
             {tag}
           </span>
         ))}
+        {displayStatus === 'suspended' && <span className="px-3 py-1.5 bg-red-50 border border-red-200 text-error text-xs font-bold rounded-lg tracking-wide">Suspended</span>}
         {displayStatus === 'has_offers' && <span className="px-3 py-1.5 bg-[#FFF9E5] border border-[#FDE68A] text-[#D48C44] text-xs font-bold rounded-lg tracking-wide">Offers Received</span>}
         {displayStatus === 'awaiting' && <span className="px-3 py-1.5 bg-[#F3F4F6] border border-[#E5E7EB] text-[#9CA3AF] text-xs font-bold rounded-lg tracking-wide">Awaiting Offers</span>}
         {displayStatus === 'negotiating' && <span className="px-3 py-1.5 bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] text-xs font-bold rounded-lg tracking-wide">Negotiating</span>}
@@ -56,7 +57,9 @@ export default function ListingCard({
 
       {/* Footer Row */}
       <div className="min-h-[48px] flex items-center">
-        {guideInfo ? (
+        {displayStatus === 'suspended' ? (
+          <p className="text-[13px] text-error font-medium w-full text-left">This listing is suspended.</p>
+        ) : guideInfo ? (
            <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-[#B48F60] border-2 border-[#E7DCCA] text-white flex items-center justify-center font-bold shadow-sm">
