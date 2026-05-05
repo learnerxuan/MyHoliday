@@ -1,20 +1,45 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import MarketplaceLiveStats from '@/components/admin/MarketplaceLiveStats'
+import LiveNoOffersCard from '@/components/admin/LiveNoOffersCard'
+import LiveOverviewStats from '@/components/admin/LiveOverviewStats'
 
 export default async function AdminDashboardPage() {
   const supabase = await createSupabaseServerClient()
   
-  const { count, error } = await supabase
+  const { count: travellerCount } = await supabase
     .from('traveller_profiles')
     .select('*', { count: 'exact', head: true })
-
-  const totalTravellers = count || 0
 
   const { count: guidesCount } = await supabase
     .from('tour_guides')
     .select('*', { count: 'exact', head: true })
     .eq('verification_status', 'approved')
 
-  const totalApprovedGuides = guidesCount || 0
+  // ── Return Customers ──
+  const { data: itinUsers } = await supabase.from('itineraries').select('user_id')
+  const userCounts: Record<string, number> = {}
+  itinUsers?.forEach(item => {
+    userCounts[item.user_id] = (userCounts[item.user_id] || 0) + 1
+  })
+  const initialReturnCustomers = Object.values(userCounts).filter(count => count > 1).length
+
+  // ── Marketplace stats (Initial values for hydration) ──
+  const { count: listingsCount } = await supabase
+    .from('marketplace_listings')
+    .select('*', { count: 'exact', head: true })
+
+  const { data: allOffers } = await supabase
+    .from('marketplace_offers')
+    .select('id, listing_id, status')
+
+  // Calculate initial "No Offers" count for server hydration
+  let initialNoOffers = 0
+  if (listingsCount !== null && allOffers) {
+    const { data: listingIdsData } = await supabase.from('marketplace_listings').select('id')
+    const listingIds = (listingIdsData || []).map(l => l.id)
+    const offerListingIds = new Set(allOffers.map(o => o.listing_id))
+    initialNoOffers = listingIds.filter(id => !offerListingIds.has(id)).length
+  }
 
   // Fetch top 3 most clicked destinations using the API (bypassing IPv6 issues)
   let topDestinations: any[] = []
@@ -56,23 +81,23 @@ export default async function AdminDashboardPage() {
 
   return (
     <main className="min-h-screen bg-warmwhite p-8">
-      <div className="max-w-4xl mx-auto font-body text-charcoal">
+      <div className="max-w-5xl mx-auto font-body text-charcoal">
         <h1 className="text-3xl font-display font-extrabold mb-8">Admin Dashboard</h1>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Total Travellers</h2>
-            <div className="text-4xl font-display font-black text-slate-800">
-              {totalTravellers}
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Approved Guides</h2>
-            <div className="text-4xl font-display font-black text-slate-800">
-              {totalApprovedGuides}
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <LiveOverviewStats 
+            initialTravellers={travellerCount || 0}
+            initialGuides={guidesCount || 0}
+            initialReturnCustomers={initialReturnCustomers}
+          />
+          <LiveNoOffersCard initialCount={initialNoOffers} />
         </div>
+
+        {/* ── Marketplace Activity (LIVE) ── */}
+        <MarketplaceLiveStats 
+          initialListingsCount={listingsCount || 0} 
+          initialOffers={allOffers || []} 
+        />
 
         <section className="bg-white p-8 rounded-3xl shadow-md border border-gray-100">
           <div className="flex items-center justify-between mb-6">
