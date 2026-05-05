@@ -562,7 +562,7 @@ export default function SavedItineraryViewer() {
             </div>
           )}
 
-          {userRole !== 'guide' && (
+          {!isAdmin && userRole !== 'guide' && (
             <>
               <button
                 onClick={() => router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`)}
@@ -577,17 +577,21 @@ export default function SavedItineraryViewer() {
             </>
           )}
 
-          <button
-            onClick={handleRevertToChat}
-            disabled={isReverting || !sessionId}
-            className="text-xs font-bold text-secondary hover:text-charcoal px-3 py-2 rounded-lg border border-border hover:border-charcoal transition-all flex items-center gap-2 disabled:opacity-40"
-            title="Move this plan back to AI Chat to continue dreaming"
-          >
-            <BackIcon />
-            <span>{isReverting ? '...' : 'Go back to AI Chat'}</span>
-          </button>
+          {!isAdmin && userRole !== 'guide' && (
+            <>
+              <button
+                onClick={handleRevertToChat}
+                disabled={isReverting || !sessionId}
+                className="text-xs font-bold text-secondary hover:text-charcoal px-3 py-2 rounded-lg border border-border hover:border-charcoal transition-all flex items-center gap-2 disabled:opacity-40"
+                title="Move this plan back to AI Chat to continue dreaming"
+              >
+                <BackIcon />
+                <span>{isReverting ? '...' : 'Go back to AI Chat'}</span>
+              </button>
 
-          <div className="h-4 w-px bg-border mx-1" />
+              <div className="h-4 w-px bg-border mx-1" />
+            </>
+          )}
 
           <div className="relative">
             <button
@@ -658,21 +662,23 @@ export default function SavedItineraryViewer() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowMobileActions(false)} />
                 <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-border rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-200">
-                  {userRole !== 'guide' && (
-                    <button
-                      onClick={() => { setShowMobileActions(false); router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`); }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
-                    >
-                      <SearchIcon /> Find Tour Guide
-                    </button>
+                  {!isAdmin && userRole !== 'guide' && (
+                    <>
+                      <button
+                        onClick={() => { setShowMobileActions(false); router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`); }}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
+                      >
+                        <SearchIcon /> Find Tour Guide
+                      </button>
+                      <button
+                        onClick={() => { setShowMobileActions(false); handleRevertToChat(); }}
+                        disabled={isReverting || !sessionId}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2 disabled:opacity-40"
+                      >
+                        <BackIcon /> {isReverting ? 'Reverting...' : 'Back to AI Chat'}
+                      </button>
+                    </>
                   )}
-                  <button
-                    onClick={() => { setShowMobileActions(false); handleRevertToChat(); }}
-                    disabled={isReverting || !sessionId}
-                    className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2 disabled:opacity-40"
-                  >
-                    <BackIcon /> {isReverting ? 'Reverting...' : 'Back to AI Chat'}
-                  </button>
                   <div className="h-px bg-border mx-3 my-1" />
                   <button
                     onClick={() => { setShowMobileActions(false); handleDownloadPDF(); }}

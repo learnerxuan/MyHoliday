@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-export async function PATCH(request, context) {
+export async function PATCH(request: Request, context: any) {
   try {
     const params = context.params ? context.params : context
     const resolvedParams = typeof params?.then === 'function' ? await params : params
@@ -44,7 +44,7 @@ export async function PATCH(request, context) {
     }
 
     return Response.json({ success: true })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Suspend listing error:', err)
     return Response.json({ error: err.message || 'Internal error' }, { status: 500 })
   }
