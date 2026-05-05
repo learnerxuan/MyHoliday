@@ -445,7 +445,7 @@ export default function ListingDetailPage() {
                     Waiting for Offers
                   </h2>
                   <p className="text-secondary/80 text-[13px] leading-relaxed max-w-[240px] mb-8">
-                    Tour guides are reviewing your itinerary. Sit tight, you'll be notified via email when an offer arrives.
+                    Tour guides are reviewing your itinerary. Sit tight, you&apos;ll be notified via email when an offer arrives.
                   </p>
                   {listing.status !== 'confirmed' && (
                     <button 
@@ -512,13 +512,169 @@ export default function ListingDetailPage() {
           </div>
         </>
       ) : (
-        /* --- ORIGINAL GUIDE / FALLBACK HEADER --- */
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <PageHeader tag="Listing Detail" title={`${listing.city_name} Trip`} />
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-secondary text-sm">Budget: {formatMYR(listing.desired_budget)}</span>
-              <StatusBadge status={displayStatus} />
+        /* --- GUIDE HEADER & OFFER SUBMISSION --- */
+        <div className="mb-12">
+          {/* Dark Header */}
+          <div 
+            className="text-warmwhite relative overflow-hidden pt-10 sm:pt-12 px-6 sm:px-12 pb-8 sm:pb-10 rounded-t-[32px] shadow-sm z-10"
+            style={{ background: '#0f0f0f' }}
+          >
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'radial-gradient(ellipse 60% 55% at 75% 20%, rgba(196,135,74,0.22) 0%, transparent 70%),' +
+                  'radial-gradient(ellipse 40% 40% at 20% 80%, rgba(196,135,74,0.10) 0%, transparent 65%)',
+              }}
+            />
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+                backgroundSize: '28px 28px',
+              }}
+            />
+            <div className="relative z-10">
+              <h1 className="text-3xl sm:text-[40px] font-extrabold text-white font-display mb-2 tracking-tight leading-tight">
+                Submit an Offer
+              </h1>
+              <p className="text-sm sm:text-[15px] font-body text-white/60 max-w-2xl leading-relaxed mt-2">
+                You are bidding on a confirmed itinerary request. Craft a competitive proposal to win this client.
+              </p>
+            </div>
+          </div>
+          
+          {/* Body: Two Panes */}
+          <div className="bg-white flex flex-col md:flex-row border-x border-b border-[#E5E0DA] rounded-b-[32px] overflow-hidden shadow-xl shadow-black/5">
+            {/* Left: Traveller Context */}
+            <div className="w-full md:w-[45%] bg-[#FAF9F7] p-8 sm:p-10 border-r border-[#E5E0DA] relative">
+              <h3 className="text-[11px] text-secondary/80 uppercase tracking-widest font-extrabold mb-6">Trip Details</h3>
+              <h4 className="font-display font-extrabold text-[28px] text-charcoal leading-tight mb-4">
+                {listingTitle}
+              </h4>
+              <div className="space-y-4">
+                <div className="flex gap-4 items-start">
+                   <div className="w-10 h-10 rounded-full bg-[#F0EBE3] flex items-center justify-center text-[16px] shrink-0">📍</div>
+                   <div>
+                      <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Location</div>
+                      <div className="text-[14px] font-bold text-charcoal">{listing.city_name}{listing.country_name ? `, ${listing.country_name}` : ''}</div>
+                   </div>
+                </div>
+                <div className="flex gap-4 items-start">
+                   <div className="w-10 h-10 rounded-full bg-[#F0EBE3] flex items-center justify-center text-[16px] shrink-0">📅</div>
+                   <div>
+                      <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Dates</div>
+                      <div className="text-[14px] font-bold text-charcoal">{formattedDateRange} <span className="text-secondary font-medium ml-1">({pax})</span></div>
+                   </div>
+                </div>
+              </div>
+              <div className="mt-8 pt-8 border-t border-border">
+                 <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-2">Target Budget</div>
+                 <div className="font-display font-extrabold text-[32px] text-charcoal">{formatMYR(listing.desired_budget)}</div>
+              </div>
+            </div>
+
+            {/* Right: Offer Form */}
+            <div className="w-full md:w-[55%] p-8 sm:p-10 bg-white relative">
+              <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber to-[#FBAE3C]"></div>
+              
+              {listing.status === 'confirmed' ? (
+                <div className="h-full flex flex-col justify-center text-center">
+                  <h3 className="text-[22px] font-display font-extrabold text-charcoal mb-2">Listing Closed</h3>
+                  <p className="text-secondary text-[13.5px]">This listing has been confirmed and is no longer accepting offers.</p>
+                </div>
+              ) : (!myGuideOffer || isEditingOffer) ? (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-[22px] font-display font-extrabold text-charcoal mb-2">Propose Your Value</h3>
+                    <p className="text-secondary text-[13.5px] leading-relaxed mb-6">Review the traveller&apos;s requirements closely. Present a competitive offer along with a personalized note.</p>
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-extrabold text-charcoal uppercase tracking-wider mb-2">
+                      Proposed Price (RM)
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[18px] font-display font-bold text-charcoal/40 group-focus-within:text-amber transition-colors">RM</div>
+                      <input 
+                        type="number" 
+                        placeholder="Your Proposed Price" 
+                        value={proposedPrice}
+                        onChange={(e) => setProposedPrice(e.target.value)}
+                        className="w-full pl-14 pr-5 py-5 bg-[#FAF9F7] border-2 border-[#E5E0DA] rounded-2xl text-[24px] font-display font-extrabold text-charcoal focus:outline-none focus:border-amber focus:bg-white focus:ring-4 focus:ring-amber/10 transition-all placeholder:text-charcoal/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <label className="block text-[12px] font-extrabold text-charcoal uppercase tracking-wider mb-2">
+                      Introductory Message <span className="text-secondary font-medium normal-case tracking-normal ml-1">(Optional)</span>
+                    </label>
+                    <textarea 
+                      rows={4}
+                      value={introMessage}
+                      onChange={(e) => setIntroMessage(e.target.value)}
+                      placeholder="e.g. Hi! I've been a verified guide here for 5 years..."
+                      className="w-full px-5 py-4 bg-[#FAF9F7] border border-[#E5E0DA] rounded-2xl text-[14px] text-charcoal focus:outline-none focus:border-amber focus:bg-white focus:ring-4 focus:ring-amber/10 transition-all resize-none placeholder:text-secondary/50 leading-relaxed"
+                    ></textarea>
+                  </div>
+                  
+                  <div className="pt-6 border-t border-border mt-8 flex justify-end gap-3 items-center">
+                     {isEditingOffer && (
+                       <button onClick={() => setIsEditingOffer(false)} className="px-6 py-3.5 text-[14px] font-bold text-secondary hover:text-charcoal transition-colors">
+                         Cancel
+                       </button>
+                     )}
+                     <button 
+                       onClick={handleSubmitOffer} 
+                       disabled={isSubmittingOffer || !proposedPrice}
+                       className="px-8 py-3.5 bg-amber hover:bg-[#E08A1E] text-white text-[14px] font-bold rounded-xl shadow-lg shadow-amber/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                     >
+                       {isSubmittingOffer ? <Spinner /> : isEditingOffer ? 'Update Offer' : 'Submit Offer'}
+                     </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                   <div>
+                     <h3 className="text-[22px] font-display font-extrabold text-charcoal mb-2">Your Proposal is Active</h3>
+                     <p className="text-secondary text-[13.5px] leading-relaxed mb-6">The traveller is reviewing your offer. You can edit or withdraw it before they make a decision.</p>
+                   </div>
+                   
+                   <div className="p-6 bg-warmwhite rounded-2xl border border-border">
+                     <div className="flex items-center justify-between mb-4">
+                       <div>
+                         <p className="text-xs text-secondary uppercase font-bold tracking-widest mb-1">Submitted Quote</p>
+                         <p className="text-amber font-display font-extrabold text-3xl">{formatMYR(myGuideOffer.proposed_price)}</p>
+                       </div>
+                       <StatusBadge status={myGuideOffer.status} />
+                     </div>
+                     {myGuideOffer.intro_message && (
+                       <div className="pt-4 border-t border-border/50">
+                         <p className="text-[11px] font-bold text-secondary uppercase tracking-widest mb-2">Intro Message</p>
+                         <p className="text-[14px] text-charcoal leading-relaxed">{myGuideOffer.intro_message}</p>
+                       </div>
+                     )}
+                   </div>
+
+                   {myGuideOffer.status === 'pending' && (
+                     <div className="flex gap-3 pt-4 border-t border-border">
+                       <button onClick={handleEditOfferClick} className="flex-1 py-3.5 border border-border/50 rounded-xl font-bold text-[14px] hover:bg-black/5 transition-colors">
+                         Edit Offer
+                       </button>
+                       <button onClick={() => handleWithdrawOffer(myGuideOffer.id)} className="flex-1 py-3.5 bg-red-50 text-error rounded-xl font-bold text-[14px] hover:bg-red-100 transition-colors">
+                         Withdraw Offer
+                       </button>
+                     </div>
+                   )}
+                   {myGuideOffer.status !== 'withdrawn' && (
+                     <div className="pt-4">
+                       <button onClick={() => window.location.href = `/marketplace/${listingId}/chat`} className="w-full py-3.5 bg-charcoal text-white rounded-xl font-bold text-[14px] shadow-md hover:bg-black transition-colors">
+                         Open Chat
+                       </button>
+                     </div>
+                   )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -534,8 +690,7 @@ export default function ListingDetailPage() {
       )}
 
       {/* POLISHED ITINERARY VIEW */}
-      {isTraveller && (
-        <div className="mb-16 w-full">
+      <div className="mb-16 w-full">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-[26px] font-display font-extrabold text-charcoal">Finalized Itinerary Plan</h3>
             <div className="text-[13px] font-extrabold text-secondary tracking-widest uppercase border border-border px-4 py-2 rounded-lg bg-white shadow-sm">
@@ -596,147 +751,6 @@ export default function ListingDetailPage() {
             ))}
           </div>
         </div>
-      )}
-
-      {/* Offers & Chat Grid */}
-      {isGuide && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* LEFT COLUMN: Offers */}
-          <div className="flex flex-col gap-8">
-            
-            {/* Guide Submission Panel (Guide View) */}
-            {listing.status !== 'confirmed' && (
-              <div className="bg-white p-6 rounded-xl border border-border">
-                <h3 className="font-body font-semibold text-charcoal mb-4">Your Proposal</h3>
-                {(!myGuideOffer || isEditingOffer) ? (
-                  <div className="flex flex-col gap-4">
-                    <Input 
-                      type="number" 
-                      placeholder="Your Proposed Price (MYR)" 
-                      value={proposedPrice}
-                      onChange={(e) => setProposedPrice(e.target.value)}
-                    />
-                    <textarea
-                      placeholder="Introductory message (optional)... e.g. Hi, I'm a local expert in this area!"
-                      value={introMessage}
-                      onChange={(e) => setIntroMessage(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-border bg-white text-charcoal font-body focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber resize-none h-24 text-[14px]"
-                    />
-                    <div className="flex gap-3">
-                      {isEditingOffer && (
-                        <Button variant="ghost" onClick={() => setIsEditingOffer(false)} className="flex-1">
-                          Cancel
-                        </Button>
-                      )}
-                      <Button variant="primary" onClick={handleSubmitOffer} disabled={isSubmittingOffer || !proposedPrice} className="flex-1">
-                        {isSubmittingOffer ? <Spinner /> : isEditingOffer ? 'Update Offer' : 'Submit Offer'}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    <div className="p-4 bg-warmwhite rounded-lg border border-border flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-secondary">Submitted Quote</p>
-                          <p className="text-amber font-bold text-lg">{formatMYR(myGuideOffer.proposed_price)}</p>
-                        </div>
-                        <StatusBadge status={myGuideOffer.status} />
-                      </div>
-                      {myGuideOffer.intro_message && (
-                        <div className="pt-3 border-t border-border/50">
-                          <p className="text-[11px] font-bold text-secondary uppercase tracking-widest mb-1">Intro Message</p>
-                          <p className="text-[13px] text-charcoal leading-relaxed">{myGuideOffer.intro_message}</p>
-                        </div>
-                      )}
-                    </div>
-                    {myGuideOffer.status === 'pending' && (
-                      <div className="flex gap-3">
-                        <Button variant="ghost" onClick={handleEditOfferClick} className="flex-1 border border-border/50">Edit Offer</Button>
-                        <Button variant="ghost" onClick={() => handleWithdrawOffer(myGuideOffer.id)} className="flex-1 text-error hover:bg-red-50 hover:text-red-700">Withdraw Offer</Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT COLUMN: Chat Window */}
-          <div className="h-[600px] flex flex-col bg-white border border-border rounded-xl overflow-hidden">
-            {/* Note: This simulates the ChatWindow component usage as specified by ZX */}
-            <ChatWindow 
-              messages={messages} 
-              currentUserRole={user?.role} 
-            />
-            <div className="p-4 border-t border-border bg-warmwhite flex gap-2">
-              <Input 
-                value={chatMessage} 
-                onChange={(e) => setChatMessage(e.target.value)} 
-                placeholder="Type a message..." 
-                className="flex-1"
-              />
-              <Button variant="primary" onClick={handleSendMessage} disabled={isSendingMsg}>
-                Send
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full">
-            <h2 className="text-lg font-bold mb-2">Withdraw Listing?</h2>
-            <p className="text-gray-600 mb-4">
-              This will remove the listing. Your itinerary will remain saved.
-            </p>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 border rounded"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleDeleteListing}
-                className="bg-red-600 text-white px-4 py-2 rounded"
-              >
-                Confirm Withdraw
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Accept Offer Modal */}
-      {showAcceptModal && selectedOffer && (
-        <Modal onClose={() => setShowAcceptModal(false)} title="Confirm Booking">
-          <p className="text-secondary text-sm mb-4">
-            You are about to accept the offer from <strong>{selectedOffer.guide_name}</strong> for <strong>{formatMYR(selectedOffer.proposed_price)}</strong>.
-          </p>
-          <div className="flex justify-end gap-3 mt-6">
-            <Button variant="ghost" onClick={() => setShowAcceptModal(false)}>Cancel</Button>
-            <Button variant="primary" onClick={confirmAcceptOffer} disabled={isProcessingTransaction}>
-              {isProcessingTransaction ? <Spinner /> : 'Confirm & Book'}
-            </Button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Bottom Navigation */}
-      <div className="mt-16 flex justify-center border-t border-border/50 pt-10">
-        <button 
-          onClick={() => router.push('/marketplace')}
-          className="px-8 py-3.5 bg-white border border-border text-charcoal font-bold text-[14px] rounded-xl hover:bg-[#FDFBF7] hover:border-amber/40 transition-colors flex items-center gap-2 shadow-sm"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Return to Marketplace
-        </button>
-      </div>
 
           </div>
         </div>

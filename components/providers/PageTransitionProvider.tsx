@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, createContext, useContext } from 'react'
+import { useEffect, useState, createContext, useContext, useMemo } from 'react'
 import { usePathname, useSearchParams, useRouter as useNextRouter } from 'next/navigation'
 
 import Spinner from '@/components/ui/Spinner'
@@ -90,7 +90,7 @@ export function useAppRouter() {
   const router = useNextRouter()
   const triggerTransition = useContext(RouterTransitionContext)
 
-  return {
+  return useMemo(() => ({
     ...router,
     push: (href: string, options?: any) => {
       if (triggerTransition) triggerTransition()
@@ -100,5 +100,5 @@ export function useAppRouter() {
       if (triggerTransition) triggerTransition()
       window.location.replace(href)
     }
-  }
+  }), [router, triggerTransition])
 }

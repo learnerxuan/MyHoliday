@@ -283,7 +283,7 @@ export default function SubmitOfferPage() {
                  Propose Your Value
                </h3>
                <p className="text-secondary text-[15px] leading-relaxed mb-10">
-                 Review the traveller's requirements closely. Present a competitive offer along with a personalized note to increase your chances of being selected.
+                 Review the traveller&apos;s requirements closely. Present a competitive offer along with a personalized note to increase your chances of being selected.
                </p>
 
                {error && <div className="mb-6 p-4 bg-error-bg text-error text-sm rounded-lg">{error}</div>}
