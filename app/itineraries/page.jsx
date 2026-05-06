@@ -219,7 +219,7 @@ export default function ItinerariesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col pt-6 sm:pt-10 px-4 sm:px-6 pb-20">
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20">
       
       {/* ── THE ISLAND CONTAINER ── */}
       <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
@@ -471,7 +471,7 @@ export default function ItinerariesPage() {
                                 <span className="text-[9px] font-extrabold text-[#D97706] uppercase tracking-wider leading-none">Listed: {offerCount} Offers</span>
                               </div>
                               <Link 
-                                href="/marketplace/manage"
+                                href={`/marketplace/${listing.id}`}
                                 className="bg-[#C4874A] text-[#FAF9F7] text-[12px] font-semibold px-4 py-2 rounded-lg hover:bg-[#8B6A3E] transition-all shadow-sm active:scale-95 whitespace-nowrap"
                               >
                                 Manage Offers

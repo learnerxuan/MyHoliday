@@ -146,7 +146,7 @@ function MessageBubble({ role, content, quickReplies = [], onSend, disabled = fa
                 h3: ({ children }) => <p className="font-semibold mt-2 mb-0.5">{children}</p>,
                 h2: ({ children }) => <p className="font-semibold mt-2 mb-0.5">{children}</p>,
                 img: () => null,
-                a: ({ children }) => <span className="text-amber underline">{children}</span>,
+                a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber underline hover:text-amberdark transition-colors">{children}</a>,
               }}
             >
               {preprocessContent(content)}

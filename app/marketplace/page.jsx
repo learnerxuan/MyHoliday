@@ -377,7 +377,7 @@ export default function MarketplacePage() {
   // --- GUIDE APPROVAL BARRIER ---
   if (isGuide && guideProfile?.verification_status !== 'approved') {
     return (
-      <div className="w-full bg-warmwhite min-h-screen font-body pb-24 pt-8 sm:pt-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full bg-warmwhite min-h-screen font-body pb-24 -mt-7 md:-mt-6 p-4 sm:p-6 lg:px-8">
       <section className="max-w-5xl mx-auto p-6 lg:p-12 bg-white rounded-[24px] shadow-sm border border-border/50 flex justify-center">
         <div className="text-center py-20 max-w-xl mx-auto border border-border/60 rounded-3xl bg-[#FAF9F7] shadow-sm">
            <div className="text-[48px] mb-4">⏳</div>
@@ -398,7 +398,7 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col pt-6 sm:pt-10 px-4 sm:px-6 pb-20 font-body">
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20 font-body">
     <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
       
       {/* ── TRAVELLER VIEW ── */}

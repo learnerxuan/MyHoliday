@@ -485,8 +485,8 @@ function NewListingContent() {
 
 export default function CreateListingPage() {
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col pt-2 pb-24 px-2 sm:px-6">
-      <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col mt-4">
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20 font-body">
+      <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
         <Suspense fallback={<div className="flex justify-center py-20"><Spinner /></div>}>
           <NewListingContent />
         </Suspense>
