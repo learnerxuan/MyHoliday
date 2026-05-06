@@ -225,7 +225,7 @@ export default function ChatsPage() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'marketplace_messages', filter: `offer_id=eq.${activeOfferId}` },
         (payload) => {
-          const newMsg = payload.new
+          const newMsg = payload.new as MarketplaceMessage
           setMessages(prev => {
             if (prev.some(m => m.id === newMsg.id)) return prev
             return [...prev, newMsg]
