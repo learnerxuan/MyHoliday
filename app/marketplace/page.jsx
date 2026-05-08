@@ -526,7 +526,7 @@ export default function MarketplacePage() {
             <div className="relative flex flex-col md:flex-row md:items-stretch justify-between gap-6">
               <div className="max-w-2xl">
                 <div className="inline-flex items-center gap-2 bg-[#EAF3DE]/20 text-[#EAF3DE] text-xs font-semibold px-3 py-1 rounded-full border border-[#EAF3DE]/30 mb-3 uppercase tracking-widest">
-                  💼 Tour Guide Workspace
+                  Tour Guide Workspace
                 </div>
                 <h1 className="text-3xl sm:text-5xl font-extrabold font-display mb-4 text-warmwhite leading-tight">
                   Find your next client

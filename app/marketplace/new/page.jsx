@@ -317,17 +317,29 @@ function NewListingContent() {
                 if (match) days = Number(match[1]);
               }
               
+              const metadata = itin.trip_metadata || {};
               const city = itin.destinations?.city || 'Unknown';
               const country = itin.destinations?.country || 'Unknown';
               
-              const dateObj = new Date(itin.created_at);
-              const endDateObj = new Date(dateObj);
-              endDateObj.setDate(endDateObj.getDate() + (parseInt(days) || 1));
-              const startDateStr = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-              const endDateStr = endDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-              const dateDisplay = `${startDateStr} - ${endDateStr}`;
+              // Date logic synchronized with My Itineraries
+              let dateDisplay = 'Dates TBD';
+              if (metadata.travel_date_start) {
+                const fmt = (date) => {
+                  const d = date.getDate();
+                  const m = date.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
+                  const y = date.getFullYear();
+                  return `${d} ${m} ${y}`;
+                };
+                const [y, m, d] = metadata.travel_date_start.split('-').map(Number);
+                const start = new Date(y, m - 1, d);
+                const end = new Date(start);
+                end.setDate(end.getDate() + (parseInt(days) || 5) - 1);
+                dateDisplay = `${fmt(start)} - ${fmt(end)}`;
+              } else {
+                const dateObj = new Date(itin.created_at);
+                dateDisplay = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+              }
               
-              const metadata = itin.trip_metadata || {};
               const group = metadata.group_size || 'SOLO';
               const pace = metadata.pace || 'BALANCED';
               const budgetStyleClass = getBudgetStyle(metadata.budget || 'LUXURY');
@@ -362,8 +374,8 @@ function NewListingContent() {
                   <div className="p-4 flex flex-col flex-1">
                     {/* Title and Dates Row */}
                     <div className="flex justify-between items-start mb-1">
-                      <h3 className="text-[17px] font-extrabold font-display text-charcoal truncate pr-2 group-hover:text-amber transition-colors">
-                        {city} · {days} Days
+                      <h3 className="text-[17px] font-extrabold font-display text-charcoal pr-2 group-hover:text-amber transition-colors line-clamp-2">
+                        {itin.title}
                       </h3>
                       <div className="text-[10px] font-extrabold text-amber whitespace-nowrap pt-1 uppercase tracking-tighter flex items-center gap-1">
                         <CalendarIcon />
@@ -414,7 +426,17 @@ function NewListingContent() {
           <div style={{ background: "#fff", border: "1px solid #EBEBEB", borderRadius: 16, padding: "40px", textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>💰</div>
             <h2 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", marginBottom: 8, fontFamily: "'Funnel Display', sans-serif" }}>Set a Desired Budget</h2>
-            <p style={{ color: "#666", fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>How much are you willing to pay a local tour guide to execute this itinerary? Guides will send you offers based on this amount. Negotations will be done through the chat.</p>
+            
+            {/* Itinerary Summary for Verification */}
+            <div style={{ background: "#F9F9F9", borderRadius: 12, padding: "12px 20px", marginBottom: 24, display: "inline-flex", alignItems: "center", gap: 12, border: "1px solid #EBEBEB" }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#C4874A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📍</div>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{selectedPlan?.title || 'Untitled Itinerary'}</div>
+                <div style={{ fontSize: 11, color: "#888" }}>{selectedPlan?.destinations?.city || 'City'}, {selectedPlan?.destinations?.country || 'Country'}</div>
+              </div>
+            </div>
+
+            <p style={{ color: "#666", fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>How much are you willing to pay a local tour guide to execute this itinerary? Guides will send you offers based on this amount. Negotiations will be done through the chat.</p>
             
             <div style={{ position: "relative", maxWidth: 300, margin: "0 auto 32px" }}>
               <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 20, fontWeight: 700, color: "#1A1A1A" }}>RM</span>
@@ -445,7 +467,8 @@ function NewListingContent() {
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid #EBEBEB" }}>
                 <div>
                   <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>Selected Itinerary</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{selectedPlan?.destinations?.city || 'City'}, {selectedPlan?.destinations?.country || 'Country'} · {selectedDays} Days</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{selectedPlan?.title || 'Untitled Itinerary'}</div>
+                  <div style={{ fontSize: 13, color: "#666" }}>{selectedPlan?.destinations?.city || 'City'}, {selectedPlan?.destinations?.country || 'Country'} · {selectedDays} Days</div>
                 </div>
                 <button onClick={() => setPostStep(1)} style={{ background: "none", border: "none", color: "#C4874A", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>Edit</button>
               </div>
