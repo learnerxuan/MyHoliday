@@ -383,9 +383,6 @@ export default function ChatPage() {
                     {isSendingMsg ? <Spinner className="w-4 h-4 border-2" /> : <span className="text-[20px] leading-none mb-1">↗</span>}
                   </button>
                 </div>
-                <div className="text-[10px] text-secondary/50 font-medium text-center mt-3 flex items-center justify-center gap-2">
-                  <span>🔒</span> Messages are end-to-end encrypted
-                </div>
              </div>
            </div>
         </div>
