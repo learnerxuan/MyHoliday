@@ -50,6 +50,7 @@ export async function PATCH(
   if (body.status !== undefined) updatePayload.status = body.status
   if (body.proposed_price !== undefined) updatePayload.proposed_price = body.proposed_price
   if (body.intro_message !== undefined) updatePayload.intro_message = body.intro_message
+  if (body.edited_itinerary !== undefined) updatePayload.edited_itinerary = body.edited_itinerary
 
   const { data, error } = await supabase
     .from('marketplace_offers')

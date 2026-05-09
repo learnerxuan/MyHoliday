@@ -8,6 +8,7 @@ import Spinner from '@/components/ui/Spinner'
 import Avatar from '@/components/ui/Avatar'
 import Modal from '@/components/ui/Modal'
 import ItineraryTimeline from '@/components/ui/ItineraryTimeline'
+import ItineraryPanel from '@/components/sections/ItineraryPanel'
 // Reusable Dark Header matching the Mockup
 function DarkHeader({ tag, title, description, children }) {
   return (
@@ -74,7 +75,23 @@ export default function ChatPage() {
   const [isSendingMsg, setIsSendingMsg] = useState(false)
   const [error, setError] = useState('')
   const [showItineraryModal, setShowItineraryModal] = useState(false)
+  const [viewingOriginal, setViewingOriginal] = useState(false)
+  const [itineraryEditMode, setItineraryEditMode] = useState(false)
+  const [editedItinerary, setEditedItinerary] = useState(null)
+  const [isSavingItinerary, setIsSavingItinerary] = useState(false)
+  const [showEditPriceModal, setShowEditPriceModal] = useState(false)
+  const [editPrice, setEditPrice] = useState('')
+  const [isUpdatingPrice, setIsUpdatingPrice] = useState(false)
   const scrollRef = useRef(null)
+
+  // Set default view based on whether an edit exists
+  useEffect(() => {
+    if (activeOffer?.edited_itinerary) {
+      setViewingOriginal(false)
+    } else {
+      setViewingOriginal(true)
+    }
+  }, [activeOffer?.edited_itinerary])
 
   useEffect(() => {
     if (!listingId) return
@@ -214,6 +231,80 @@ export default function ChatPage() {
     }
   }
 
+  const handleOpenEdit = () => {
+    if (activeOffer?.edited_itinerary) {
+      setEditedItinerary(activeOffer.edited_itinerary)
+    } else {
+      setEditedItinerary(listing?.itinerary_content || {})
+    }
+    setItineraryEditMode(true)
+    setViewingOriginal(false)
+  }
+
+  const handleSaveEdits = async () => {
+    if (!activeOffer?.id || !editedItinerary) return
+    setIsSavingItinerary(true)
+    try {
+      const { error: updateError } = await supabase
+        .from('marketplace_offers')
+        .update({ edited_itinerary: editedItinerary })
+        .eq('id', activeOffer.id)
+
+      if (updateError) throw updateError
+      
+      setActiveOffer(prev => ({ ...prev, edited_itinerary: editedItinerary }))
+      setItineraryEditMode(false)
+    } catch (err) {
+      console.error('Failed to save itinerary:', err)
+      setError('Failed to save itinerary edits.')
+    } finally {
+      setIsSavingItinerary(false)
+    }
+  }
+
+  const handleUpdatePrice = async () => {
+    const priceNum = parseFloat(editPrice)
+    if (isNaN(priceNum) || priceNum <= 0) return
+
+    setIsUpdatingPrice(true)
+    setError('')
+
+    try {
+      const { error: updateError } = await supabase
+        .from('marketplace_offers')
+        .update({ proposed_price: priceNum })
+        .eq('id', activeOffer.id)
+
+      if (updateError) throw updateError
+
+      const msgRes = await fetch('/api/marketplace/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offer_id: activeOffer.id,
+          sender_id: user.id,
+          sender_type: 'guide',
+          content: `__OFFER_PRICE__:${priceNum}`
+        })
+      })
+
+      if (!msgRes.ok) throw new Error('Failed to update price message')
+
+      setActiveOffer(prev => ({ ...prev, proposed_price: priceNum }))
+      
+      const newMsg = await msgRes.json()
+      setMessages(prev => [...prev, newMsg])
+      
+      setShowEditPriceModal(false)
+      setEditPrice('')
+      setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setIsUpdatingPrice(false)
+    }
+  }
+
   const isGuide = user?.role === 'guide'
   const isTraveller = user?.role !== 'guide'
 
@@ -317,8 +408,16 @@ export default function ChatPage() {
                      Accept {formatMYR(activeOffer.proposed_price)}
                    </button>
                  )}
+                 {isGuide && activeOffer.status !== 'accepted' && (
+                   <button
+                     onClick={() => { setEditPrice(activeOffer?.proposed_price?.toString() || ''); setShowEditPriceModal(true) }}
+                     className="px-4 py-2.5 border border-[#D48C44] bg-[#D48C44] text-white hover:bg-[#C27E3B] text-[12px] font-bold rounded-lg shadow-sm transition-all"
+                   >
+                     Edit Offer Price
+                   </button>
+                 )}
                  {isGuide && activeOffer.status === 'pending' && (
-                   <button className="px-5 py-2.5 bg-[#F0EBE3] text-charcoal text-[12px] font-bold rounded-lg shadow-sm transition-all">
+                   <button className="px-5 py-2.5 bg-[#F0EBE3] text-charcoal text-[12px] font-bold rounded-lg shadow-sm transition-all hidden sm:block">
                      Offer Pending
                    </button>
                  )}
@@ -348,7 +447,13 @@ export default function ChatPage() {
                     }
                     return (
                       <div key={msg.id || idx} className={`flex gap-3 max-w-[85%] ${isMine ? 'self-end ms-auto flex-row-reverse' : ''}`}>
-                        <Avatar name={isMine ? 'Me' : (isGuide ? 'Traveller' : activeOffer.guide_name)} size="sm" />
+                        <Avatar 
+                          name={isMine 
+                            ? (isTraveller ? listing?.traveller_name : activeOffer?.guide_name) 
+                            : (isTraveller ? activeOffer?.guide_name : listing?.traveller_name)
+                          } 
+                          size="sm" 
+                        />
                         <div className={`flex flex-col ${isMine ? 'items-end' : ''}`}>
                           <div className={`${isMine ? 'bg-charcoal text-white rounded-tr-sm' : 'bg-white border border-[#E5E0DA] text-charcoal rounded-tl-sm'} rounded-2xl px-5 py-3.5 text-[14px] leading-relaxed shadow-sm`}>
                             {msg.content}
@@ -383,9 +488,6 @@ export default function ChatPage() {
                     {isSendingMsg ? <Spinner className="w-4 h-4 border-2" /> : <span className="text-[20px] leading-none mb-1">↗</span>}
                   </button>
                 </div>
-                <div className="text-[10px] text-secondary/50 font-medium text-center mt-3 flex items-center justify-center gap-2">
-                  <span>🔒</span> Messages are end-to-end encrypted
-                </div>
              </div>
            </div>
         </div>
@@ -395,17 +497,195 @@ export default function ChatPage() {
 
       {showItineraryModal && (
         <Modal 
-          title="Itinerary Details" 
+          title={activeOffer?.edited_itinerary ? "Tour Guide's Suggested Itinerary" : "Itinerary Details"} 
           onClose={() => setShowItineraryModal(false)}
           maxWidth="max-w-5xl"
         >
-          <ItineraryTimeline 
-            listing={listing} 
-            isEditable={isGuide} 
-            onSuggestEdits={() => {
-              alert("Edit mode coming soon!")
-            }}
-          />
+          <div className="bg-[#FAF9F7] rounded-b-2xl overflow-hidden -m-6 flex flex-col">
+            {/* Toolbar matching Guide View */}
+            <div className="flex flex-col border-b border-border/60 bg-white">
+              <div className="flex items-center justify-between px-6 pt-0.5 pb-2">
+                <div className="flex items-center gap-3">
+                  {activeOffer?.edited_itinerary && !itineraryEditMode ? (
+                    <div className="flex bg-muted p-1 rounded-lg">
+                      <button
+                        onClick={() => setViewingOriginal(false)}
+                        className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${!viewingOriginal ? 'bg-white text-charcoal shadow-sm' : 'text-secondary hover:text-charcoal'}`}
+                      >
+                        Edited Plan
+                      </button>
+                      <button
+                        onClick={() => setViewingOriginal(true)}
+                        className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${viewingOriginal ? 'bg-white text-charcoal shadow-sm' : 'text-secondary hover:text-charcoal'}`}
+                      >
+                        Original Plan
+                      </button>
+                    </div>
+                  ) : !itineraryEditMode ? (
+                    <div className="px-3 py-1 bg-muted rounded-lg text-[11px] font-bold text-secondary uppercase tracking-widest">
+                      Original Plan
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 text-[11px] font-bold px-3 py-1 rounded-full border border-green-200 uppercase tracking-widest">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      Edit Mode
+                    </span>
+                  )}
+
+                  {!itineraryEditMode && (
+                    <div className="text-[11px] font-extrabold text-secondary tracking-widest uppercase border border-border px-3 py-1 rounded-lg bg-white shadow-sm flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-secondary/30"></span>
+                      {Object.keys(viewingOriginal ? (listing?.itinerary_content || {}) : (activeOffer?.edited_itinerary || listing?.itinerary_content || {})).length} Days
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {isGuide && (
+                    !itineraryEditMode ? (
+                      <button
+                        onClick={handleOpenEdit}
+                        className="px-4 py-2 bg-amber text-white text-[12px] font-bold rounded-lg hover:bg-[#E08A1E] transition-all shadow-sm flex items-center gap-2"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        Edit Itinerary
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setItineraryEditMode(false)}
+                          className="px-4 py-2 border border-border text-secondary text-[12px] font-bold rounded-lg hover:bg-[#F5F5F5] transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveEdits}
+                          disabled={isSavingItinerary}
+                          className="px-4 py-2 bg-charcoal text-white text-[12px] font-bold rounded-lg hover:bg-black transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {isSavingItinerary ? 'Saving...' : (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Save Edits
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+
+              {activeOffer?.edited_itinerary && !itineraryEditMode && (
+                <div className={`px-6 py-1 border-t border-border/40 ${!viewingOriginal ? 'bg-amber/[0.03]' : 'bg-gray-50/50'}`}>
+                  {!viewingOriginal ? (
+                    <div className="flex items-center gap-2 text-[11px] text-amber font-bold uppercase tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber animate-pulse" />
+                      Viewing customized offer plan
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-[11px] text-secondary font-bold uppercase tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-secondary/30" />
+                      Viewing original plan
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {itineraryEditMode ? (
+                <div className="h-[60vh]">
+                  <ItineraryPanel 
+                    itinerary={editedItinerary || {}}
+                    onUpdate={(updates) => {
+                      setEditedItinerary(prev => {
+                        const updated = { ...(prev || {}) }
+                        updates.forEach(u => {
+                          const dayKey = `day${u.day}`
+                          if (u.action === 'add') {
+                            const { action, day, ...item } = u
+                            updated[dayKey] = [...(updated[dayKey] || []), item]
+                          } else if (u.action === 'update') {
+                            updated[dayKey] = (updated[dayKey] || []).map(item => 
+                              item.name === u.name 
+                                ? { ...item, ...(u.new_name ? { ...u, name: u.new_name } : u) }
+                                : item
+                            )
+                          }
+                        })
+                        return updated
+                      })
+                    }}
+                    onDelete={(dayKey, itemName) => {
+                      setEditedItinerary(prev => {
+                        const updated = { ...(prev || {}) }
+                        if (updated[dayKey]) {
+                          updated[dayKey] = updated[dayKey].filter(i => i.name !== itemName)
+                        }
+                        return updated
+                      })
+                    }}
+                    city={listing?.city_name}
+                    allowFullEdit={true}
+                    hideExport={true}
+                  />
+                </div>
+              ) : (
+                <div className="pt-1.5 p-5 lg:pt-2 lg:p-6">
+                  <ItineraryTimeline 
+                    listing={{
+                      ...listing,
+                      itinerary_content: (viewingOriginal ? listing?.itinerary_content : activeOffer?.edited_itinerary || listing?.itinerary_content) || {}
+                    }}
+                    isEditable={false}
+                    isGuideEdited={!viewingOriginal && Boolean(activeOffer?.edited_itinerary)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Price Modal */}
+      {showEditPriceModal && (
+        <Modal 
+          onClose={() => setShowEditPriceModal(false)}
+          title="Edit Offer Price"
+        >
+          <div className="p-6">
+            <label className="block text-sm font-bold text-charcoal mb-2">New Proposed Price (RM)</label>
+            <input
+              type="number"
+              value={editPrice}
+              onChange={(e) => setEditPrice(e.target.value)}
+              placeholder="Enter new price"
+              className="w-full px-4 py-3 rounded-xl border border-border/70 focus:outline-none focus:ring-2 focus:ring-amber/30 focus:border-amber transition-all mb-4"
+            />
+            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setShowEditPriceModal(false)}
+                className="px-5 py-2.5 rounded-xl font-bold text-secondary hover:bg-[#F5F5F5] transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleUpdatePrice}
+                disabled={isUpdatingPrice || !editPrice}
+                className="px-5 py-2.5 rounded-xl font-bold bg-amber text-white hover:bg-[#D48C44] transition-colors disabled:opacity-50"
+              >
+                {isUpdatingPrice ? 'Updating...' : 'Save New Price'}
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

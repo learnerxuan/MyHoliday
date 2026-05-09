@@ -565,7 +565,7 @@ export default function SavedItineraryViewer() {
           {!isAdmin && userRole !== 'guide' && (
             <>
               <button
-                onClick={() => router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`)}
+                onClick={() => router.push(`/marketplace/new?itinerary_id=${id}&city=${encodeURIComponent(destination?.city || '')}`)}
                 className="text-xs font-bold text-amber hover:text-amberdark px-3 py-2 rounded-lg border border-amber/30 hover:border-amber bg-amber/5 transition-all flex items-center gap-2"
                 title="Post this itinerary to the marketplace to find a local tour guide"
               >
@@ -665,7 +665,7 @@ export default function SavedItineraryViewer() {
                   {!isAdmin && userRole !== 'guide' && (
                     <>
                       <button
-                        onClick={() => { setShowMobileActions(false); router.push(`/marketplace?itineraryId=${id}&city=${encodeURIComponent(destination?.city || '')}`); }}
+                        onClick={() => { setShowMobileActions(false); router.push(`/marketplace/new?itinerary_id=${id}&city=${encodeURIComponent(destination?.city || '')}`); }}
                         className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted text-charcoal flex items-center gap-2"
                       >
                         <SearchIcon /> Find Tour Guide

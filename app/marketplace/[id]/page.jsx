@@ -61,10 +61,21 @@ export default function ListingDetailPage() {
         const { data: { user: currentUser }, error: sessionError } = await supabase.auth.getUser()
         if (sessionError || !currentUser) throw new Error('Not authenticated')
 
+        let currentGuideId = null
+        if (currentUser.user_metadata?.role === 'guide') {
+          const { data: guideData } = await supabase
+            .from('tour_guides')
+            .select('id')
+            .eq('user_id', currentUser.id)
+            .single()
+          currentGuideId = guideData?.id
+        }
+
         setUser({
           id: currentUser.id,
           email: currentUser.email,
-          role: currentUser.user_metadata?.role || 'traveler'
+          role: currentUser.user_metadata?.role || 'traveler',
+          guide_id: currentGuideId
         })
 
         const listingRes = await fetch(`/api/marketplace/listings/${listingId}`)
@@ -332,7 +343,7 @@ export default function ListingDetailPage() {
 
   const isGuide = user?.role === 'guide'
 
-  const myGuideOffer = isTraveller ? null : offers.find(o => o.guide_id === user?.id)
+  const myGuideOffer = isTraveller ? null : offers.find(o => o.guide_id === user?.guide_id)
 
   // Parse meta data
   const rawContent = listing?.itinerary_content
@@ -591,10 +602,14 @@ export default function ListingDetailPage() {
             />
             <div className="relative z-10">
               <h1 className="text-3xl sm:text-[40px] font-extrabold text-white font-display mb-2 tracking-tight leading-tight">
-                Submit an Offer
+                {myGuideOffer ? (isEditingOffer ? 'Edit Your Offer' : 'Your Active Offer') : 'Submit an Offer'}
               </h1>
               <p className="text-sm sm:text-[15px] font-body text-white/60 max-w-2xl leading-relaxed mt-2">
-                You are bidding on a confirmed itinerary request. Craft a competitive proposal to win this client.
+                {myGuideOffer 
+                  ? (isEditingOffer 
+                      ? 'Update your proposed price or introductory message below.' 
+                      : 'You have successfully submitted an offer for this itinerary request.') 
+                  : 'You are bidding on a confirmed itinerary request. Craft a competitive proposal to win this client.'}
               </p>
             </div>
           </div>

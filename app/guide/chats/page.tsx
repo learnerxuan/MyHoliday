@@ -6,47 +6,13 @@ import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
 import Modal from '@/components/ui/Modal'
 import ItineraryTimeline from '@/components/ui/ItineraryTimeline'
+import ItineraryPanel from '@/components/sections/ItineraryPanel'
+import Avatar from '@/components/ui/Avatar'
 
-type MarketplaceOffer = {
-  id: string
-  listing_id: string
-  guide_id: string
-  proposed_price: number
-  status: string
-  created_at: string
-}
-
-type ListingRecord = {
-  id: string
-  user_id: string
-  itinerary_title?: string
-  traveller_name?: string
-  city_name?: string
-  itinerary_content?: Record<string, unknown>[]
-  trip_metadata?: Record<string, unknown>
-}
-
-type MarketplaceMessage = {
-  id: string
-  content: string
-  sender_type: 'guide' | 'traveler'
-  created_at: string
-}
-
-type ChatThread = {
-  offer_id: string
-  listing_id: string
-  traveller_id: string
-  traveller_name: string
-  title: string
-  city_name: string
-  proposed_price: number
-  status: string
-  last_message: string
-  last_message_at: string
-  itinerary_content?: Record<string, unknown>[]
-  trip_metadata?: Record<string, unknown>
-}
+type MarketplaceOffer = any
+type ListingRecord = any
+type MarketplaceMessage = any
+type ChatThread = any
 
 const formatMYR = (amount: number | string) =>
   `RM ${Number(amount).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
@@ -67,9 +33,14 @@ export default function ChatsPage() {
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showItineraryModal, setShowItineraryModal] = useState(false)
+  const [itineraryEditMode, setItineraryEditMode] = useState(false)
+  const [viewingOriginal, setViewingOriginal] = useState(false)
+  const [editedItinerary, setEditedItinerary] = useState<Record<string, any> | null>(null)
+  const [isSavingItinerary, setIsSavingItinerary] = useState(false)
   const [showEditPriceModal, setShowEditPriceModal] = useState(false)
   const [editPrice, setEditPrice] = useState('')
   const [isUpdatingPrice, setIsUpdatingPrice] = useState(false)
+  const [guideName, setGuideName] = useState<string>('Guide')
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const filteredThreads = useMemo(() => {
@@ -98,10 +69,12 @@ export default function ChatsPage() {
 
     const { data: guideData, error: guideErr } = await supabase
       .from('tour_guides')
-      .select('id')
+      .select('id, full_name')
       .eq('user_id', userData.user.id)
       .single()
     if (guideErr || !guideData?.id) throw new Error('Guide profile not found.')
+    
+    setGuideName(guideData.full_name || 'Guide')
 
     const offersRes = await fetch('/api/marketplace/offers?scope=mine')
     if (!offersRes.ok) throw new Error('Failed to load your offers.')
@@ -172,7 +145,8 @@ export default function ChatsPage() {
         last_message: latestMessage?.content || `Offer: ${formatMYR(offer.proposed_price)}`,
         last_message_at: latestMessage?.created_at || offer.created_at,
         itinerary_content: listing?.itinerary_content,
-        trip_metadata: listing?.trip_metadata
+        trip_metadata: listing?.trip_metadata,
+        edited_itinerary: offer.edited_itinerary || null
       }
     })
 
@@ -280,6 +254,44 @@ export default function ChatsPage() {
       setError((err as Error).message)
     } finally {
       setIsSending(false)
+    }
+  }
+
+  const handleOpenItineraryModal = () => {
+    // Initialise edit state with whatever is already saved (edited or original)
+    const thread = threads.find(t => t.offer_id === activeOfferId)
+    if (thread?.edited_itinerary) {
+      setEditedItinerary(thread.edited_itinerary)
+    } else {
+      // Fall back to the original content so the guide can start editing from it
+      setEditedItinerary(thread?.itinerary_content || null)
+    }
+    setItineraryEditMode(false)
+    setViewingOriginal(false)
+    setShowItineraryModal(true)
+  }
+
+  const handleSaveItineraryEdits = async () => {
+    if (!activeOfferId || !editedItinerary) return
+    setIsSavingItinerary(true)
+    try {
+      const res = await fetch(`/api/marketplace/offers/${activeOfferId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ edited_itinerary: editedItinerary })
+      })
+      if (!res.ok) throw new Error('Failed to save itinerary edits.')
+      // Update local thread state so the edit persists across modal opens
+      setThreads(prev => prev.map(t =>
+        t.offer_id === activeOfferId
+          ? { ...t, edited_itinerary: editedItinerary }
+          : t
+      ))
+      setItineraryEditMode(false)
+    } catch (err: unknown) {
+      setError((err as Error).message)
+    } finally {
+      setIsSavingItinerary(false)
     }
   }
 
@@ -426,7 +438,7 @@ export default function ChatsPage() {
               </div>
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => setShowItineraryModal(true)}
+                  onClick={handleOpenItineraryModal}
                   className="px-4 py-2 border border-[#E5E0DA] bg-white text-charcoal hover:bg-[#FAF9F7] text-[12px] font-bold rounded-lg shadow-sm transition-all"
                 >
                   View Itinerary
@@ -466,6 +478,11 @@ export default function ChatsPage() {
 
               return (
                 <div key={msg.id || idx} className={`flex gap-3 max-w-[85%] ${isMine ? 'self-end ms-auto flex-row-reverse' : ''}`}>
+                  <Avatar 
+                    name={isMine ? guideName : activeThread?.traveller_name || 'Traveller'} 
+                    size="sm" 
+                    url={undefined}
+                  />
                   <div
                     className={`${isMine ? 'bg-charcoal text-white rounded-tr-sm' : 'bg-white border border-[#E5E0DA] text-charcoal rounded-tl-sm'} rounded-2xl px-5 py-3.5 text-[14px] leading-relaxed shadow-sm`}
                   >
@@ -499,23 +516,172 @@ export default function ChatsPage() {
           </div>
         </div>
 
-        {/* View Itinerary Modal */}
+        {/* View / Edit Itinerary Modal */}
         {showItineraryModal && (
           <Modal 
-            onClose={() => setShowItineraryModal(false)}
-            title={`${activeThread?.traveller_name || 'Traveller'}'s Itinerary`}
+            onClose={() => { setShowItineraryModal(false); setItineraryEditMode(false) }}
+            title={itineraryEditMode ? 'Edit Itinerary for This Offer' : `${activeThread?.traveller_name || 'Traveller'}'s Itinerary`}
             maxWidth="max-w-5xl"
           >
             {activeThread ? (
-              <div className="bg-[#FAF9F7] p-4 sm:p-6 lg:p-8 rounded-b-2xl">
-                <ItineraryTimeline 
-                  listing={{
-                    itinerary_content: activeThread.itinerary_content || [],
-                    trip_metadata: activeThread.trip_metadata || {},
-                    city_name: activeThread.city_name
-                  }} 
-                  isEditable={true}
-                />
+              <div className="bg-[#FAF9F7] rounded-b-2xl overflow-hidden -m-6 flex flex-col">
+                {/* Toolbar */}
+                <div className="flex flex-col border-b border-border/60 bg-white">
+                  <div className="flex items-center justify-between px-6 pt-0.5 pb-2">
+                    <div className="flex items-center gap-3">
+                      {activeThread.edited_itinerary && !itineraryEditMode && (
+                        <div className="flex bg-muted p-1 rounded-lg">
+                          <button
+                            onClick={() => setViewingOriginal(false)}
+                            className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${!viewingOriginal ? 'bg-white text-charcoal shadow-sm' : 'text-secondary hover:text-charcoal'}`}
+                          >
+                            Edited Plan
+                          </button>
+                          <button
+                            onClick={() => setViewingOriginal(true)}
+                            className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${viewingOriginal ? 'bg-white text-charcoal shadow-sm' : 'text-secondary hover:text-charcoal'}`}
+                          >
+                            Original Plan
+                          </button>
+                        </div>
+                      )}
+                      
+                      {!activeThread.edited_itinerary && !itineraryEditMode && (
+                        <div className="px-3 py-1 bg-muted rounded-lg text-[11px] font-bold text-secondary uppercase tracking-widest">
+                          Original Plan
+                        </div>
+                      )}
+
+                      {itineraryEditMode && (
+                        <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 text-[11px] font-bold px-3 py-1 rounded-full border border-green-200 uppercase tracking-widest">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                          Edit Mode Active
+                        </span>
+                      )}
+
+                      {!itineraryEditMode && (
+                        <div className="text-[11px] font-extrabold text-secondary tracking-widest uppercase border border-border px-3 py-1 rounded-lg bg-white shadow-sm flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-secondary/30"></span>
+                          {Object.keys(viewingOriginal ? (activeThread.itinerary_content || {}) : (activeThread.edited_itinerary || activeThread.itinerary_content || {})).length} Days
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {!itineraryEditMode ? (
+                        <button
+                          onClick={() => setItineraryEditMode(true)}
+                          className="px-4 py-2 bg-amber text-white text-[12px] font-bold rounded-lg hover:bg-[#E08A1E] transition-all shadow-sm flex items-center gap-2"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                          Edit Itinerary
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setItineraryEditMode(false)}
+                            className="px-4 py-2 border border-border text-secondary text-[12px] font-bold rounded-lg hover:bg-[#F5F5F5] transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveItineraryEdits}
+                            disabled={isSavingItinerary}
+                            className="px-4 py-2 bg-charcoal text-white text-[12px] font-bold rounded-lg hover:bg-black transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {isSavingItinerary ? 'Saving...' : (
+                              <>
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Save Edits
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Status Banner */}
+                  {!itineraryEditMode && (activeThread.edited_itinerary) && (
+                    <div className={`px-6 py-1 border-t border-border/40 ${!viewingOriginal ? 'bg-amber/[0.03]' : 'bg-gray-50/50'}`}>
+                      {!viewingOriginal ? (
+                        <div className="flex items-center gap-2 text-[11px] text-amber font-bold uppercase tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber animate-pulse" />
+                          Viewing your customized offer plan
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-[11px] text-secondary font-bold uppercase tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-secondary/30" />
+                          Viewing traveller&apos;s original plan
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 overflow-y-auto">
+                  {itineraryEditMode ? (
+                    <div className="h-[60vh]">
+                      <ItineraryPanel
+                        itinerary={editedItinerary || {}}
+                        onExport={() => {}}
+                        tripContext={{}}
+                        selectedDay={null}
+                        onFocusLocation={() => {}}
+                        onUpdate={(updates: any[]) => {
+                          setEditedItinerary((prev: any) => {
+                            const updated = { ...(prev || {}) }
+                            updates.forEach((u: any) => {
+                              const dayKey = `day${u.day}`
+                              if (u.action === 'add') {
+                                const { action, day, ...item } = u
+                                updated[dayKey] = [...(updated[dayKey] || []), item]
+                              } else if (u.action === 'update') {
+                                updated[dayKey] = (updated[dayKey] || []).map((item: any) =>
+                                  item.name === u.name
+                                    ? { ...item, ...(u.new_name ? { ...u, name: u.new_name } : u) }
+                                    : item
+                                )
+                              }
+                            })
+                            return updated
+                          })
+                        }}
+                        onDelete={(dayKey: string, itemName: string) => {
+                          setEditedItinerary((prev: any) => {
+                            const updated = { ...(prev || {}) }
+                            if (updated[dayKey]) {
+                              updated[dayKey] = updated[dayKey].filter((i: any) => i.name !== itemName)
+                            }
+                            return updated
+                          })
+                        }}
+                        city={activeThread.city_name}
+                        allowFullEdit={true}
+                        hideExport={true}
+                      />
+                    </div>
+                  ) : (
+                    <div className="pt-1.5 p-5 lg:pt-2 lg:p-6">
+                      <ItineraryTimeline 
+                        listing={{
+                          itinerary_content: (viewingOriginal ? activeThread.itinerary_content : activeThread.edited_itinerary || activeThread.itinerary_content) || {},
+                          trip_metadata: activeThread.trip_metadata || {},
+                          city_name: activeThread.city_name,
+                          traveller_name: activeThread.traveller_name
+                        }} 
+                        isEditable={false}
+                        isGuideEdited={!viewingOriginal && Boolean(activeThread.edited_itinerary)}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <p className="p-8 text-center text-secondary">No itinerary available.</p>
