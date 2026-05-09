@@ -4,11 +4,12 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 import { signOut } from '@/lib/supabase/auth'
 
 export default function Navbar() {
-  const [user, setUser]       = useState<any>(null)
+  const [user, setUser]       = useState<User | null>(null)
   const [role, setRole]       = useState<string>('')
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -51,7 +52,7 @@ export default function Navbar() {
           }`}
         >
           {/* ── Logo ── */}
-          <a href="/" className="pointer-events-auto flex items-center shrink-0 pl-2" onClick={close}>
+          <Link href="/" className="pointer-events-auto flex items-center shrink-0 pl-2" onClick={close}>
             <Image
               src="/logo.png?v=2"
               alt="MyHoliday"
@@ -61,7 +62,7 @@ export default function Navbar() {
               priority
               unoptimized
             />
-          </a>
+          </Link>
 
           {/* ── Desktop Middle Nav ── */}
           <nav
@@ -81,6 +82,7 @@ export default function Navbar() {
               <>
                 <NavLink href="/marketplace">Marketplace</NavLink>
                 <NavLink href="/guide/chats">Chats</NavLink>
+                <NavLink href="/guide/bookings">Bookings</NavLink>
                 <NavLink href="/guide/history">Schedule</NavLink>
               </>
             ) : (
@@ -89,6 +91,7 @@ export default function Navbar() {
                 <NavLink href="/destinations">Destinations</NavLink>
                 <NavLink href="/itineraries">Itineraries</NavLink>
                 <NavLink href="/marketplace">Marketplace</NavLink>
+                {user && <NavLink href="/history">History</NavLink>}
                 <NavLink href="/about">About</NavLink>
               </>
             )}
@@ -173,6 +176,7 @@ export default function Navbar() {
               <>
                 <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
                 <MobileNavLink href="/guide/chats" onClick={close}>Chats</MobileNavLink>
+                <MobileNavLink href="/guide/bookings" onClick={close}>Bookings</MobileNavLink>
                 <MobileNavLink href="/guide/history" onClick={close}>Schedule</MobileNavLink>
               </>
             ) : (
@@ -181,6 +185,7 @@ export default function Navbar() {
                 <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
                 <MobileNavLink href="/itineraries" onClick={close}>Itineraries</MobileNavLink>
                 <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
+                {user && <MobileNavLink href="/history" onClick={close}>History</MobileNavLink>}
                 <MobileNavLink href="/about" onClick={close}>About</MobileNavLink>
               </>
             )}

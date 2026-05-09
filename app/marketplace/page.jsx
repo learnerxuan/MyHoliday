@@ -9,6 +9,14 @@ import Modal from '@/components/ui/Modal'
 
 const formatMYR = (amount) => `RM ${Number(amount).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
+const normaliseList = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  if (typeof value === 'string' && value.trim()) {
+    return value.split(',').map(item => item.trim()).filter(Boolean)
+  }
+  return []
+}
+
 const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, offerAmount, onClick, onSubmitOffer }) => {
   // If listing is open and no offer is submitted by me, I can submit an offer
   const isActionable = status === "open" && !offerAmount
@@ -243,12 +251,18 @@ export default function MarketplacePage() {
           else if (gsStr.includes('small group')) pax = 'Small Group'
           else if (gsStr.includes('large group')) pax = 'Large Group'
           else pax = `${groupSize} pax`
-          let tags = parsedMeta.preferred_styles || tripMeta.preferred_styles || []
-          if (!tags || tags.length === 0) {
-            tags = ['Culture', 'Budget']
-          } else if (tags.length > 2) {
+          let tags = [
+            ...normaliseList(parsedMeta.preferred_styles),
+            ...normaliseList(tripMeta.preferred_styles),
+            ...normaliseList(parsedMeta.styles),
+            ...normaliseList(tripMeta.styles),
+            ...normaliseList(parsedMeta.travel_styles),
+            ...normaliseList(tripMeta.travel_styles)
+          ].filter((tag, index, all) => all.indexOf(tag) === index)
+          if (tags.length > 2) {
             tags = tags.slice(0, 2)
           }
+          const budgetType = parsedMeta.budget || tripMeta.budget || parsedMeta.budget_profile || tripMeta.budget_profile
 
           const offers = l.marketplace_offers || []
 
@@ -296,6 +310,7 @@ export default function MarketplacePage() {
             days,
             pax,
             tags,
+            budgetType,
             displayStatus,
             offerCount: offers.length,
             guideInfo,
@@ -348,6 +363,7 @@ export default function MarketplacePage() {
   const filteredListings = listings.filter(item => {
     if (isGuide) {
       const myOffer = item.offers.find(o => o.guide_id === guideProfile?.id && o.status !== 'withdrawn')
+      const myAcceptedOffer = item.offers.find(o => o.guide_id === guideProfile?.id && o.status === 'accepted')
       if (filter === 'requests') {
          // Show listings where the guide has not sent an offer, or if it is generally 'open'
          // We'll exclude ones where we already submitted an offer for this tab.
@@ -355,7 +371,7 @@ export default function MarketplacePage() {
          return item.status === 'open' || item.status === 'awaiting'
       }
       if (filter === 'my_offers') return !!myOffer && item.status !== 'confirmed';
-      if (filter === 'confirmed') return !!myOffer && item.status === 'confirmed';
+      if (filter === 'confirmed') return !!myAcceptedOffer && item.status === 'confirmed';
       return false
     } else {
       if (filter === 'all') return true
@@ -377,7 +393,7 @@ export default function MarketplacePage() {
   // --- GUIDE APPROVAL BARRIER ---
   if (isGuide && guideProfile?.verification_status !== 'approved') {
     return (
-      <div className="w-full bg-warmwhite min-h-screen font-body pb-24 -mt-7 md:-mt-6 p-4 sm:p-6 lg:px-8">
+    <div className="w-full bg-warmwhite min-h-screen font-body pb-24 -mt-7 md:-mt-6 p-4 sm:p-6 lg:px-8 [&_button:not(:disabled)]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
       <section className="max-w-5xl mx-auto p-6 lg:p-12 bg-white rounded-[24px] shadow-sm border border-border/50 flex justify-center">
         <div className="text-center py-20 max-w-xl mx-auto border border-border/60 rounded-3xl bg-[#FAF9F7] shadow-sm">
            <div className="text-[48px] mb-4">⏳</div>
@@ -398,7 +414,7 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20 font-body">
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20 font-body [&_button:not(:disabled)]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
     <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
       
       {/* ── TRAVELLER VIEW ── */}
@@ -443,11 +459,11 @@ export default function MarketplacePage() {
             </div>
           </div>
 
-          <div className="px-4 sm:px-10 pt-6 sm:pt-10 pb-12 sm:pb-16 bg-[#FAFAFA] flex-1">
+          <div className="px-4 sm:px-10 pt-4 sm:pt-6 pb-12 sm:pb-16 bg-[#FAFAFA] flex-1">
             {error && <p className="text-error mb-4">{error}</p>}
 
             {/* Filter Bar */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-5">
               <div className="flex gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide pb-1">
                 {['all', 'open', 'has_offers', 'settled'].map((f) => {
                   const labels = {
@@ -496,6 +512,7 @@ export default function MarketplacePage() {
               {filteredListings.map((listing) => (
                 <div key={listing.id} onClick={() => router.push(`/marketplace/${listing.id}`)}>
                   <ListingCard 
+                    title={listing.title}
                     city={listing.city_name} 
                     country={listing.country_name}
                     budget={listing.desired_budget} 
@@ -504,7 +521,8 @@ export default function MarketplacePage() {
                     days={listing.days}
                     pax={listing.pax}
                     tags={listing.tags}
-                    guideInfo={listing.guideInfo}
+                    budgetType={listing.budgetType}
+                    offerCount={listing.offerCount}
                     onDelete={() => setListingToDelete(listing)}
                   />
                 </div>

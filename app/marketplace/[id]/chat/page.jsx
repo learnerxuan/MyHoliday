@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
 import Avatar from '@/components/ui/Avatar'
@@ -13,7 +12,7 @@ import ItineraryPanel from '@/components/sections/ItineraryPanel'
 function DarkHeader({ tag, title, description, children }) {
   return (
     <div 
-      className="text-warmwhite relative overflow-hidden pt-10 sm:pt-12 px-6 sm:px-12 pb-8 sm:pb-10 rounded-t-[32px] shadow-sm z-10"
+      className="text-warmwhite relative overflow-hidden px-6 sm:px-8 py-6 sm:py-7 shadow-sm z-10"
       style={{ background: '#0f0f0f' }}
     >
       <div
@@ -38,7 +37,7 @@ function DarkHeader({ tag, title, description, children }) {
               {tag}
             </div>
           )}
-          <h1 className="text-3xl sm:text-[40px] font-extrabold text-white font-display mb-2 tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-[30px] font-extrabold text-white font-display mb-1 tracking-tight leading-tight">
             {title}
           </h1>
           {description && (
@@ -58,6 +57,81 @@ function DarkHeader({ tag, title, description, children }) {
 }
 
 const formatMYR = (amount) => `RM ${Number(amount).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+
+const CalendarIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+)
+
+const GroupIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
+const PaceIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+)
+
+const BudgetIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="1" x2="12" y2="23" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+)
+
+const getBudgetStyle = (budget) => {
+  if (!budget) return 'bg-white text-secondary border-border/50'
+  const b = budget.toLowerCase()
+  if (b.includes('economy') || b.includes('budget')) return 'bg-success-bg text-success border-success/10'
+  if (b.includes('mid-range') || b.includes('balanced') || b.includes('midrange')) return 'bg-warning-bg text-warning border-warning/10'
+  if (b.includes('luxury')) return 'bg-muted text-amberdark border-amberdark/10'
+  return 'bg-white text-secondary border-border/50'
+}
+
+const formatTripDateRange = (startDate, endDate, fallbackDays) => {
+  if (startDate && endDate) {
+    try {
+      const formatDate = (value, includeYear = false) => {
+        const [y, m, d] = String(value).split('-').map(Number)
+        const date = new Date(y, m - 1, d)
+        return date.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          ...(includeYear ? { year: 'numeric' } : {})
+        })
+      }
+      return `${formatDate(startDate)} - ${formatDate(endDate, true)}`
+    } catch {
+      return `${fallbackDays} Days`
+    }
+  }
+  return `${fallbackDays} Days`
+}
+
+const normaliseList = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  if (typeof value === 'string' && value.trim()) {
+    return value.split(',').map(item => item.trim()).filter(Boolean)
+  }
+  return []
+}
+
+const OFFER_PRICE_TOKEN = '__OFFER_PRICE__:'
+const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
+const PAYMENT_ENABLED_TOKEN = '__PAYMENT_ENABLED__:'
+const PAYMENT_COMPLETED_TOKEN = '__PAYMENT_COMPLETED__:'
+const ITINERARY_UPDATED_TOKEN = '__ITINERARY_UPDATED__'
+const OFFER_WITHDRAWN_TOKEN = '__OFFER_WITHDRAWN__'
 
 export default function ChatPage() {
   const router = useRouter()
@@ -82,15 +156,15 @@ export default function ChatPage() {
   const [showEditPriceModal, setShowEditPriceModal] = useState(false)
   const [editPrice, setEditPrice] = useState('')
   const [isUpdatingPrice, setIsUpdatingPrice] = useState(false)
+  const [transaction, setTransaction] = useState(null)
   const scrollRef = useRef(null)
 
   // Set default view based on whether an edit exists
   useEffect(() => {
-    if (activeOffer?.edited_itinerary) {
-      setViewingOriginal(false)
-    } else {
-      setViewingOriginal(true)
-    }
+    const timer = setTimeout(() => {
+      setViewingOriginal(!activeOffer?.edited_itinerary)
+    }, 0)
+    return () => clearTimeout(timer)
   }, [activeOffer?.edited_itinerary])
 
   useEffect(() => {
@@ -104,16 +178,13 @@ export default function ChatPage() {
         const role = currentUser.user_metadata?.role || 'traveler'
         setUser({ id: currentUser.id, role })
 
-        let guideIdToFetch = targetGuideId
+        // Guides should use the consolidated chats dashboard, not this traveller page
         if (role === 'guide') {
-          const { data: guideData, error: guideErr } = await supabase
-            .from('tour_guides')
-            .select('id')
-            .eq('user_id', currentUser.id)
-            .single()
-          if (guideErr || !guideData?.id) throw new Error('Guide profile not found.')
-          guideIdToFetch = guideData.id
+          router.replace('/guide/chats')
+          return
         }
+
+        let guideIdToFetch = targetGuideId
 
         const [listingRes, offersRes] = await Promise.all([
           fetch(`/api/marketplace/listings/${listingId}`),
@@ -161,6 +232,12 @@ export default function ChatPage() {
           const msgData = await msgRes.json()
           setMessages(msgData || [])
         }
+
+        const txRes = await fetch(`/api/marketplace/transactions?offer_id=${chosenOffer.id}`)
+        if (txRes.ok) {
+          const txData = await txRes.json()
+          setTransaction(txData)
+        }
       } catch (err) {
         setError(err.message || 'Failed to load data.')
       } finally {
@@ -195,6 +272,11 @@ export default function ChatPage() {
           if (newMsg.content && newMsg.content.startsWith('__OFFER_PRICE__:')) {
             const newPrice = parseFloat(newMsg.content.split(':')[1])
             setActiveOffer(prev => prev ? { ...prev, proposed_price: newPrice } : prev)
+          }
+
+          if (newMsg.content && newMsg.content.startsWith(OFFER_ACCEPTED_TOKEN)) {
+            setActiveOffer(prev => prev ? { ...prev, status: 'accepted' } : prev)
+            setShowEditPriceModal(false)
           }
         }
       )
@@ -263,6 +345,12 @@ export default function ChatPage() {
   }
 
   const handleUpdatePrice = async () => {
+    if (isOfferLocked) {
+      setError('Accepted offers cannot be edited.')
+      setShowEditPriceModal(false)
+      return
+    }
+
     const priceNum = parseFloat(editPrice)
     if (isNaN(priceNum) || priceNum <= 0) return
 
@@ -270,12 +358,16 @@ export default function ChatPage() {
     setError('')
 
     try {
-      const { error: updateError } = await supabase
-        .from('marketplace_offers')
-        .update({ proposed_price: priceNum })
-        .eq('id', activeOffer.id)
+      const updateRes = await fetch(`/api/marketplace/offers/${activeOffer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposed_price: priceNum })
+      })
 
-      if (updateError) throw updateError
+      if (!updateRes.ok) {
+        const data = await updateRes.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to update offer price')
+      }
 
       const msgRes = await fetch('/api/marketplace/messages', {
         method: 'POST',
@@ -305,8 +397,47 @@ export default function ChatPage() {
     }
   }
 
+  const handleAcceptOffer = async () => {
+    if (!activeOffer?.id) return
+    setError('')
+
+    try {
+      const res = await fetch(`/api/marketplace/offers/${activeOffer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'accepted' })
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to accept offer')
+      }
+
+      router.push(`/marketplace/${listingId}`)
+    } catch (err) {
+      setError(err.message || 'Failed to accept offer')
+    }
+  }
+
   const isGuide = user?.role === 'guide'
   const isTraveller = user?.role !== 'guide'
+  const hasAcceptanceMessage = messages.some((msg) => typeof msg?.content === 'string' && msg.content.startsWith(OFFER_ACCEPTED_TOKEN))
+  const isOfferLocked = Boolean(
+    activeOffer && (
+      activeOffer.status === 'accepted' ||
+      listing?.status === 'confirmed' ||
+      activeOffer.payment_enabled ||
+      hasAcceptanceMessage ||
+      transaction
+    )
+  )
+
+  useEffect(() => {
+    if (isOfferLocked && showEditPriceModal) {
+      const timer = setTimeout(() => setShowEditPriceModal(false), 0)
+      return () => clearTimeout(timer)
+    }
+  }, [isOfferLocked, showEditPriceModal])
 
   if (loading) {
     return <div className="py-20 flex justify-center"><Spinner /></div>
@@ -320,58 +451,137 @@ export default function ChatPage() {
      return <div className="py-20 flex justify-center text-secondary">No active offer found for this chat.</div>
   }
 
-  const isOfferPriceMessage = (msg) => typeof msg?.content === 'string' && msg.content.startsWith('__OFFER_PRICE__:')
+  const isOfferPriceMessage = (msg) => typeof msg?.content === 'string' && msg.content.startsWith(OFFER_PRICE_TOKEN)
+  const isSystemMessage = (msg) => [
+    OFFER_ACCEPTED_TOKEN, PAYMENT_ENABLED_TOKEN, PAYMENT_COMPLETED_TOKEN, OFFER_WITHDRAWN_TOKEN
+  ].some(tok => msg?.content?.startsWith(tok))
+
+  const rawContent = listing?.itinerary_content
+  let parsedMeta = {}
+  try {
+    parsedMeta = typeof rawContent === 'string' ? JSON.parse(rawContent) : (rawContent || {})
+  } catch {
+    parsedMeta = {}
+  }
+  const tripMeta = listing?.trip_metadata || {}
+  const days = parsedMeta.trip_days || tripMeta.trip_days || parsedMeta.duration_days || 5
+  const groupSize = parsedMeta.group_size || tripMeta.group_size || parsedMeta.pax || tripMeta.pax
+  const budgetType = parsedMeta.budget || tripMeta.budget || parsedMeta.budget_profile || tripMeta.budget_profile
+  const pace = parsedMeta.pace || tripMeta.pace
+  const preferenceTags = [
+    ...normaliseList(parsedMeta.preferred_styles),
+    ...normaliseList(tripMeta.preferred_styles),
+    ...normaliseList(parsedMeta.styles),
+    ...normaliseList(tripMeta.styles)
+  ].filter((tag, index, all) => all.indexOf(tag) === index)
+  const startDate = parsedMeta.start_date || tripMeta.travel_date_start || tripMeta.start_date || tripMeta.travel_dates?.start
+  const endDate = parsedMeta.end_date || tripMeta.travel_date_end || tripMeta.end_date || tripMeta.travel_dates?.end
+  const formattedDateRange = formatTripDateRange(startDate, endDate, days)
+  const listingTitle = listing?.itinerary_title || `${listing?.city_name || 'Trip'} Itinerary`
+  const tripInfoChips = [
+    {
+      key: 'date',
+      icon: <CalendarIcon />,
+      value: formattedDateRange,
+      className: 'bg-[#F0EBE3] text-secondary border-border/40'
+    },
+    budgetType && {
+      key: 'budget',
+      icon: <BudgetIcon />,
+      value: budgetType,
+      className: getBudgetStyle(budgetType)
+    },
+    pace && {
+      key: 'pace',
+      icon: <PaceIcon />,
+      value: pace,
+      className: 'bg-[#F0EBE3] text-secondary border-border/40'
+    },
+    groupSize && {
+      key: 'group',
+      icon: <GroupIcon />,
+      value: groupSize,
+      className: 'bg-[#F0EBE3] text-secondary border-border/40'
+    }
+  ].filter(Boolean)
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20 font-body">
-      <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
-        <div className="px-4 sm:px-10 pt-8 sm:pt-12 pb-12 sm:pb-16 bg-white flex flex-col items-center">
-          <div className="w-full max-w-[1100px] animate-in fade-in slide-in-from-bottom-4 duration-700">
-        
-        <div className="mb-6">
-          <Link href={`/marketplace/${listingId}`} className="text-[12px] text-secondary font-bold hover:text-charcoal transition-colors tracking-wide uppercase">
-            &larr; Back to Offer
-          </Link>
-        </div>
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20 font-body [&_button:not(:disabled)]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
+      <section className="max-w-7xl mx-auto w-full flex flex-col md:flex-row gap-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-        <DarkHeader 
-          tag={activeOffer.status === 'pending' ? 'In Progress' : activeOffer.status} 
-          title="Chat with Tour Guide" 
-        />
-
-        <div className="bg-white flex flex-col md:flex-row border-x border-b border-[#E5E0DA] rounded-b-[32px] overflow-hidden shadow-xl shadow-black/5">
-           {/* Left Context Pane */}
-           <div className="w-full md:w-[35%] bg-[#FAF9F7] p-8 border-r border-[#E5E0DA] flex flex-col justify-between">
-             <div>
-               <div className="inline-block bg-[#F0EBE3] text-charcoal text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest mb-3">
-                 Current Offer
-               </div>
-               <h3 className="font-display font-extrabold text-[24px] text-charcoal leading-tight mb-6">
-                 {formatMYR(activeOffer.proposed_price)}
-               </h3>
-
-               <div className="space-y-4 mb-8">
-                 <div>
-                   <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Tour Guide</div>
-                   <div className="text-[14px] font-bold text-charcoal flex items-center gap-2">
-                     {activeOffer.guide_name || 'Guide'} <span className="bg-[#EAF3DE] text-[#3B6D11] px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider font-extrabold">Verified</span>
+           {/* Left Context Island */}
+           <div className="w-full md:w-[35%] bg-[#FAF9F7] border border-border/50 rounded-[24px] shadow-sm overflow-hidden flex flex-col md:h-[680px]">
+             <DarkHeader 
+               tag={activeOffer.status === 'pending' ? 'In Progress' : activeOffer.status} 
+               title="Chat with Tour Guide" 
+             />
+             <div className="p-6 flex-1 md:overflow-y-auto">
+               <div>
+                 <div className="mb-5">
+                   <div className="inline-block bg-[#F0EBE3] text-charcoal text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest mb-3">
+                     Trip Info
+                   </div>
+                   <h2 className="font-display font-extrabold text-[22px] text-charcoal leading-tight mb-3">
+                     {listingTitle}
+                   </h2>
+                   <div className="flex flex-wrap items-center gap-1.5">
+                     {tripInfoChips.map(chip => (
+                       <span
+                         key={chip.key}
+                         className={`flex items-center gap-1.5 px-2 rounded border text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0 ${chip.className}`}
+                       >
+                         {chip.icon}
+                         <span className="pt-[1px]">{chip.value}</span>
+                       </span>
+                     ))}
                    </div>
                  </div>
-                 <div>
-                   <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Traveller Target</div>
-                   <div className="text-[14px] font-bold text-charcoal line-through decoration-secondary/40">{formatMYR(listing.desired_budget)}</div>
+
+                 {preferenceTags.length > 0 && (
+                   <div className="mb-5">
+                     <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-2">Preference</div>
+                     <div className="flex flex-wrap items-center gap-1.5">
+                       {preferenceTags.map(tag => (
+                         <span
+                           key={tag}
+                           className="flex items-center px-2 rounded border border-[#EAE6DF] bg-[#FDFBF7] text-[#7A7367] text-[10px] font-bold uppercase leading-none h-[22px] whitespace-nowrap shrink-0"
+                         >
+                           <span className="pt-[1px]">{tag}</span>
+                         </span>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
+                 <div className="space-y-3 mb-5">
+                   <div>
+                     <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Tour Guide</div>
+                     <div className="text-[14px] font-bold text-charcoal flex items-center gap-2">
+                       {activeOffer.guide_name || 'Guide'} <span className="bg-[#EAF3DE] text-[#3B6D11] px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider font-extrabold">Verified</span>
+                     </div>
+                   </div>
+                   <div>
+                     <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Current Offer</div>
+                     <div className="font-display font-extrabold text-[24px] text-charcoal leading-tight">
+                       {formatMYR(activeOffer.proposed_price)}
+                     </div>
+                   </div>
+                   <div>
+                     <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Traveller Target</div>
+                     <div className="text-[14px] font-bold text-charcoal line-through decoration-secondary/40">{formatMYR(listing.desired_budget)}</div>
+                   </div>
                  </div>
+                 <p className="text-[13px] text-secondary leading-relaxed border-t border-border pt-4">
+                   Use the chat to discuss specific requirements, clarify inclusions, or negotiate the final price. The traveller must accept the offer to secure the booking.
+                 </p>
                </div>
-               <p className="text-[13px] text-secondary leading-relaxed border-t border-border pt-6">
-                 Use the chat to discuss specific requirements, clarify inclusions, or negotiate the final price. The traveller must accept the offer to secure the booking.
-               </p>
              </div>
            </div>
 
-           {/* Right Chat Interface */}
-           <div className="w-full md:w-[65%] flex flex-col h-[600px] relative bg-[#FCFBF9]">
+           {/* Right Chat Island */}
+           <div className="w-full md:w-[65%] flex flex-col h-[680px] relative bg-[#FCFBF9] border border-border/50 rounded-[24px] shadow-sm overflow-hidden">
              {/* Chat header */}
-             <div className="px-8 py-5 border-b border-[#E5E0DA] bg-white flex justify-between items-center z-10">
+             <div className="h-[80px] px-8 py-5 border-b border-[#E5E0DA] bg-white flex justify-between items-center z-10">
                <div className="flex items-center gap-3">
                  <Avatar name={isGuide ? listing?.traveller_name || 'Traveller' : activeOffer.guide_name || 'Guide'} size="md" />
                   <div>
@@ -384,40 +594,32 @@ export default function ChatPage() {
                <div className="flex items-center gap-2">
                  <button
                    onClick={() => setShowItineraryModal(true)}
-                   className="px-4 py-2.5 border border-[#E5E0DA] bg-white text-charcoal hover:bg-[#FAF9F7] text-[12px] font-bold rounded-lg shadow-sm transition-all"
+                   className="px-4 py-2 border border-[#E5E0DA] bg-white text-charcoal hover:bg-[#FAF9F7] text-[12px] font-bold rounded-lg shadow-sm transition-all"
                  >
                    View Itinerary
                  </button>
-                 {isTraveller && activeOffer.status === 'pending' && (
-                   <button
-                     onClick={async () => {
-                       await fetch(`/api/marketplace/offers/${activeOffer.id}`, {
-                         method: 'PATCH',
-                         headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify({ status: 'accepted' })
-                       })
-                       await fetch(`/api/marketplace/listings/${listingId}`, {
-                         method: 'PATCH',
-                         headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify({ status: 'confirmed' })
-                       })
-                       router.push(`/marketplace/${listingId}`)
-                     }}
-                     className="px-5 py-2.5 bg-amber hover:bg-[#E08A1E] text-white text-[12px] font-bold rounded-lg shadow-sm transition-all focus:ring-2 focus:ring-amber/40 outline-none"
+                 {isTraveller && activeOffer.status === 'pending' && !isOfferLocked && (
+                  <button
+                    onClick={handleAcceptOffer}
+                     className="px-5 py-2 bg-amber hover:bg-[#E08A1E] text-white text-[12px] font-bold rounded-lg shadow-sm transition-all focus:ring-2 focus:ring-amber/40 outline-none"
                    >
                      Accept {formatMYR(activeOffer.proposed_price)}
                    </button>
                  )}
-                 {isGuide && activeOffer.status !== 'accepted' && (
+                 {isGuide && !isOfferLocked && (
                    <button
-                     onClick={() => { setEditPrice(activeOffer?.proposed_price?.toString() || ''); setShowEditPriceModal(true) }}
-                     className="px-4 py-2.5 border border-[#D48C44] bg-[#D48C44] text-white hover:bg-[#C27E3B] text-[12px] font-bold rounded-lg shadow-sm transition-all"
+                     onClick={() => {
+                       if (isOfferLocked) return
+                       setEditPrice(activeOffer?.proposed_price?.toString() || '')
+                       setShowEditPriceModal(true)
+                     }}
+                     className="px-4 py-2 border border-[#D48C44] bg-[#D48C44] text-white hover:bg-[#C27E3B] text-[12px] font-bold rounded-lg shadow-sm transition-all"
                    >
                      Edit Offer Price
                    </button>
                  )}
                  {isGuide && activeOffer.status === 'pending' && (
-                   <button className="px-5 py-2.5 bg-[#F0EBE3] text-charcoal text-[12px] font-bold rounded-lg shadow-sm transition-all hidden sm:block">
+                   <button className="px-5 py-2 bg-[#F0EBE3] text-charcoal text-[12px] font-bold rounded-lg shadow-sm transition-all hidden sm:block">
                      Offer Pending
                    </button>
                  )}
@@ -445,6 +647,24 @@ export default function ChatPage() {
                         </div>
                       )
                     }
+                    const content = msg.content
+                    if (content && content.startsWith(OFFER_ACCEPTED_TOKEN)) {
+                      return (<div key={msg.id || idx} className="flex justify-center"><div className="bg-[#EFF6FF] border border-blue-200 px-4 py-2 rounded-xl text-[12px] text-blue-700 font-medium">🎉 Traveller accepted this offer</div></div>)
+                    }
+                    if (content && content.startsWith(OFFER_WITHDRAWN_TOKEN)) {
+                      return (<div key={msg.id || idx} className="flex justify-center"><div className="bg-[#FEF2F2] border border-red-200 px-4 py-2 rounded-xl text-[12px] text-red-700 font-medium">Offer withdrawn by tour guide</div></div>)
+                    }
+                    if (content && content.startsWith(PAYMENT_ENABLED_TOKEN)) {
+                      const amt = content.split(':')[1]
+                      return (<div key={msg.id || idx} className="flex justify-center"><div className="bg-[#FFFBEB] border border-amber/30 px-4 py-2 rounded-xl text-[12px] text-amber-700 font-medium">💳 Payment of {formatMYR(amt)} enabled — <a href={'/marketplace/' + listingId} className="underline font-bold">Pay Now</a></div></div>)
+                    }
+                    if (content && content.startsWith(PAYMENT_COMPLETED_TOKEN)) {
+                      const amt = content.split(':')[1]
+                      return (<div key={msg.id || idx} className="flex justify-center"><div className="bg-[#ECFDF5] border border-green-200 px-4 py-2 rounded-xl text-[12px] text-green-700 font-medium">✅ Payment of {formatMYR(amt)} completed</div></div>)
+                    }
+                    if (content && content.startsWith(ITINERARY_UPDATED_TOKEN)) {
+                      return (<div key={msg.id || idx} className="flex justify-center"><div className="bg-[#FFFDF5] border border-amber/20 px-4 py-2 rounded-xl text-[12px] text-amberdark font-medium">🗺️ Itinerary updated</div></div>)
+                    }
                     return (
                       <div key={msg.id || idx} className={`flex gap-3 max-w-[85%] ${isMine ? 'self-end ms-auto flex-row-reverse' : ''}`}>
                         <Avatar 
@@ -456,7 +676,7 @@ export default function ChatPage() {
                         />
                         <div className={`flex flex-col ${isMine ? 'items-end' : ''}`}>
                           <div className={`${isMine ? 'bg-charcoal text-white rounded-tr-sm' : 'bg-white border border-[#E5E0DA] text-charcoal rounded-tl-sm'} rounded-2xl px-5 py-3.5 text-[14px] leading-relaxed shadow-sm`}>
-                            {msg.content}
+                            {content}
                           </div>
                           <div className="text-[10px] text-secondary/60 font-medium mt-1.5 px-1 flex items-center gap-1">
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -490,9 +710,6 @@ export default function ChatPage() {
                 </div>
              </div>
            </div>
-        </div>
-           </div>
-        </div>
       </section>
 
       {showItineraryModal && (
@@ -655,7 +872,7 @@ export default function ChatPage() {
       )}
 
       {/* Edit Price Modal */}
-      {showEditPriceModal && (
+      {showEditPriceModal && !isOfferLocked && (
         <Modal 
           onClose={() => setShowEditPriceModal(false)}
           title="Edit Offer Price"

@@ -25,7 +25,7 @@ export default function SchedulePage() {
         
         if (guideError || !guide) throw new Error('Could not find guide profile')
 
-        // 1. Get offers where the associated listing is 'confirmed'
+        // 1. Get this guide's accepted offers where the associated listing is confirmed.
         const { data: acceptedOffers, error: offersError } = await supabase
           .from('marketplace_offers')
           .select(`
@@ -45,6 +45,7 @@ export default function SchedulePage() {
             )
           `)
           .eq('guide_id', guide.id)
+          .eq('status', 'accepted')
           .eq('marketplace_listings.status', 'confirmed')
 
         if (offersError) throw new Error(offersError.message)

@@ -6,7 +6,11 @@ import { useAppRouter as useRouter } from '@/components/providers/PageTransition
 import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
 import ItineraryTimeline from '@/components/ui/ItineraryTimeline'
+import { resolveMarketplacePlatformFeeRate } from '@/lib/marketplace/payment-config'
 const formatMYR = (amount) => `RM ${Number(amount).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+const PLATFORM_FEE_RATE = resolveMarketplacePlatformFeeRate(process.env.NEXT_PUBLIC_MARKETPLACE_PLATFORM_FEE_RATE)
+const platformFeeLabel = `${Math.round(PLATFORM_FEE_RATE * 100)}% Platform Fee`
+const calculateExpectedPayout = (amount) => amount - (amount * PLATFORM_FEE_RATE)
 
 export default function SubmitOfferPage() {
   const router = useRouter()
@@ -162,8 +166,8 @@ export default function SubmitOfferPage() {
         }
       }
 
-      // Redirect guide directly into this offer's chat thread
-      router.push(`/marketplace/${listingId}/chat?guide=${offerData.guide_id}`)
+      // Redirect to the listing detail page
+      router.push(`/marketplace/${listingId}`)
 
     } catch (err) {
       setError(err.message)
@@ -360,7 +364,7 @@ export default function SubmitOfferPage() {
                  
                  <div className="flex justify-between items-center mt-3 px-1">
                    <div className="text-[12px] text-secondary font-medium">
-                     Expected Payout: <strong className="text-charcoal ml-0.5">{proposedPrice ? formatMYR(parseFloat(proposedPrice) * 0.9) : 'RM 0'} <span className="text-[#888] font-normal">(10% Platform Fee)</span></strong>
+                      Expected Payout: <strong className="text-charcoal ml-0.5">{proposedPrice ? formatMYR(calculateExpectedPayout(parseFloat(proposedPrice))) : 'RM 0'} <span className="text-[#888] font-normal">({platformFeeLabel})</span></strong>
                    </div>
                    {indicator && (
                      <div className={`text-[12px] font-bold ${indicator.color}`}>
