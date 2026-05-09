@@ -29,6 +29,7 @@ export default function ListingDetailPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const showSuccess = searchParams ? searchParams.get('success') === 'true' : false
+  const fromSchedule = searchParams ? searchParams.get('from') === 'schedule' : false
   const listingId = Array.isArray(params?.id) ? params.id[0] : params?.id
 
   console.log('params =', params)
@@ -403,13 +404,13 @@ export default function ListingDetailPage() {
             {/* Top Navigation */}
             <div className="mb-8">
         <button 
-          onClick={() => router.push('/marketplace')} 
+          onClick={() => router.push(fromSchedule ? '/guide/history' : '/marketplace')} 
           className="text-[12px] font-bold text-secondary uppercase tracking-widest hover:text-charcoal transition-colors flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          BACK TO MARKETPLACE
+          {fromSchedule ? 'BACK TO SCHEDULE' : 'BACK TO MARKETPLACE'}
         </button>
       </div>
 

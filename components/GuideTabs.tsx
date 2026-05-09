@@ -15,7 +15,7 @@ export default function GuideTabs() {
         Chats
       </TabLink>
       <TabLink href="/guide/history" active={pathname?.startsWith('/guide/history')}>
-        History
+        Schedule
       </TabLink>
     </div>
   )

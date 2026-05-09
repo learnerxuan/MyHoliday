@@ -81,7 +81,7 @@ export default function Navbar() {
               <>
                 <NavLink href="/marketplace">Marketplace</NavLink>
                 <NavLink href="/guide/chats">Chats</NavLink>
-                <NavLink href="/guide/history">History</NavLink>
+                <NavLink href="/guide/history">Schedule</NavLink>
               </>
             ) : (
               <>
@@ -173,7 +173,7 @@ export default function Navbar() {
               <>
                 <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
                 <MobileNavLink href="/guide/chats" onClick={close}>Chats</MobileNavLink>
-                <MobileNavLink href="/guide/history" onClick={close}>History</MobileNavLink>
+                <MobileNavLink href="/guide/history" onClick={close}>Schedule</MobileNavLink>
               </>
             ) : (
               <>
