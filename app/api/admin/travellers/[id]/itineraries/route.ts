@@ -1,9 +1,9 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextRequest } from 'next/server'
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const profileId = params.id
+    const { id: profileId } = await params
     const supabase = await createSupabaseServerClient()
 
     // Fetch profile to get user_id
@@ -30,8 +30,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     }
 
     return Response.json({ itineraries: itineraries || [] })
-  } catch (err: any) {
+  } catch (err) {
     console.error('Admin traveller itineraries GET error:', err)
-    return Response.json({ error: err?.message || 'Failed to load itineraries' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Failed to load itineraries'
+    return Response.json({ error: message }, { status: 500 })
   }
 }
