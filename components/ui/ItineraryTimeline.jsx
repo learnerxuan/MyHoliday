@@ -41,11 +41,6 @@ export default function ItineraryTimeline({ listing, isEditable = false, onSugge
                         <span className="text-[10px] font-bold tracking-widest uppercase bg-white border border-border px-2.5 py-1.5 rounded-lg text-secondary">
                           {icon} {activity.type || 'place'}
                         </span>
-                        {(activity.price_estimate || activity.cost) && (
-                          <span className="text-[10px] font-bold tracking-widest uppercase bg-[#EDFDF3] border border-[#BCE7D0] px-2.5 py-1.5 rounded-lg text-[#036A38]">
-                            {activity.price_estimate || `RM ${activity.cost}`}
-                          </span>
-                        )}
                       </div>
                     </div>
                   </div>

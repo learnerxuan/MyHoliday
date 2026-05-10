@@ -366,28 +366,11 @@ export default function ListingDetailPage() {
 
     try {
       const withdrawRes = await fetch(`/api/marketplace/offers/${offerId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'withdrawn' })
+        method: 'DELETE'
       })
       if (!withdrawRes.ok) {
         const data = await withdrawRes.json().catch(() => ({}))
         throw new Error(data.error || 'Failed to withdraw offer.')
-      }
-
-      const messageRes = await fetch('/api/marketplace/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          offer_id: offerId,
-          sender_id: user.id,
-          sender_type: user.role,
-          content: '__OFFER_WITHDRAWN__'
-        })
-      })
-      if (!messageRes.ok) {
-        const data = await messageRes.json().catch(() => ({}))
-        throw new Error(data.error || 'Offer withdrawn, but chat update failed.')
       }
 
       router.push('/marketplace')

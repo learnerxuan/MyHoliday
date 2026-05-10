@@ -23,6 +23,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid sender_type' }, { status: 400 })
   }
 
+  const { data: offer, error: offerError } = await supabase
+    .from('marketplace_offers')
+    .select(`
+      id,
+      guide_id,
+      marketplace_listings(user_id, status, is_suspended)
+    `)
+    .eq('id', offer_id)
+    .single()
+
+  if (offerError || !offer) {
+    return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
+  }
+
+  const relatedListing = Array.isArray(offer.marketplace_listings)
+    ? offer.marketplace_listings[0]
+    : offer.marketplace_listings
+
+  if (relatedListing?.status === 'closed' || relatedListing?.is_suspended) {
+    return NextResponse.json({ error: 'This chat is no longer available' }, { status: 410 })
+  }
+
   const { data, error } = await supabase
     .from('marketplace_messages')
     .insert([

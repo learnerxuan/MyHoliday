@@ -83,10 +83,16 @@ export default function ChatsPage() {
     [messages]
   )
   const activeThreadStatus = String(activeThread?.status || '').toLowerCase()
-  const isActiveThreadAccepted = activeThreadStatus === 'accepted'
+  const isActiveThreadRejected = activeThreadStatus === 'rejected'
+  const isActiveThreadAccepted = Boolean(
+    activeThreadStatus === 'accepted' ||
+    activeThread?.has_acceptance_message ||
+    activeThreadHasAcceptanceMessage
+  )
 
   const isActiveOfferLocked = Boolean(
     activeThread && (
+      isActiveThreadRejected ||
       isActiveThreadAccepted ||
       activeThread.payment_enabled ||
       activeThread.has_acceptance_message ||
@@ -284,12 +290,21 @@ export default function ChatsPage() {
     loadMessages(activeOfferId).catch((err) => setError(err.message || 'Failed to load messages.'))
     // Fetch transaction if the active thread's offer is accepted
     const thread = threads.find(t => t.offer_id === activeOfferId)
-    if (thread?.status === 'accepted') {
+    const hasAccepted =
+      thread?.status === 'accepted' ||
+      thread?.has_acceptance_message
+    if (hasAccepted) {
       fetchTransaction(activeOfferId)
     } else {
       setTransaction(null)
     }
   }, [activeOfferId, threads])
+
+  useEffect(() => {
+    if (!activeOfferId || !activeThreadHasAcceptanceMessage) return
+    const timer = setTimeout(() => fetchTransaction(activeOfferId), 0)
+    return () => clearTimeout(timer)
+  }, [activeOfferId, activeThreadHasAcceptanceMessage])
 
   useEffect(() => {
     if (!threads.length) return
@@ -377,7 +392,7 @@ export default function ChatsPage() {
   }, [messages, activeOfferId])
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !activeOfferId || !guideUserId || isSending) return
+    if (!newMessage.trim() || !activeOfferId || !guideUserId || isSending || isActiveThreadRejected) return
     setIsSending(true)
     try {
       const res = await fetch('/api/marketplace/messages', {
@@ -645,6 +660,18 @@ export default function ChatsPage() {
               </div>
             </header>
 
+            {isActiveThreadRejected && (
+              <div className="mx-0 px-6 py-4 border-b border-red-200 bg-[#FEF2F2]">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">×</span>
+                  <div>
+                    <p className="font-bold text-[#B91C1C] text-[14px]">Offer Rejected</p>
+                    <p className="text-[#DC2626] text-[12px]">This traveller chose another offer. This chat is now read-only.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Payment Banner — shown when offer is accepted */}
             {isActiveThreadAccepted && (
               <div className={`mx-0 px-6 py-4 border-b border-border/60 ${
@@ -775,12 +802,13 @@ export default function ChatsPage() {
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               type="text"
-              placeholder={`Reply to ${activeThread?.traveller_name || 'traveller'}...`}
-              className="w-full bg-[#FAF9F7] border border-[#E5E0DA] rounded-xl pl-5 pr-14 py-3.5 text-[14px] text-charcoal focus:outline-none focus:border-amber focus:ring-2 focus:ring-amber/10 transition-all placeholder:text-secondary/60"
+              placeholder={isActiveThreadRejected ? 'This rejected offer chat is read-only.' : `Reply to ${activeThread?.traveller_name || 'traveller'}...`}
+              disabled={isActiveThreadRejected}
+              className="w-full bg-[#FAF9F7] border border-[#E5E0DA] rounded-xl pl-5 pr-14 py-3.5 text-[14px] text-charcoal focus:outline-none focus:border-amber focus:ring-2 focus:ring-amber/10 transition-all placeholder:text-secondary/60 disabled:cursor-not-allowed disabled:opacity-60"
             />
             <button
               onClick={sendMessage}
-              disabled={isSending || !newMessage.trim() || !activeOfferId}
+              disabled={isSending || !newMessage.trim() || !activeOfferId || isActiveThreadRejected}
               className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-charcoal hover:bg-black/5 rounded-lg transition-colors disabled:opacity-50"
             >
               {isSending ? <Spinner className="w-4 h-4 border-2" /> : <span className="text-[20px] leading-none mb-1">↗</span>}

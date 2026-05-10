@@ -20,8 +20,30 @@ const normaliseList = (value) => {
 const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, offerAmount, onClick, onSubmitOffer }) => {
   // If listing is open and no offer is submitted by me, I can submit an offer
   const isActionable = status === "open" && !offerAmount
+  const isRejected = status === 'rejected'
+  const statusLabel =
+    status === 'open' ? 'Open for Offers' :
+    status === 'negotiating' ? 'In Negotiation' :
+    status === 'accepted' ? 'Offer Accepted' :
+    status === 'rejected' ? 'Offer Rejected' :
+    status === 'confirmed' ? 'Booking Confirmed' :
+    null
+  const statusClass =
+    status === 'open' ? 'bg-[#F0EDE9] text-[#888]' :
+    status === 'negotiating' ? 'bg-[#EFF6FF] text-[#185FA5]' :
+    status === 'accepted' ? 'bg-[#EFF6FF] text-[#185FA5]' :
+    status === 'rejected' ? 'bg-[#FEF2F2] text-[#EF4444]' :
+    'bg-[#ECFDF5] text-[#059669]'
   return (
-    <div className="bg-white border border-border rounded-xl p-5 cursor-pointer hover:border-charcoal transition-all hover:shadow-md" onClick={onClick}>
+    <div
+      className={`bg-white border border-border rounded-xl p-5 transition-all ${
+        isRejected
+          ? 'opacity-70 cursor-not-allowed'
+          : 'cursor-pointer hover:border-charcoal hover:shadow-md'
+      }`}
+      onClick={isRejected ? undefined : onClick}
+      aria-disabled={isRejected}
+    >
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="text-[16px] font-bold text-charcoal">{title}</div>
@@ -34,9 +56,11 @@ const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, o
       </div>
       <div className="flex gap-1.5 mb-4 flex-wrap items-center">
         {tags.map(t => <span key={t} className="text-[10px] font-bold px-2 py-1 bg-subtle text-amber rounded">{t}</span>)}
-        <span className={`text-[11px] font-bold px-2.5 py-1 rounded ${status === 'open' ? 'bg-[#F0EDE9] text-[#888]' : status === 'negotiating' ? 'bg-[#EFF6FF] text-[#185FA5]' : 'bg-[#ECFDF5] text-[#059669]'}`}>
-          {status === 'open' ? 'Open for Offers' : status === 'negotiating' ? 'In Negotiation' : 'Confirmed'}
-        </span>
+        {statusLabel && (
+          <span className={`text-[11px] font-bold px-2.5 py-1 rounded ${statusClass}`}>
+            {statusLabel}
+          </span>
+        )}
       </div>
       <div className="flex justify-between items-center pt-3.5 border-t border-[#F0EDE9]">
         {offerAmount ? (
@@ -51,6 +75,10 @@ const GuideListingCard = ({ title, travellerName, dates, budget, tags, status, o
           >
             Submit Offer
           </button>
+        ) : isRejected ? (
+           <span className="bg-[#FEF2F2] text-[#EF4444] px-3.5 py-[7px] text-[11px] rounded-lg font-bold">
+             Rejected
+           </span>
         ) : status === 'negotiating' ? (
            <button className="bg-charcoal text-white px-3.5 py-[7px] text-[11px] rounded-lg font-bold hover:bg-black transition-colors">View Chat</button>
         ) : (
@@ -157,8 +185,9 @@ export default function MarketplacePage() {
             is_suspended,
             created_at,
             destinations ( city, country ),
-            marketplace_offers ( id, status, guide_id, proposed_price, tour_guides ( full_name ) )
+            marketplace_offers ( id, status, guide_id, proposed_price, payment_enabled, tour_guides ( full_name ), transactions ( status ) )
           `)
+          .neq('status', 'closed')
           .order('created_at', { ascending: false })
 
         if (role === 'guide') {
@@ -265,23 +294,46 @@ export default function MarketplacePage() {
           const budgetType = parsedMeta.budget || tripMeta.budget || parsedMeta.budget_profile || tripMeta.budget_profile
 
           const offers = l.marketplace_offers || []
+          const paidOffer = offers.find(o => o.transactions?.some?.(tx => tx.status === 'completed'))
+          const acceptedOffer = offers.find(o => String(o.status || '').toLowerCase() === 'accepted')
+          const bookingOffer = acceptedOffer || paidOffer
+          const effectiveOffers = bookingOffer
+            ? offers.map(o => (
+                o.id !== bookingOffer.id && o.status !== 'withdrawn'
+                  ? { ...o, status: 'rejected' }
+                  : o
+              ))
+            : offers
+          const activeOffer =
+            bookingOffer ||
+            effectiveOffers.find(o => o.status !== 'rejected' && o.status !== 'withdrawn') ||
+            null
+          const reviewableOffers = effectiveOffers.filter(o => o.status === 'pending' || o.status === 'accepted')
+          const hasCompletedPayment = Boolean(paidOffer)
+          const isBookingConfirmed = hasCompletedPayment
 
           let displayStatus = l.status
           if (l.is_suspended) {
             displayStatus = 'suspended'
+          } else if (isBookingConfirmed) {
+            displayStatus = 'confirmed'
+          } else if (bookingOffer || l.status === 'confirmed') {
+            displayStatus = 'accepted'
           } else if (l.status === 'open') {
-            displayStatus = offers.length > 0 ? 'has_offers' : 'awaiting'
+            displayStatus = reviewableOffers.length > 0 ? 'has_offers' : 'awaiting'
           }
 
           let guideInfo = null
-          const acceptedOffer = offers.find(o => o.status === 'accepted')
-          const primaryOffer = acceptedOffer || (offers.length > 0 ? offers[0] : null)
+          const primaryOffer = bookingOffer || (displayStatus === 'accepted' || displayStatus === 'confirmed'
+            ? activeOffer
+            : (reviewableOffers.length > 0 ? reviewableOffers[0] : null))
           
           if (primaryOffer) {
             guideInfo = {
               name: primaryOffer.tour_guides?.full_name || 'Ahmad R.',
               location: l.destinations?.city || 'City',
-              status: primaryOffer.status === 'accepted' ? 'Accepted' : 'Offer received'
+              status: isBookingConfirmed ? 'Confirmed' : primaryOffer.status === 'accepted' ? 'Accepted' : 'Offer received',
+              price: primaryOffer.proposed_price
             }
           }
 
@@ -312,9 +364,12 @@ export default function MarketplacePage() {
             tags,
             budgetType,
             displayStatus,
-            offerCount: offers.length,
+            displayBudget: displayStatus === 'accepted' || displayStatus === 'confirmed'
+              ? (primaryOffer?.proposed_price || l.desired_budget)
+              : l.desired_budget,
+            offerCount: displayStatus === 'accepted' || displayStatus === 'confirmed' ? 0 : reviewableOffers.length,
             guideInfo,
-            offers
+            offers: effectiveOffers
           }
         })
 
@@ -340,22 +395,27 @@ export default function MarketplacePage() {
     if (!listingToDelete) return
     
     const targetId = listingToDelete.id
+    setIsDeleting(true)
     
     // Optimistic UI Update: Instantly remove the card and close the modal
     setListings(prev => prev.filter(l => String(l.id) !== String(targetId)))
     setListingToDelete(null)
 
-    // Perform database deletion silently in the background
+    // Use the server route so closed listings are hidden from guides and chat is disabled.
     try {
-      const { error: deleteError } = await supabase
-        .from('marketplace_listings')
-        .delete()
-        .eq('id', targetId)
+      const res = await fetch(`/api/marketplace/listings/${targetId}`, {
+        method: 'DELETE'
+      })
 
-      if (deleteError) throw deleteError
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to withdraw listing')
+      }
     } catch (err) {
       console.error('Failed to delete listing in background:', err)
-      // Revert is omitted for simplicity, but could be added here
+      setError(err.message || 'Failed to withdraw listing')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -370,14 +430,14 @@ export default function MarketplacePage() {
          if (myOffer) return false;
          return item.status === 'open' || item.status === 'awaiting'
       }
-      if (filter === 'my_offers') return !!myOffer && item.status !== 'confirmed';
-      if (filter === 'confirmed') return !!myAcceptedOffer && item.status === 'confirmed';
+      if (filter === 'my_offers') return !!myOffer && item.displayStatus !== 'confirmed';
+      if (filter === 'confirmed') return !!myAcceptedOffer && item.displayStatus === 'confirmed';
       return false
     } else {
       if (filter === 'all') return true
       if (filter === 'open') return item.status === 'open' || item.status === 'awaiting' || item.status === 'has_offers'
-      if (filter === 'has_offers') return item.displayStatus === 'has_offers' || item.offerCount > 0
-      if (filter === 'settled') return item.status === 'confirmed'
+      if (filter === 'has_offers') return item.displayStatus === 'has_offers' || item.displayStatus === 'accepted'
+      if (filter === 'settled') return item.displayStatus === 'confirmed'
       return true
     }
   })
@@ -515,15 +575,20 @@ export default function MarketplacePage() {
                     title={listing.title}
                     city={listing.city_name} 
                     country={listing.country_name}
-                    budget={listing.desired_budget} 
+                    budget={listing.displayBudget} 
                     displayStatus={listing.displayStatus}
                     dates={listing.dates}
                     days={listing.days}
                     pax={listing.pax}
                     tags={listing.tags}
                     budgetType={listing.budgetType}
+                    guideInfo={listing.guideInfo}
                     offerCount={listing.offerCount}
-                    onDelete={() => setListingToDelete(listing)}
+                    onDelete={
+                      listing.displayStatus === 'accepted' || listing.displayStatus === 'confirmed'
+                        ? undefined
+                        : () => setListingToDelete(listing)
+                    }
                   />
                 </div>
               ))}
@@ -616,6 +681,9 @@ export default function MarketplacePage() {
               </div>
             ) : filteredListings.map(listing => {
               const myOffer = listing.offers?.find(o => o.guide_id === guideProfile?.id)
+              const guideCardStatus = myOffer
+                ? (myOffer.status === 'accepted' && listing.displayStatus === 'confirmed' ? 'confirmed' : myOffer.status)
+                : listing.status
               return (
                  <GuideListingCard 
                     key={listing.id}
@@ -624,7 +692,7 @@ export default function MarketplacePage() {
                     dates={listing.dates}
                     budget={formatMYR(listing.desired_budget)}
                     tags={listing.tags}
-                    status={listing.status}
+                    status={guideCardStatus}
                     offerAmount={myOffer ? formatMYR(myOffer.proposed_price) : null}
                     onClick={() => {
                       const isActionable = listing.status === 'open' && !myOffer

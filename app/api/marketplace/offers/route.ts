@@ -25,8 +25,10 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from('marketplace_offers')
-      .select('*')
+      .select('*, marketplace_listings!inner(status, is_suspended)')
       .eq('guide_id', guideData.id)
+      .neq('marketplace_listings.status', 'closed')
+      .eq('marketplace_listings.is_suspended', false)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -64,6 +66,20 @@ export async function POST(request: Request) {
 
   if (guideError || !guideData) {
     return NextResponse.json({ error: 'Tour guide profile not found' }, { status: 400 })
+  }
+
+  const { data: listing, error: listingError } = await supabase
+    .from('marketplace_listings')
+    .select('id, status, is_suspended')
+    .eq('id', listing_id)
+    .single()
+
+  if (listingError || !listing) {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+  }
+
+  if (listing.status !== 'open' || listing.is_suspended) {
+    return NextResponse.json({ error: 'This listing is no longer accepting offers' }, { status: 409 })
   }
 
   const { data, error } = await supabase

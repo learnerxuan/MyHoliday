@@ -444,7 +444,7 @@ function NewListingContent() {
                 type="number" 
                 value={postBudget}
                 onChange={(e) => setPostBudget(e.target.value)}
-                placeholder="2500" 
+                placeholder="0" 
                 style={{ width: "100%", padding: "16px 16px 16px 64px", fontSize: 24, fontWeight: 800, fontFamily: "'Funnel Display', sans-serif", border: "2px solid #EBEBEB", borderRadius: 12, outline: "none", color: "#1A1A1A", textAlign: "center" }} 
               />
             </div>

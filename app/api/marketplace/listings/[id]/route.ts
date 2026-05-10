@@ -4,7 +4,7 @@ import { Client } from 'pg'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServerClient()
 
@@ -14,13 +14,15 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const listingId = (await params).id
+
   const { data, error } = await supabase
     .from('marketplace_listings')
     .select(`
       *,
       destinations(city,country)
     `)
-    .eq('id', (await params).id)
+    .eq('id', listingId)
     .single()
 
   if (error) {
@@ -34,8 +36,12 @@ export async function GET(
   const { data: userData } = await supabase.auth.getUser()
   const role = userData?.user?.user_metadata?.role || 'traveller'
 
-  if (role === 'traveller' && data.user_id !== user.id) {
+  if ((role === 'traveller' || role === 'traveler') && data.user_id !== user.id) {
     return NextResponse.json({ error: 'Forbidden. You are not the owner of this listing.' }, { status: 403 })
+  }
+
+  if (role === 'guide' && (data.status === 'closed' || data.is_suspended)) {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
   }
 
   const { data: itinerary, error: itineraryError } = await supabase
@@ -78,7 +84,7 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServerClient()
 
@@ -88,6 +94,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const listingId = (await params).id
   const body = await request.json()
   const { status } = body
 
@@ -100,7 +107,7 @@ export async function PATCH(
   const { data: listing, error: listingError } = await supabase
     .from('marketplace_listings')
     .select('id, user_id')
-    .eq('id', (await params).id)
+    .eq('id', listingId)
     .single()
 
   if (listingError || !listing) {
@@ -118,7 +125,7 @@ export async function PATCH(
       *,
       destinations(city,country)
     `)
-    .eq('id', (await params).id)
+    .eq('id', listingId)
     .single()
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
@@ -128,7 +135,7 @@ export async function PATCH(
 }
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServerClient()
 
@@ -156,7 +163,7 @@ export async function DELETE(
 
   const { error: deleteError } = await supabase
     .from('marketplace_listings')
-    .delete()
+    .update({ status: 'closed' })
     .eq('id', listingId)
 
   if (deleteError) {

@@ -49,7 +49,9 @@ export default function ListingCard({
         <div className="flex items-start gap-3">
           <div className="text-right whitespace-nowrap">
             <p className="font-display font-bold text-2xl text-[#d48c44]">RM {Number(budget).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-            <p className="text-[11px] text-[#d48c44]/70 font-semibold tracking-wider relative -top-1">desired budget</p>
+            <p className="text-[11px] text-[#d48c44]/70 font-semibold tracking-wider relative -top-1">
+              {displayStatus === 'accepted' || displayStatus === 'confirmed' ? 'offer price' : 'desired budget'}
+            </p>
           </div>
           {onDelete && (
             <button 
@@ -74,6 +76,7 @@ export default function ListingCard({
         {displayStatus === 'has_offers' && <span className="px-3 py-1.5 bg-[#FFF9E5] border border-[#FDE68A] text-[#D48C44] text-xs font-bold rounded-lg tracking-wide">Offers Received</span>}
         {displayStatus === 'awaiting' && <span className="px-3 py-1.5 bg-[#F3F4F6] border border-[#E5E7EB] text-[#9CA3AF] text-xs font-bold rounded-lg tracking-wide">Awaiting Offers</span>}
         {displayStatus === 'negotiating' && <span className="px-3 py-1.5 bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] text-xs font-bold rounded-lg tracking-wide">Negotiating</span>}
+        {displayStatus === 'accepted' && <span className="px-3 py-1.5 bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] text-xs font-bold rounded-lg tracking-wide">Offer Accepted</span>}
         {displayStatus === 'confirmed' && <span className="px-3 py-1.5 bg-[#ECFDF5] border border-[#A7F3D0] text-[#059669] text-xs font-bold rounded-lg tracking-wide">Booking Confirmed</span>}
       </div>
 
@@ -84,6 +87,21 @@ export default function ListingCard({
       <div className="min-h-[38px] flex items-center">
         {displayStatus === 'suspended' ? (
           <p className="text-[13px] text-error font-medium w-full text-left">This listing is suspended.</p>
+        ) : ((displayStatus === 'confirmed' || displayStatus === 'accepted') && guideInfo) || (guideInfo && ['Accepted', 'Confirmed'].includes(guideInfo.status)) ? (
+           <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-[#B48F60] border-2 border-[#E7DCCA] text-white flex items-center justify-center font-bold shadow-sm">
+                {guideInfo.name.charAt(0)}
+              </div>
+              <div className="flex flex-col">
+                <p className="font-bold text-sm text-charcoal">{guideInfo.name}</p>
+                <p className="text-[11px] font-medium text-secondary/80">Certified Â· {guideInfo.location || city}</p>
+              </div>
+            </div>
+            <p className={`font-bold ${displayStatus === 'confirmed' ? 'text-[#059669]' : 'text-[#2563EB]'} text-xs tracking-wide`}>
+              {displayStatus === 'confirmed' ? 'Confirmed' : 'Accepted'}
+            </p>
+          </div>
         ) : offerCount > 0 ? (
           <div className="flex items-center justify-between w-full">
             <div>

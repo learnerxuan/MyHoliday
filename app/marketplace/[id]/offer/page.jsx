@@ -22,7 +22,7 @@ export default function SubmitOfferPage() {
   const [listing, setListing] = useState(null)
   const [error, setError] = useState('')
 
-  const [proposedPrice, setProposedPrice] = useState('3400')
+  const [proposedPrice, setProposedPrice] = useState('')
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -71,7 +71,7 @@ export default function SubmitOfferPage() {
         const startDate = parsedMeta.start_date || tripMeta.start_date || tripMeta.travel_dates?.start
         const endDate = parsedMeta.end_date || tripMeta.end_date || tripMeta.travel_dates?.end
         
-        let formattedDateRange = `${days} Days`
+        let formattedDateRange = 'Dates not specified'
         if (startDate && endDate) {
           try {
             const start = new Date(startDate)
@@ -80,12 +80,19 @@ export default function SubmitOfferPage() {
               const sMonth = start.toLocaleDateString('en-US', { month: 'short' })
               const eMonth = end.toLocaleDateString('en-US', { month: 'short' })
               if (sMonth === eMonth && start.getFullYear() === end.getFullYear()) {
-                formattedDateRange = `${start.getDate()} - ${end.getDate()} ${sMonth} ${start.getFullYear()} (${days} Days)`
+                formattedDateRange = `${start.getDate()} - ${end.getDate()} ${sMonth} ${start.getFullYear()}`
               } else if (start.getFullYear() === end.getFullYear()) {
-                formattedDateRange = `${start.getDate()} ${sMonth} - ${end.getDate()} ${eMonth} ${start.getFullYear()} (${days} Days)`
+                formattedDateRange = `${start.getDate()} ${sMonth} - ${end.getDate()} ${eMonth} ${start.getFullYear()}`
               } else {
-                 formattedDateRange = `${start.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} (${days} Days)`
+                 formattedDateRange = `${start.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
               }
+            }
+          } catch(err) {}
+        } else if (startDate) {
+          try {
+            const start = new Date(startDate)
+            if (!isNaN(start.getTime())) {
+              formattedDateRange = start.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
             }
           } catch(err) {}
         }
@@ -204,26 +211,11 @@ export default function SubmitOfferPage() {
   const indicator = getTargetIndicator();
 
   return (
-    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-4 sm:p-6 pb-20 font-body">
-      <section className="max-w-7xl mx-auto w-full bg-white rounded-[24px] shadow-sm border border-border/50 overflow-hidden flex flex-col">
-        <div className="px-4 sm:px-10 pt-8 sm:pt-12 pb-12 sm:pb-16 bg-white flex flex-col items-center">
-          <div className="w-full max-w-[1100px]">
-            {/* Top Navigation */}
-            <div className="mb-8">
-              <button 
-                onClick={() => router.push('/marketplace')} 
-                className="text-[12px] font-bold text-secondary uppercase tracking-widest hover:text-charcoal transition-colors flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Return to Marketplace
-              </button>
-            </div>
-
+    <div className="min-h-screen bg-warmwhite flex flex-col -mt-7 md:-mt-6 p-3 sm:p-4 pb-12 font-body">
+      <section className="max-w-7xl mx-auto w-full flex flex-col">
             {/* Dark Header */}
             <div 
-              className="text-warmwhite relative overflow-hidden pt-10 sm:pt-12 px-6 sm:px-12 pb-8 sm:pb-10 rounded-t-[32px] shadow-sm z-10"
+              className="text-warmwhite relative overflow-hidden pt-5 sm:pt-6 px-4 sm:px-8 pb-5 sm:pb-6 rounded-t-[24px] shadow-sm z-10"
               style={{ background: '#0f0f0f' }}
             >
               <div
@@ -242,21 +234,21 @@ export default function SubmitOfferPage() {
                 }}
               />
               <div className="relative z-10">
-                <h1 className="text-3xl sm:text-[40px] font-extrabold text-white font-display mb-2 tracking-tight leading-tight">
+                <h1 className="text-2xl sm:text-[32px] font-extrabold text-white font-display mb-1 tracking-tight leading-tight">
                   Submit an Offer
                 </h1>
-                <p className="text-sm sm:text-[15px] font-body text-white/60 max-w-2xl leading-relaxed mt-2">
+                <p className="text-xs sm:text-[14px] font-body text-white/60 max-w-2xl leading-snug mt-1">
                   You are bidding on a confirmed itinerary request. Craft a competitive proposal to win this client.
                 </p>
               </div>
             </div>
             
             {/* Body: Two Panes */}
-            <div className="bg-white flex flex-col md:flex-row border-x border-b border-[#E5E0DA] rounded-b-[32px] overflow-hidden shadow-xl shadow-black/5 mb-16">
+            <div className="bg-white flex flex-col md:flex-row border-x border-b border-[#E5E0DA] rounded-b-[24px] overflow-hidden shadow-xl shadow-black/5 mb-8">
             
             {/* LEFT COLUMN: Trip Details */}
-            <div className="md:w-[45%] p-10 md:p-14 border-r border-border/40 flex flex-col relative z-0">
-               <div className="flex justify-between items-center mb-6">
+            <div className="md:w-[45%] p-6 md:p-8 border-r border-border/40 flex flex-col relative z-0">
+               <div className="flex justify-between items-center mb-4">
                  <div className="text-[10px] text-secondary/70 font-bold tracking-[0.2em] uppercase">
                    Trip Details
                  </div>
@@ -267,14 +259,14 @@ export default function SubmitOfferPage() {
                  </div>
                </div>
 
-               <h2 className="font-display font-extrabold text-[#111] text-3xl leading-[1.1] tracking-tight mb-10">
+               <h2 className="font-display font-extrabold text-[#111] text-2xl leading-[1.1] tracking-tight mb-6">
                  {listing?.itinerary_title || 'Urban Exploration & Food Tour'}
                </h2>
 
-               <div className="flex flex-col gap-6 mb-12 flex-1">
+               <div className="flex flex-col gap-4 mb-6 flex-1">
                  {/* Item 1 */}
                  <div className="flex items-start gap-4">
-                   <div className="w-10 h-10 rounded-full bg-[#F4EFEB] flex items-center justify-center shrink-0">
+                   <div className="w-9 h-9 rounded-full bg-[#F4EFEB] flex items-center justify-center shrink-0">
                      <span className="text-[#B95945] text-lg">📍</span> 
                    </div>
                    <div>
@@ -289,7 +281,7 @@ export default function SubmitOfferPage() {
 
                  {/* Item 2 */}
                  <div className="flex items-start gap-4">
-                   <div className="w-10 h-10 rounded-full bg-[#EFEFEF] flex items-center justify-center shrink-0">
+                   <div className="w-9 h-9 rounded-full bg-[#EFEFEF] flex items-center justify-center shrink-0">
                      <span className="text-[#888] text-lg">📅</span> 
                    </div>
                    <div>
@@ -297,61 +289,58 @@ export default function SubmitOfferPage() {
                        Dates
                      </div>
                      <div className="text-[15px] font-semibold text-charcoal">
-                       {listing?.dates || '14 - 18 Oct 2024 (5 Days)'}
+                       {listing?.dates || 'Dates not specified'}
                      </div>
                    </div>
                  </div>
 
                  {/* Item 3 */}
                  <div className="flex items-start gap-4">
-                   <div className="w-10 h-10 rounded-full bg-[#EAEAEA] flex items-center justify-center shrink-0">
+                   <div className="w-9 h-9 rounded-full bg-[#EAEAEA] flex items-center justify-center shrink-0">
                      <span className="text-[#6484A4] text-lg">👤</span>
                    </div>
                    <div>
                      <div className="text-[10px] text-secondary/80 font-bold tracking-widest uppercase mb-1">
                        Traveller
                      </div>
-                     <div className="flex items-center gap-2">
-                       <span className="text-[15px] font-bold text-charcoal">{listing?.travellerName}</span>
-                       <span className="text-[10px] bg-[#F4F4F4] text-[#888] px-2 py-0.5 rounded-md font-bold">First-time visitor</span>
-                     </div>
+                     <div className="text-[15px] font-bold text-charcoal">{listing?.travellerName}</div>
                    </div>
                  </div>
                </div>
 
-               <div className="pt-8 border-t border-border/40">
+               <div className="pt-5 border-t border-border/40">
                  <div className="text-[10px] text-secondary/80 font-bold tracking-widest uppercase mb-2">
                    Target Budget
                  </div>
-                 <div className="font-display font-extrabold text-[32px] tracking-tight text-charcoal">
+                 <div className="font-display font-extrabold text-[28px] tracking-tight text-charcoal">
                    {formatMYR(listing?.desired_budget || 0)}
                  </div>
                </div>
             </div>
 
             {/* RIGHT COLUMN: Propose Your Value */}
-            <div className="md:w-[55%] p-10 md:p-14 bg-white relative">
-               <h3 className="font-display font-extrabold text-[24px] text-charcoal mb-4">
+            <div className="md:w-[55%] p-6 md:p-8 bg-white relative">
+               <h3 className="font-display font-extrabold text-[22px] text-charcoal mb-2">
                  Propose Your Value
                </h3>
-               <p className="text-secondary text-[15px] leading-relaxed mb-10">
+               <p className="text-secondary text-[14px] leading-snug mb-6">
                  Review the traveller&apos;s requirements closely. Present a competitive offer along with a personalized note to increase your chances of being selected.
                </p>
 
                {error && <div className="mb-6 p-4 bg-error-bg text-error text-sm rounded-lg">{error}</div>}
 
                {/* Proposed Price Input */}
-               <div className="mb-8 relative">
-                 <label className="block text-[11px] font-bold tracking-widest uppercase text-charcoal mb-3">
+               <div className="mb-5 relative">
+                 <label className="block text-[11px] font-bold tracking-widest uppercase text-charcoal mb-2">
                    Proposed Price (RM)
                  </label>
-                 <div className="relative flex items-center bg-[#FAFAFA] border border-border focus-within:border-charcoal focus-within:ring-1 focus-within:ring-charcoal rounded-[12px] transition-all overflow-hidden h-[70px]">
-                   <span className="pl-6 text-[22px] font-extrabold text-[#CCC] select-none text-center">
+                 <div className="relative flex items-center bg-[#FAFAFA] border border-border focus-within:border-charcoal focus-within:ring-1 focus-within:ring-charcoal rounded-[12px] transition-all overflow-hidden h-[58px]">
+                   <span className="pl-5 text-[18px] font-extrabold text-[#CCC] select-none text-center">
                      RM
                    </span>
                    <input 
                      type="number"
-                     className="w-full h-full bg-transparent pl-3 pr-10 text-[26px] font-extrabold text-charcoal outline-none placeholder:text-[#EEE]"
+                     className="w-full h-full bg-transparent pl-3 pr-10 text-[22px] font-extrabold text-charcoal outline-none placeholder:text-[#EEE]"
                      value={proposedPrice}
                      onChange={(e) => setProposedPrice(e.target.value)}
                      placeholder="0"
@@ -375,12 +364,12 @@ export default function SubmitOfferPage() {
                </div>
 
                {/* Introductory Message */}
-               <div className="mb-10">
-                 <label className="block text-[11px] font-bold tracking-widest uppercase text-charcoal mb-3">
+               <div className="mb-6">
+                 <label className="block text-[11px] font-bold tracking-widest uppercase text-charcoal mb-2">
                    Introductory Message <span className="text-secondary/70 font-normal capitalize tracking-normal ml-1">(Optional)</span>
                  </label>
                  <textarea 
-                   className="w-full bg-[#FAFAFA] border border-[#EBEBEB] focus:border-charcoal focus:ring-1 focus:ring-charcoal rounded-[12px] p-5 text-[15px] outline-none text-charcoal resize-none placeholder:text-[#AAA] leading-relaxed transition-all h-[140px]"
+                   className="w-full bg-[#FAFAFA] border border-[#EBEBEB] focus:border-charcoal focus:ring-1 focus:ring-charcoal rounded-[12px] p-4 text-[14px] outline-none text-charcoal resize-none placeholder:text-[#AAA] leading-snug transition-all h-[104px]"
                    placeholder="Hi John! I've been a verified guide in KL for 5 years. I specialize in hidden food gems and would love to show you the authentic side of the city..."
                    value={message}
                    onChange={(e) => setMessage(e.target.value)}
@@ -388,17 +377,17 @@ export default function SubmitOfferPage() {
                </div>
 
                {/* Actions */}
-               <div className="flex justify-end items-center gap-4 pt-10 border-t border-border/40">
+               <div className="flex justify-end items-center gap-3 pt-5 border-t border-border/40">
                   <button 
                     onClick={() => router.push('/marketplace')} 
-                    className="px-6 py-4 text-[14px] font-bold text-charcoal hover:bg-[#F4F4F4] rounded-[10px] transition-colors"
+                    className="px-5 py-3 text-[13px] font-bold text-charcoal hover:bg-[#F4F4F4] rounded-[10px] transition-colors"
                   >
                     Cancel
                   </button>
                   <button 
                     onClick={handleSubmit} 
                     disabled={isSubmitting || !proposedPrice}
-                    className="bg-[#BB8B5D] hover:bg-[#A37549] text-white px-8 py-4 rounded-[10px] text-[14px] font-bold shadow-md shadow-[#BB8B5D]/20 transition-colors flex items-center justify-center gap-2 min-w-[160px] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-[#BB8B5D] hover:bg-[#A37549] text-white px-7 py-3 rounded-[10px] text-[13px] font-bold shadow-md shadow-[#BB8B5D]/20 transition-colors flex items-center justify-center gap-2 min-w-[150px] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? <Spinner /> : 'Submit Offer →'}
                   </button>
@@ -408,13 +397,11 @@ export default function SubmitOfferPage() {
           
 {/* POLISHED ITINERARY VIEW */}
       <div className="mb-16 w-full">
+         <h2 className="mb-4 font-display text-2xl font-extrabold tracking-tight text-charcoal">
+           User&apos;s Itinerary
+         </h2>
          <ItineraryTimeline listing={listing} />
       </div>
-
-
-
-        </div>
-        </div>
       </section>
     </div>
   )

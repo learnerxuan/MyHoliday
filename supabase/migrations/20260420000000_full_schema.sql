@@ -1,9 +1,18 @@
 -- ============================================================
--- MyHoliday — Consolidated Database Schema
+-- MyHoliday consolidated Supabase migration
+-- Squashed from all migrations present on 2026-05-10
+-- ============================================================
+
+-- ============================================================
+-- Source: 20260420000000_full_schema.sql
+-- ============================================================
+
+-- ============================================================
+-- MyHoliday - Consolidated Database Schema
 -- Travel and Tourism Recommendation System
 -- ============================================================
 
--- ── EXTENSIONS ──────────────────────────────────────────────
+-- EXTENSIONS ------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================
@@ -212,7 +221,7 @@ ALTER TABLE public.marketplace_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_interactions   ENABLE ROW LEVEL SECURITY;
 
--- ── POLICIES ────────────────────────────────────────────────
+-- POLICIES --------------------------------------------------
 
 -- Destinations: Public Read
 CREATE POLICY "public: read all destinations" ON public.destinations FOR SELECT USING (true);
@@ -241,3 +250,370 @@ CREATE POLICY "user: own itineraries" ON public.itineraries USING (auth.uid() = 
 
 -- User Interactions: Own Access
 CREATE POLICY "user: own interactions" ON public.user_interactions USING (auth.uid() = user_id);
+
+
+-- ============================================================
+-- Source: 20260420_add_is_active_traveller_profiles.sql
+-- ============================================================
+
+-- Add is_active column to traveller_profiles for soft-delete (default TRUE)
+-- Run this in Supabase SQL Editor or apply via your migration workflow
+
+ALTER TABLE public.traveller_profiles
+  ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT TRUE;
+
+-- Ensure existing rows are active
+UPDATE public.traveller_profiles SET is_active = TRUE WHERE is_active IS NULL;
+
+-- Create an index to speed up queries filtering by is_active
+CREATE INDEX IF NOT EXISTS idx_traveller_profiles_is_active ON public.traveller_profiles(is_active);
+
+
+-- ============================================================
+-- Source: 20260421_add_admin_update_policy_traveller_profiles.sql
+-- ============================================================
+
+-- Grant admin users the ability to UPDATE traveller_profiles (e.g. set is_active)
+-- Run this migration using your Supabase migration workflow or SQL editor.
+
+-- Allow admins (role = 'admin' stored in auth.users.raw_user_meta_data) to UPDATE traveller_profiles
+CREATE POLICY "admin: update profiles" ON public.traveller_profiles
+  FOR UPDATE
+  USING ((SELECT (raw_user_meta_data->>'role') FROM auth.users WHERE id = auth.uid()) = 'admin');
+
+-- Optionally, you may want to add a corresponding DELETE policy in a future migration.
+
+
+-- ============================================================
+-- Source: 20260421_fix_admin_update_policy_use_jwt_claims.sql
+-- ============================================================
+
+-- Make admin FOR UPDATE policy robust by checking JWT claims as well as auth.users
+-- This avoids permission errors when the policy's subquery cannot read auth.users
+
+DO $$
+BEGIN
+  -- Drop existing policy if present
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policy
+    WHERE polname = 'admin: update profiles'
+      AND polrelid = 'public.traveller_profiles'::regclass
+  ) THEN
+    DROP POLICY IF EXISTS "admin: update profiles" ON public.traveller_profiles;
+  END IF;
+
+  -- Create a policy that allows admin updates by checking either auth.users
+  -- (legacy) OR the JWT claims (safer in many Supabase setups).
+  CREATE POLICY "admin: update profiles" ON public.traveller_profiles
+    FOR UPDATE
+    USING (
+      (SELECT (raw_user_meta_data->>'role') FROM auth.users WHERE id = auth.uid()) = 'admin'
+      OR (current_setting('jwt.claims', true)::json ->> 'role') = 'admin'
+    );
+END
+$$;
+
+
+-- ============================================================
+-- Source: 20260430_add_admin_update_policy_marketplace_listings.sql
+-- ============================================================
+
+-- Allow admins to update marketplace listings (e.g. suspending/reopening)
+-- CORRECTED to use auth.jwt()
+
+DO $$
+BEGIN
+  -- Drop existing policy if present just in case
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policy
+    WHERE polname = 'admin: update marketplace listings'
+      AND polrelid = 'public.marketplace_listings'::regclass
+  ) THEN
+    DROP POLICY IF EXISTS "admin: update marketplace listings" ON public.marketplace_listings;
+  END IF;
+
+  -- Create the policy using auth.jwt() which correctly reads the user_metadata role
+  CREATE POLICY "admin: update marketplace listings" ON public.marketplace_listings
+    FOR UPDATE
+    USING (
+      (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    );
+END
+$$;
+
+
+-- ============================================================
+-- Source: 20260505_add_is_suspended_marketplace_listings.sql
+-- ============================================================
+
+-- Migration to add the is_suspended column to marketplace_listings
+ALTER TABLE public.marketplace_listings
+ADD COLUMN is_suspended BOOLEAN NOT NULL DEFAULT false;
+
+
+-- ============================================================
+-- Source: 20260505_fix_admin_marketplace_rls.sql
+-- ============================================================
+
+-- Fix Admin RLS Policy for marketplace_listings
+-- Drops any existing admin update policies and creates a comprehensive one
+
+DO $$
+BEGIN
+  -- Drop existing policies if present
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policy
+    WHERE polname = 'admin: update marketplace listings'
+      AND polrelid = 'public.marketplace_listings'::regclass
+  ) THEN
+    DROP POLICY IF EXISTS "admin: update marketplace listings" ON public.marketplace_listings;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policy
+    WHERE polname = 'admin: all marketplace listings'
+      AND polrelid = 'public.marketplace_listings'::regclass
+  ) THEN
+    DROP POLICY IF EXISTS "admin: all marketplace listings" ON public.marketplace_listings;
+  END IF;
+
+  -- Create a comprehensive policy allowing admins to perform ANY action on marketplace listings
+  CREATE POLICY "admin: all marketplace listings" ON public.marketplace_listings
+    FOR ALL
+    USING (
+      (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    );
+END
+$$;
+
+
+-- ============================================================
+-- Source: 20260505_rpc_suspend_listing.sql
+-- ============================================================
+
+-- Create an RPC function to suspend listings that bypasses RLS
+-- This function runs as SECURITY DEFINER, meaning it executes with superuser privileges,
+-- ignoring Row Level Security. The API route is responsible for ensuring only admins can call it.
+
+CREATE OR REPLACE FUNCTION admin_suspend_listing(p_listing_id UUID, p_is_suspended BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE public.marketplace_listings 
+  SET is_suspended = p_is_suspended 
+  WHERE id = p_listing_id;
+  
+  RETURN FOUND;
+END;
+$$;
+
+
+-- ============================================================
+-- Source: 20260508_add_edited_itinerary_marketplace_offers.sql
+-- ============================================================
+
+-- Add edited_itinerary column to marketplace_offers
+-- This allows a tour guide to provide a customized/suggested itinerary
+-- per offer, without modifying the traveller's original itinerary.
+
+ALTER TABLE public.marketplace_offers
+  ADD COLUMN IF NOT EXISTS edited_itinerary JSONB DEFAULT NULL;
+
+COMMENT ON COLUMN public.marketplace_offers.edited_itinerary IS 
+  'Optional: tour guide suggested edits to the traveller itinerary, scoped to this offer only. The original itinerary in the itineraries table is NOT modified.';
+
+
+-- ============================================================
+-- Source: 20260508_enable_realtime_marketplace_messages.sql
+-- ============================================================
+
+-- Enable Realtime for marketplace_messages to support live chat
+ALTER PUBLICATION supabase_realtime ADD TABLE marketplace_messages;
+
+
+-- ============================================================
+-- Source: 20260508_fix_marketplace_messages_rls.sql
+-- ============================================================
+
+-- ============================================================
+-- Fix marketplace_messages RLS policies
+-- 1. Remove the overly permissive public read policy
+-- 2. Fix the broken "participants: read messages" policy
+--    (it incorrectly joined on offer_id = listing_id)
+-- ============================================================
+
+-- Drop the insecure public read policy
+DROP POLICY IF EXISTS "Enable public read access for marketplace messages" ON public.marketplace_messages;
+
+-- Drop the broken participant policy (wrong join condition)
+DROP POLICY IF EXISTS "participants: read messages" ON public.marketplace_messages;
+
+-- Create a correct participant SELECT policy
+-- Only the traveller (listing owner) OR the guide involved in the offer can read messages
+CREATE POLICY "participants: read messages"
+ON public.marketplace_messages
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.marketplace_offers mo
+    JOIN public.marketplace_listings ml ON ml.id = mo.listing_id
+    WHERE mo.id = marketplace_messages.offer_id
+      AND (
+        ml.user_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM public.tour_guides tg
+          WHERE tg.id = mo.guide_id
+            AND tg.user_id = auth.uid()
+        )
+      )
+  )
+);
+
+
+-- ============================================================
+-- Source: 20260509_fix_marketplace_message_insert_policy.sql
+-- ============================================================
+
+-- Allow marketplace chat participants to insert messages.
+-- This is required for system notifications such as offer acceptance,
+-- payment enabled, and payment completed to appear in realtime.
+
+DROP POLICY IF EXISTS "participants: insert messages" ON public.marketplace_messages;
+
+CREATE POLICY "participants: insert messages"
+ON public.marketplace_messages
+FOR INSERT
+WITH CHECK (
+  sender_id = auth.uid()
+  AND sender_type IN ('traveler', 'guide')
+  AND EXISTS (
+    SELECT 1
+    FROM public.marketplace_offers mo
+    JOIN public.marketplace_listings ml ON ml.id = mo.listing_id
+    WHERE mo.id = marketplace_messages.offer_id
+      AND (
+        (sender_type = 'traveler' AND ml.user_id = auth.uid())
+        OR EXISTS (
+          SELECT 1 FROM public.tour_guides tg
+          WHERE sender_type = 'guide'
+            AND tg.id = mo.guide_id
+            AND tg.user_id = auth.uid()
+        )
+      )
+  )
+);
+
+
+-- ============================================================
+-- Source: 20260509_payment_flow.sql
+-- ============================================================
+
+-- ============================================================
+-- Payment Flow Migration
+-- Adds payment_enabled to marketplace_offers
+-- Adds RLS policies for transactions table
+-- ============================================================
+
+-- 1. Add payment_enabled flag to marketplace_offers
+ALTER TABLE public.marketplace_offers
+  ADD COLUMN IF NOT EXISTS payment_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- 2. RLS Policies for transactions table
+-- (table already exists from full_schema.sql)
+-- Drop first to avoid duplicates, then recreate
+
+DROP POLICY IF EXISTS "traveller: read own transactions" ON public.transactions;
+CREATE POLICY "traveller: read own transactions"
+  ON public.transactions
+  FOR SELECT
+  USING (auth.uid() = payer_id);
+
+DROP POLICY IF EXISTS "guide: read own transactions" ON public.transactions;
+CREATE POLICY "guide: read own transactions"
+  ON public.transactions
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.tour_guides
+      WHERE id = transactions.payee_id
+        AND user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "authenticated: insert transactions" ON public.transactions;
+CREATE POLICY "authenticated: insert transactions"
+  ON public.transactions
+  FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "traveller: update own transaction" ON public.transactions;
+CREATE POLICY "traveller: update own transaction"
+  ON public.transactions
+  FOR UPDATE
+  USING (auth.uid() = payer_id)
+  WITH CHECK (auth.uid() = payer_id);
+
+
+-- ============================================================
+-- Source: 20260510_hide_deleted_marketplace_access.sql
+-- ============================================================
+
+-- Hide traveller-deleted marketplace listings from guides and disable their chats.
+-- Listings are soft-deleted by setting status = 'closed' so related offers,
+-- messages, and transaction history can remain intact without granting access.
+
+DROP POLICY IF EXISTS "participants: read messages" ON public.marketplace_messages;
+
+CREATE POLICY "participants: read messages"
+ON public.marketplace_messages
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.marketplace_offers mo
+    JOIN public.marketplace_listings ml ON ml.id = mo.listing_id
+    WHERE mo.id = marketplace_messages.offer_id
+      AND ml.status <> 'closed'
+      AND COALESCE(ml.is_suspended, false) = false
+      AND (
+        ml.user_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM public.tour_guides tg
+          WHERE tg.id = mo.guide_id
+            AND tg.user_id = auth.uid()
+        )
+      )
+  )
+);
+
+DROP POLICY IF EXISTS "participants: insert messages" ON public.marketplace_messages;
+
+CREATE POLICY "participants: insert messages"
+ON public.marketplace_messages
+FOR INSERT
+WITH CHECK (
+  sender_id = auth.uid()
+  AND sender_type IN ('traveler', 'guide')
+  AND EXISTS (
+    SELECT 1
+    FROM public.marketplace_offers mo
+    JOIN public.marketplace_listings ml ON ml.id = mo.listing_id
+    WHERE mo.id = marketplace_messages.offer_id
+      AND ml.status <> 'closed'
+      AND COALESCE(ml.is_suspended, false) = false
+      AND (
+        (sender_type = 'traveler' AND ml.user_id = auth.uid())
+        OR EXISTS (
+          SELECT 1 FROM public.tour_guides tg
+          WHERE sender_type = 'guide'
+            AND tg.id = mo.guide_id
+            AND tg.user_id = auth.uid()
+        )
+      )
+  )
+);
+
+
