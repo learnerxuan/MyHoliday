@@ -65,9 +65,9 @@ export default function PendingRequestsList({ requests }: { requests: any[] }) {
           
           <div className="flex-1 bg-black/5 rounded-2xl p-5 mb-6 border border-black/5">
              <p className="text-[10px] font-bold text-tertiary font-body uppercase tracking-widest mb-3">Submitted Document</p>
-             {req.document_url ? (
+             {req.has_document ? (
                <a 
-                 href={req.document_url} 
+                 href={`/api/admin/tour-guides/${req.id}/document`}
                  target="_blank" 
                  rel="noopener noreferrer"
                  className="flex items-center gap-2 text-sm font-semibold font-body text-blue-600 hover:text-blue-800 transition-colors"

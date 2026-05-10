@@ -2,14 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import CountrySelect from '@/components/ui/CountrySelect'
 import { supabase } from '@/lib/supabase/client'
 
-const NATIONALITIES = [
-  'Malaysian', 'Indonesian', 'Singaporean', 'Thai', 'Filipino',
-  'Vietnamese', 'Chinese', 'Japanese', 'Korean', 'Indian',
-  'Australian', 'British', 'American', 'Other',
-]
-const LANGUAGES = ['English', 'Malay', 'Mandarin', 'Tamil', 'Other']
+const LANGUAGES = ['English', 'Mandarin Chinese', 'Spanish', 'Hindi', 'Arabic', 'French', 'Bengali', 'Portuguese', 'Russian', 'Japanese', 'German', 'Korean', 'Malay', 'Tamil', 'Other']
 const DIETS = ['None', 'Vegetarian', 'Vegan', 'Halal', 'Kosher', 'Gluten-free']
 
 const STATUS_STYLES: Record<string, string> = {
@@ -169,21 +165,17 @@ export default function ProfilePage() {
 
     if (uploadErr) { setError(uploadErr.message); setUploadingDoc(false); return }
 
-    const { data: urlData } = supabase.storage
-      .from('guide-documents')
-      .getPublicUrl(filePath)
-
     const { error: updateErr } = await supabase
       .from('tour_guides')
       .update({ 
-        document_url: urlData.publicUrl,
+        document_url: filePath,
         verification_status: 'pending'
       })
       .eq('user_id', user.id)
 
     setUploadingDoc(false)
     if (updateErr) { setError(updateErr.message); return }
-    setGuide((g: any) => ({ ...g, document_url: urlData.publicUrl, verification_status: 'pending' }))
+    setGuide((g: any) => ({ ...g, document_url: filePath, verification_status: 'pending' }))
     setNewDoc(null)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
@@ -282,10 +274,12 @@ export default function ProfilePage() {
                </Field>
 
                <Field label="Nationality">
-                 <select value={tForm.nationality} onChange={e => setTForm({...tForm, nationality: e.target.value})} className={`input-base bg-white ${isEditing ? 'cursor-pointer' : 'opacity-70 cursor-not-allowed pointer-events-none'}`} disabled={!isEditing}>
-                    <option value="" disabled>Select nationality</option>
-                    {NATIONALITIES.map(n => <option key={n} value={n}>{n}</option>)}
-                 </select>
+                 <CountrySelect
+                   value={tForm.nationality}
+                   onChange={value => setTForm({...tForm, nationality: value})}
+                   disabled={!isEditing}
+                   placeholder="Search nationality..."
+                 />
                </Field>
 
                <div className="grid grid-cols-2 gap-4">

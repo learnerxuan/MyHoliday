@@ -19,10 +19,15 @@ export default async function PendingRequestsPage() {
 
   const { data: guides, error } = await supabase
     .from('tour_guides')
-    .select('*, destinations(city, country)')
+    .select('id, full_name, document_url, verification_status, created_at, destinations(city, country)')
     .eq('verification_status', 'pending')
 
   if (error) console.error('Error fetching pending guides:', error)
+
+  const requests = (guides || []).map(({ document_url, ...guide }) => ({
+    ...guide,
+    has_document: Boolean(document_url),
+  }))
 
   return (
     <main className="min-h-screen bg-warmwhite py-10 px-6">
@@ -36,7 +41,7 @@ export default async function PendingRequestsPage() {
         <h1 className="text-3xl font-display font-extrabold text-charcoal mb-1">Pending Guide Requests</h1>
         <p className="text-secondary text-sm font-body mb-8">Review and verify applications from aspiring tour guides.</p>
         
-        <PendingRequestsList requests={guides || []} />
+        <PendingRequestsList requests={requests} />
       </div>
     </main>
   )

@@ -2,16 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import CountrySelect from '@/components/ui/CountrySelect'
 import { supabase } from '@/lib/supabase/client'
 
-
-const NATIONALITIES = [
-  'Malaysian', 'Indonesian', 'Singaporean', 'Thai', 'Filipino',
-  'Vietnamese', 'Chinese', 'Japanese', 'Korean', 'Indian',
-  'Australian', 'British', 'American', 'Other',
-]
-
-const LANGUAGES = ['English', 'Malay', 'Mandarin', 'Tamil', 'Other']
+const LANGUAGES = ['English', 'Mandarin Chinese', 'Spanish', 'Hindi', 'Arabic', 'French', 'Bengali', 'Portuguese', 'Russian', 'Japanese', 'German', 'Korean', 'Malay', 'Tamil', 'Other']
 
 const DIETS = ['None', 'Vegetarian', 'Vegan', 'Halal', 'Kosher', 'Gluten-free']
 
@@ -132,15 +126,12 @@ export default function TravellerOnboarding() {
             <label className="text-xs font-semibold font-body text-charcoal uppercase tracking-wider">
               Nationality
             </label>
-            <select
+            <CountrySelect
               required
               value={form.nationality}
-              onChange={e => setForm(f => ({ ...f, nationality: e.target.value }))}
-              className="w-full py-2.5 px-3.5 rounded-xl border border-border text-sm font-body text-charcoal focus:outline-none focus:border-amber transition-colors bg-white"
-            >
-              <option value="" disabled>Select nationality</option>
-              {NATIONALITIES.map(n => <option key={n}>{n}</option>)}
-            </select>
+              onChange={value => setForm(f => ({ ...f, nationality: value }))}
+              placeholder="Search nationality..."
+            />
           </div>
 
           {/* Dietary restrictions */}

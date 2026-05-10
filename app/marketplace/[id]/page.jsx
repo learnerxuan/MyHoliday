@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import PageHeader from '@/components/ui/PageHeader'
@@ -57,6 +57,22 @@ const BudgetIcon = () => (
   </svg>
 )
 
+const DietaryIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2C7 6 5 9.5 5 13a7 7 0 0 0 14 0c0-3.5-2-7-7-11z" />
+    <path d="M9 14c1.5 1 4.5 1 6 0" />
+  </svg>
+)
+
+const AccessibilityIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="4" r="2" />
+    <path d="M10 8h4" />
+    <path d="M12 8v7" />
+    <path d="M8 22l4-7 4 7" />
+  </svg>
+)
+
 const getBudgetStyle = (budget) => {
   if (!budget) return 'bg-white text-secondary border-border/50'
   const b = budget.toLowerCase()
@@ -100,6 +116,10 @@ const normaliseList = (value) => {
   return []
 }
 
+const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
+const PAYMENT_ENABLED_TOKEN = '__PAYMENT_ENABLED__:'
+const PAYMENT_COMPLETED_TOKEN = '__PAYMENT_COMPLETED__:'
+
 export default function ListingDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -137,70 +157,107 @@ export default function ListingDetailPage() {
   const [editedItinerary, setEditedItinerary] = useState(null)
   const [isSavingItinerary, setIsSavingItinerary] = useState(false)
 
-  useEffect(() => {
+  const refreshMarketplaceState = useCallback(async ({ keepLoading = false } = {}) => {
     if (!listingId) return
+    if (!keepLoading) setLoading(true)
+    try {
+      const { data: { user: currentUser }, error: sessionError } = await supabase.auth.getUser()
+      if (sessionError || !currentUser) throw new Error('Not authenticated')
 
-    const fetchAllData = async () => {
-      try {
-        const { data: { user: currentUser }, error: sessionError } = await supabase.auth.getUser()
-        if (sessionError || !currentUser) throw new Error('Not authenticated')
+      let currentGuideId = null
+      if (currentUser.user_metadata?.role === 'guide') {
+        const { data: guideData } = await supabase
+          .from('tour_guides')
+          .select('id')
+          .eq('user_id', currentUser.id)
+          .single()
+        currentGuideId = guideData?.id
+      }
 
-        let currentGuideId = null
-        if (currentUser.user_metadata?.role === 'guide') {
-          const { data: guideData } = await supabase
-            .from('tour_guides')
-            .select('id')
-            .eq('user_id', currentUser.id)
-            .single()
-          currentGuideId = guideData?.id
+      setUser({
+        id: currentUser.id,
+        email: currentUser.email,
+        role: currentUser.user_metadata?.role || 'traveler',
+        guide_id: currentGuideId
+      })
+
+      const listingRes = await fetch(`/api/marketplace/listings/${listingId}`)
+      const listingData = await listingRes.json()
+
+      if (!listingRes.ok) {
+        throw new Error(listingData.error || 'Failed to load listing')
+      }
+
+      if (currentUser.user_metadata?.role === 'guide' && listingData.is_suspended) {
+        throw new Error('This listing is no longer available.')
+      }
+
+      setListing(listingData)
+
+      const offersRes = await fetch(`/api/marketplace/offers/${listingId}`)
+      if (offersRes.ok) {
+        const offersData = await offersRes.json()
+        setOffers(offersData)
+
+        const transactionOffer = currentUser.user_metadata?.role === 'guide'
+          ? offersData.find(o => o.guide_id === currentGuideId && (o.status === 'accepted' || o.payment_enabled))
+          : offersData.find(o => o.status === 'accepted')
+        if (transactionOffer) {
+          const txRes = await fetch(`/api/marketplace/transactions?offer_id=${transactionOffer.id}`)
+          if (txRes.ok) {
+            const txData = await txRes.json()
+            setTransaction(txData)
+          }
+        } else {
+          setTransaction(null)
         }
+      }
 
-        setUser({
-          id: currentUser.id,
-          email: currentUser.email,
-          role: currentUser.user_metadata?.role || 'traveler',
-          guide_id: currentGuideId
-        })
+    } catch (err) {
+      setError(err.message || 'Failed to load data.')
+    } finally {
+      setLoading(false)
+    }
+  }, [listingId])
 
-        const listingRes = await fetch(`/api/marketplace/listings/${listingId}`)
-        const listingData = await listingRes.json()
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      refreshMarketplaceState()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [refreshMarketplaceState])
 
-        if (!listingRes.ok) {
-          throw new Error(listingData.error || 'Failed to load listing')
-        }
+  useEffect(() => {
+    if (!listingId || offers.length === 0) return
 
-        if (currentUser.user_metadata?.role === 'guide' && listingData.is_suspended) {
-          throw new Error('This listing is no longer available.')
-        }
+    const watchedOfferIds = new Set(offers.map(offer => offer.id))
+    const shouldRefreshForToken = (content) => (
+      typeof content === 'string' &&
+      (
+        content.startsWith(OFFER_ACCEPTED_TOKEN) ||
+        content.startsWith(PAYMENT_ENABLED_TOKEN) ||
+        content.startsWith(PAYMENT_COMPLETED_TOKEN)
+      )
+    )
 
-        setListing(listingData)
-
-        const offersRes = await fetch(`/api/marketplace/offers/${listingId}`)
-        if (offersRes.ok) {
-          const offersData = await offersRes.json()
-          setOffers(offersData)
-
-          const transactionOffer = currentUser.user_metadata?.role === 'guide'
-            ? offersData.find(o => o.guide_id === currentGuideId && (o.status === 'accepted' || o.payment_enabled))
-            : offersData.find(o => o.status === 'accepted')
-          if (transactionOffer) {
-            const txRes = await fetch(`/api/marketplace/transactions?offer_id=${transactionOffer.id}`)
-            if (txRes.ok) {
-              const txData = await txRes.json()
-              setTransaction(txData)
-            }
+    const channel = supabase
+      .channel(`listing_detail_tokens_${listingId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'marketplace_messages' },
+        (payload) => {
+          const newMessage = payload.new
+          if (watchedOfferIds.has(newMessage?.offer_id) && shouldRefreshForToken(newMessage?.content)) {
+            refreshMarketplaceState({ keepLoading: true })
           }
         }
+      )
+      .subscribe()
 
-      } catch (err) {
-        setError(err.message || 'Failed to load data.')
-      } finally {
-        setLoading(false)
-      }
+    return () => {
+      supabase.removeChannel(channel)
     }
-
-    fetchAllData()
-  }, [listingId])
+  }, [listingId, offers, refreshMarketplaceState])
 
   // --- TRAVELLER ACTIONS ---
   const handleAcceptClick = (offer) => {
@@ -579,6 +636,10 @@ export default function ListingDetailPage() {
 
   const budgetType = parsedMeta.budget || tripMeta.budget || parsedMeta.budget_profile || tripMeta.budget_profile
   const pace = parsedMeta.pace || tripMeta.pace
+  const dietaryRestrictions = listing?.traveller_dietary_restrictions && listing.traveller_dietary_restrictions !== 'None'
+    ? listing.traveller_dietary_restrictions
+    : null
+  const accessibilityNeeds = Boolean(listing?.traveller_accessibility_needs)
   const preferenceTags = [
     ...normaliseList(parsedMeta.preferred_styles),
     ...normaliseList(tripMeta.preferred_styles),
@@ -615,6 +676,18 @@ export default function ListingDetailPage() {
       icon: <GroupIcon />,
       value: groupSize,
       className: 'bg-[#F0EBE3] text-secondary border-border/40'
+    },
+    dietaryRestrictions && {
+      key: 'dietary',
+      icon: <DietaryIcon />,
+      value: dietaryRestrictions,
+      className: 'bg-[#FDF3E7] text-[#9A5B16] border-[#EBCB9F]'
+    },
+    accessibilityNeeds && {
+      key: 'accessibility',
+      icon: <AccessibilityIcon />,
+      value: 'Accessibility',
+      className: 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]'
     }
   ].filter(Boolean)
 

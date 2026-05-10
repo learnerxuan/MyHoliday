@@ -1,5 +1,6 @@
 "use client"
 
+import type { ChangeEvent, FormEvent } from 'react'
 import { useState } from 'react'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -21,7 +22,7 @@ export default function UserList({ profiles }: { profiles: any[] }) {
 
   // itineraries removed — table view keeps UI focused on profiles
 
-  async function saveEdit(e: any) {
+  async function saveEdit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!editing) return
     setLoading(true)
@@ -48,7 +49,7 @@ export default function UserList({ profiles }: { profiles: any[] }) {
           <p className="text-secondary text-sm">Search and manage traveller profiles.</p>
         </div>
         <div className="w-72">
-          <Input placeholder="Search by name or nationality" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input placeholder="Search by name or nationality" value={search} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -130,15 +131,15 @@ export default function UserList({ profiles }: { profiles: any[] }) {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-charcoal mb-1">Full Name</label>
-                <Input value={editing.full_name || ''} onChange={(e) => setEditing({...editing, full_name: e.target.value})} placeholder="Full name" />
+                <Input value={editing.full_name || ''} onChange={(e: ChangeEvent<HTMLInputElement>) => setEditing({...editing, full_name: e.target.value})} placeholder="Full name" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-charcoal mb-1">Nationality</label>
-                <Input value={editing.nationality || ''} onChange={(e) => setEditing({...editing, nationality: e.target.value})} placeholder="Nationality" />
+                <Input value={editing.nationality || ''} onChange={(e: ChangeEvent<HTMLInputElement>) => setEditing({...editing, nationality: e.target.value})} placeholder="Nationality" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-charcoal mb-1">Preferred Language</label>
-                <Input value={editing.preferred_language || ''} onChange={(e) => setEditing({...editing, preferred_language: e.target.value})} placeholder="Language" />
+                <Input value={editing.preferred_language || ''} onChange={(e: ChangeEvent<HTMLInputElement>) => setEditing({...editing, preferred_language: e.target.value})} placeholder="Language" />
               </div>
             </div>
             <div className="p-6 border-t border-border bg-[#F7F7F8] flex justify-end gap-3">

@@ -2,8 +2,16 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import ListingList from './ListingList'
 
-export default async function AdminMarketplacePage() {
+export default async function AdminMarketplacePage({
+  searchParams
+}: {
+  searchParams?: Promise<{ view?: string }>
+}) {
   const supabase = await createSupabaseServerClient()
+  const params = await searchParams
+  const initialView = params?.view === 'suspended' || params?.view === 'no-offers'
+    ? params.view
+    : 'all'
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || user.user_metadata?.role !== 'admin') {
@@ -49,10 +57,22 @@ export default async function AdminMarketplacePage() {
       (itineraries || []).map(i => [i.id, i.title])
     )
 
+    const listingIds = listings.map((l: any) => l.id).filter(Boolean)
+    const { data: offers } = await supabase
+      .from('marketplace_offers')
+      .select('listing_id')
+      .in('listing_id', listingIds)
+
+    const offerCounts = (offers || []).reduce<Record<string, number>>((acc, offer) => {
+      acc[offer.listing_id] = (acc[offer.listing_id] || 0) + 1
+      return acc
+    }, {})
+
     listings = listings.map((l: any) => ({
       ...l,
       traveller_profiles: { full_name: profileMap[l.user_id] || 'Unknown' },
-      itineraries: { title: itineraryMap[l.itinerary_id] || 'Untitled' }
+      itineraries: { title: itineraryMap[l.itinerary_id] || 'Untitled' },
+      offerCount: offerCounts[l.id] || 0
     }))
   }
 
@@ -62,7 +82,7 @@ export default async function AdminMarketplacePage() {
 
   return (
     <main className="min-h-screen bg-warmwhite">
-      <ListingList listings={listings || []} />
+      <ListingList listings={listings || []} initialView={initialView} />
     </main>
   )
 }

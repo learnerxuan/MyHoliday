@@ -10,6 +10,7 @@ import {
   Users
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import AdminReportActions from '@/components/admin/AdminReportActions'
 import AdminReportsCharts from '@/components/admin/AdminReportsCharts'
 import { getAdminReportsData } from '@/lib/actions/reports'
 
@@ -27,11 +28,14 @@ export default async function AdminReportsPage() {
   return (
     <main className="min-h-screen bg-warmwhite py-12 px-6">
       <div className="max-w-7xl mx-auto font-body text-charcoal">
-        <div className="mb-10">
-          <h1 className="text-4xl font-display font-extrabold text-charcoal">Admin Analytics</h1>
-          <p className="text-secondary mt-2">
-            Historical performance, marketplace conversion, destination demand, and dataset health.
-          </p>
+        <div className="mb-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+          <div>
+            <h1 className="text-4xl font-display font-extrabold text-charcoal">Admin Analytics</h1>
+            <p className="text-secondary mt-2">
+              Historical performance, marketplace conversion, destination demand, and dataset health.
+            </p>
+          </div>
+          <AdminReportActions data={data} />
         </div>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
@@ -108,6 +112,30 @@ export default async function AdminReportsPage() {
 
         <AdminReportsCharts data={data} />
       </div>
+      <style>{`
+        @media print {
+          .no-print,
+          nav,
+          header,
+          footer,
+          [aria-label="Open Next.js Dev Tools"] {
+            display: none !important;
+          }
+
+          body {
+            background: white !important;
+          }
+
+          main {
+            padding: 0 !important;
+            background: white !important;
+          }
+
+          main * {
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
     </main>
   )
 }

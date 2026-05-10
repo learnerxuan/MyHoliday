@@ -89,6 +89,22 @@ const BudgetIcon = () => (
   </svg>
 )
 
+const DietaryIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2C7 6 5 9.5 5 13a7 7 0 0 0 14 0c0-3.5-2-7-7-11z" />
+    <path d="M9 14c1.5 1 4.5 1 6 0" />
+  </svg>
+)
+
+const AccessibilityIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="4" r="2" />
+    <path d="M10 8h4" />
+    <path d="M12 8v7" />
+    <path d="M8 22l4-7 4 7" />
+  </svg>
+)
+
 const getBudgetStyle = (budget) => {
   if (!budget) return 'bg-white text-secondary border-border/50'
   const b = budget.toLowerCase()
@@ -468,6 +484,10 @@ export default function ChatPage() {
   const groupSize = parsedMeta.group_size || tripMeta.group_size || parsedMeta.pax || tripMeta.pax
   const budgetType = parsedMeta.budget || tripMeta.budget || parsedMeta.budget_profile || tripMeta.budget_profile
   const pace = parsedMeta.pace || tripMeta.pace
+  const dietaryRestrictions = listing?.traveller_dietary_restrictions && listing.traveller_dietary_restrictions !== 'None'
+    ? listing.traveller_dietary_restrictions
+    : null
+  const accessibilityNeeds = Boolean(listing?.traveller_accessibility_needs)
   const preferenceTags = [
     ...normaliseList(parsedMeta.preferred_styles),
     ...normaliseList(tripMeta.preferred_styles),
@@ -502,6 +522,18 @@ export default function ChatPage() {
       icon: <GroupIcon />,
       value: groupSize,
       className: 'bg-[#F0EBE3] text-secondary border-border/40'
+    },
+    dietaryRestrictions && {
+      key: 'dietary',
+      icon: <DietaryIcon />,
+      value: dietaryRestrictions,
+      className: 'bg-[#FDF3E7] text-[#9A5B16] border-[#EBCB9F]'
+    },
+    accessibilityNeeds && {
+      key: 'accessibility',
+      icon: <AccessibilityIcon />,
+      value: 'Accessibility',
+      className: 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]'
     }
   ].filter(Boolean)
 

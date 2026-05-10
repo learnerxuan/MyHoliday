@@ -47,12 +47,16 @@ export default function Navbar() {
         <div
           className={`mx-auto transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex items-center justify-between border rounded-full ${
             scrolled
-              ? 'mt-2 max-w-4xl bg-white/75 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.06)] border-black/5 px-4 py-1 md:py-1.5'
+              ? 'mt-2 w-[calc(100%-2rem)] max-w-6xl bg-white/75 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.06)] border-black/5 px-5 py-1 md:px-6 md:py-1.5'
               : 'mt-0 w-full max-w-[1400px] px-4 md:px-12 py-1.5 md:py-2.5 bg-transparent border-transparent'
           }`}
         >
           {/* ── Logo ── */}
-          <Link href="/" className="pointer-events-auto flex items-center shrink-0 pl-2" onClick={close}>
+          <Link
+            href="/"
+            className={`pointer-events-auto flex items-center shrink-0 ${scrolled ? 'min-w-[148px] pl-1' : 'pl-2'}`}
+            onClick={close}
+          >
             <Image
               src="/logo.png?v=2"
               alt="MyHoliday"
@@ -67,7 +71,7 @@ export default function Navbar() {
           {/* ── Desktop Middle Nav ── */}
           <nav
             className={`hidden md:flex items-center pointer-events-auto transition-all duration-300 rounded-full ${
-              scrolled ? 'gap-6 px-2 bg-transparent' : 'gap-6 bg-black/5 px-7 py-2.5'
+              scrolled ? 'min-w-0 flex-1 justify-center gap-5 lg:gap-6 px-5 bg-transparent' : 'gap-6 bg-black/5 px-7 py-2.5'
             }`}
           >
             {role === 'admin' ? (
@@ -91,6 +95,7 @@ export default function Navbar() {
                 <NavLink href="/destinations">Destinations</NavLink>
                 <NavLink href="/itineraries">Itineraries</NavLink>
                 <NavLink href="/marketplace">Marketplace</NavLink>
+                <NavLink href="/survey">Survey</NavLink>
                 {user && <NavLink href="/history">History</NavLink>}
                 <NavLink href="/about">About</NavLink>
               </>
@@ -100,7 +105,7 @@ export default function Navbar() {
           {/* ── Desktop Right Auth ── */}
           <div
             className={`hidden md:flex items-center pointer-events-auto transition-all duration-300 rounded-full ${
-              scrolled ? 'gap-4 pr-1 bg-transparent' : 'gap-4 bg-black/5 p-1 pl-6'
+              scrolled ? 'min-w-[180px] justify-end gap-5 pr-1 bg-transparent' : 'gap-4 bg-black/5 p-1 pl-6'
             }`}
           >
             {user ? (
@@ -185,6 +190,7 @@ export default function Navbar() {
                 <MobileNavLink href="/destinations" onClick={close}>Destinations</MobileNavLink>
                 <MobileNavLink href="/itineraries" onClick={close}>Itineraries</MobileNavLink>
                 <MobileNavLink href="/marketplace" onClick={close}>Marketplace</MobileNavLink>
+                <MobileNavLink href="/survey" onClick={close}>Survey</MobileNavLink>
                 {user && <MobileNavLink href="/history" onClick={close}>History</MobileNavLink>}
                 <MobileNavLink href="/about" onClick={close}>About</MobileNavLink>
               </>
@@ -239,7 +245,7 @@ function NavLink({ href, exact, onClick, children }: { href: string; exact?: boo
         isActive 
           ? 'font-extrabold text-charcoal' 
           : 'font-semibold text-charcoal/70 hover:text-charcoal'
-      }`}
+      } whitespace-nowrap`}
     >
       {children}
     </a>

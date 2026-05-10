@@ -82,10 +82,6 @@ export default function GuideOnboarding() {
 
       if (uploadError) throw uploadError
 
-      const { data: publicUrlData } = supabase.storage
-        .from('guide-documents')
-        .getPublicUrl(filePath)
-
       // 2. Insert tour_guides row
       const { error: insertError } = await supabase
         .from('tour_guides')
@@ -93,7 +89,7 @@ export default function GuideOnboarding() {
           user_id: user.id,
           full_name: form.full_name,
           city_id: form.city_id,
-          document_url: publicUrlData.publicUrl,
+          document_url: filePath,
           verification_status: 'pending',
         })
 

@@ -102,19 +102,34 @@ export default function BookingHistoryList({ scope }: { scope: HistoryScope }) {
 
   return (
     <section className="w-full bg-white rounded-[24px] border border-border/50 shadow-sm overflow-hidden">
-      <div className="px-5 sm:px-10 py-8 sm:py-10 border-b border-border/60 bg-[#FAF9F7]">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+      <div className="relative overflow-hidden px-5 sm:px-10 py-8 sm:py-10 border-b border-white/10 bg-[#0f0f0f] text-white">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse 60% 55% at 78% 18%, rgba(196,135,74,0.22) 0%, transparent 70%),' +
+              'radial-gradient(ellipse 42% 42% at 14% 82%, rgba(196,135,74,0.10) 0%, transparent 65%)',
+          }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        />
+        <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-5">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-lg border border-[#D48C44]/30 bg-[#D48C44]/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#9A632C] mb-3">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-amber/30 bg-amber/15 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-amber mb-3">
               <ReceiptText className="h-3.5 w-3.5" />
               Completed Payments
             </div>
-            <h1 className="text-3xl sm:text-4xl font-display font-extrabold text-charcoal leading-tight">{copy.title}</h1>
-            <p className="text-secondary text-sm sm:text-[15px] mt-2 max-w-xl">{copy.subtitle}</p>
+            <h1 className="text-3xl sm:text-4xl font-display font-extrabold text-white leading-tight">{copy.title}</h1>
+            <p className="text-white/70 text-sm sm:text-[15px] mt-2 max-w-xl">{copy.subtitle}</p>
           </div>
-          <div className="bg-white border border-border rounded-2xl px-5 py-4 min-w-[160px]">
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-secondary mb-1">Records</p>
-            <p className="text-3xl font-display font-extrabold text-charcoal">{records.length}</p>
+          <div className="bg-white/10 border border-white/15 rounded-2xl px-5 py-4 min-w-[160px] backdrop-blur-sm">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-white/60 mb-1">Records</p>
+            <p className="text-3xl font-display font-extrabold text-white">{records.length}</p>
           </div>
         </div>
       </div>

@@ -21,7 +21,7 @@ export default async function AdminTourGuidesPage() {
 
   const { data: guides, error } = await supabase
     .from('tour_guides')
-    .select('*, destinations(city, country)')
+    .select('id, full_name, document_url, verification_status, created_at, destinations(city, country)')
     .eq('verification_status', 'approved')
 
   if (error) {
@@ -40,7 +40,13 @@ export default async function AdminTourGuidesPage() {
 
   return (
     <main className="min-h-screen bg-warmwhite">
-      <TourGuideList guides={guides || []} pendingCount={pendingCount || 0} />
+      <TourGuideList
+        guides={(guides || []).map(({ document_url, ...guide }) => ({
+          ...guide,
+          has_document: Boolean(document_url),
+        }))}
+        pendingCount={pendingCount || 0}
+      />
     </main>
   )
 }

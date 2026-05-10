@@ -55,17 +55,22 @@ export async function GET(
   }
 
   let travellerName = 'Anonymous Traveller'
+  let travellerDietaryRestrictions = null
+  let travellerAccessibilityNeeds = false
   try {
     const client = new Client({ connectionString: process.env.DATABASE_URL })
     await client.connect()
     const profileResult = await client.query(
-      'SELECT full_name FROM public.traveller_profiles WHERE user_id = $1::uuid LIMIT 1',
+      'SELECT full_name, dietary_restrictions, accessibility_needs FROM public.traveller_profiles WHERE user_id = $1::uuid LIMIT 1',
       [data.user_id]
     )
     await client.end()
-    if (profileResult.rows?.[0]?.full_name) {
-      travellerName = profileResult.rows[0].full_name
+    const travellerProfile = profileResult.rows?.[0]
+    if (travellerProfile?.full_name) {
+      travellerName = travellerProfile.full_name
     }
+    travellerDietaryRestrictions = travellerProfile?.dietary_restrictions || null
+    travellerAccessibilityNeeds = Boolean(travellerProfile?.accessibility_needs)
   } catch {
     travellerName = 'Anonymous Traveller'
   }
@@ -76,7 +81,9 @@ export async function GET(
     itinerary_title: itinerary?.title || 'Untitled Itinerary',
     itinerary_content: itinerary?.content || null,
     trip_metadata: itinerary?.trip_metadata || null,
-    traveller_name: travellerName
+    traveller_name: travellerName,
+    traveller_dietary_restrictions: travellerDietaryRestrictions,
+    traveller_accessibility_needs: travellerAccessibilityNeeds
   }
 
   return NextResponse.json(formattedData)

@@ -116,14 +116,14 @@ export default async function AdminDashboardPage() {
             title="Suspended Listings"
             value={data.suspendedListings}
             description="Marketplace listings currently hidden from guides."
-            href="/admin/marketplace"
-            action="Open marketplace"
+            href="/admin/marketplace?view=suspended"
+            action="View suspended"
           />
           <ActionCard
             title="Listings With No Offers"
             value={data.listingsWithNoOffers}
             description="Traveller plans that may need guide supply attention."
-            href="/admin/marketplace"
+            href="/admin/marketplace?view=no-offers"
             action="Check listings"
           />
         </section>

@@ -2,203 +2,260 @@ import Link from 'next/link'
 
 export default function AboutPage() {
   return (
-    <div className="bg-white min-h-screen">
-
-      {/* 1. HERO SECTION */}
-      <section className="bg-[#1C1A1A] text-white pt-[120px] pb-[140px] px-8 lg:px-12">
-        <div className="max-w-[1000px] mx-auto text-center">
-          <p className="text-[#d48c44] font-extrabold tracking-[0.25em] text-[11px] uppercase mb-8 font-body">About MyHoliday</p>
-          <h1 className="font-display font-extrabold text-[44px] md:text-[68px] leading-[1.1] mb-10 tracking-tight text-white">
-            Built for travellers who want<br />
-            <span className="text-[#d48c44] italic font-body font-bold">more than a list of places.</span>
-          </h1>
-          <p className="text-[#A09D9A] text-[19px] max-w-3xl mx-auto leading-relaxed mb-24 font-body">
-            MyHoliday is a data-driven travel recommendation system that goes beyond generic suggestions — matching you to destinations based on your actual preferences, then helping you plan every detail with AI.
-          </p>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
-            <div className="text-center">
-              <p className="font-display font-extrabold text-[40px] mb-2 text-white">300+</p>
-              <p className="text-[#84827F] text-[11px] uppercase tracking-widest font-semibold font-body">Destinations</p>
-            </div>
-            <div className="text-center">
-              <p className="font-display font-extrabold text-[40px] mb-2 text-white">1.2k+</p>
-              <p className="text-[#84827F] text-[11px] uppercase tracking-widest font-semibold font-body">Itineraries Generated</p>
-            </div>
-            <div className="text-center">
-              <p className="font-display font-extrabold text-[40px] mb-2 text-white">200+</p>
-              <p className="text-[#84827F] text-[11px] uppercase tracking-widest font-semibold font-body">Verified Tour Guides</p>
-            </div>
-            <div className="text-center">
-              <p className="font-display font-extrabold text-[40px] mb-2 text-white">6</p>
-              <p className="text-[#84827F] text-[11px] uppercase tracking-widest font-semibold font-body">Team Members</p>
-            </div>
+    <div className="min-h-screen bg-warmwhite">
+      <section className="relative overflow-hidden bg-charcoal text-warmwhite">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse 56% 50% at 72% 20%, rgba(196,135,74,0.22) 0%, transparent 70%), radial-gradient(ellipse 38% 38% at 20% 82%, rgba(196,135,74,0.12) 0%, transparent 68%)',
+          }}
+        />
+        <div className="relative max-w-6xl mx-auto px-6 py-20 lg:py-24">
+          <div className="max-w-3xl">
+            <p className="text-amber font-extrabold tracking-[0.2em] text-[11px] uppercase mb-5 font-body">
+              About MyHoliday
+            </p>
+            <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl leading-[1.04] mb-6 text-white">
+              Travel planning that starts with what you actually like.
+            </h1>
+            <p className="text-disabled text-base sm:text-lg max-w-2xl leading-relaxed font-body">
+              MyHoliday helps travellers find suitable destinations, build AI-assisted itineraries, and connect with local tour guides through one guided planning flow.
+            </p>
           </div>
-        </div>
-      </section>
 
-      {/* 2. WHAT WE BUILT */}
-      <section className="bg-white py-28 px-8 lg:px-12 border-b border-border">
-        <div className="max-w-[1200px] mx-auto">
-          <p className="text-[#d48c44] font-extrabold tracking-[0.2em] text-[11px] uppercase mb-4 font-body">What we built</p>
-          <h2 className="font-display font-extrabold text-4xl md:text-[50px] text-charcoal mb-[72px]">A complete travel ecosystem</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-white p-8 rounded-[20px] border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-shadow">
-              <div className="text-[32px] mb-6">🎯</div>
-              <h3 className="font-body font-bold text-[17px] text-charcoal mb-4">Preference-Based Recommendations</h3>
-              <p className="text-secondary/80 text-[15px] leading-[1.6]">Answer a short quiz about your travel style, budget, dietary needs, and interests. Our algorithm scores destinations across 9 thematic dimensions and returns a personalised ranked list.</p>
-            </div>
-            <div className="bg-white p-8 rounded-[20px] border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-shadow">
-              <div className="text-[32px] mb-6">🤖</div>
-              <h3 className="font-body font-bold text-[17px] text-charcoal mb-4">AI Itinerary Planner</h3>
-              <p className="text-secondary/80 text-[15px] leading-[1.6]">Chat with our AI assistant to build a day-by-day itinerary. The AI is aware of your profile — including dietary restrictions, accessibility needs, and preferred budget — and refines the plan through conversation.</p>
-            </div>
-            <div className="bg-white p-8 rounded-[20px] border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-shadow">
-              <div className="text-[32px] mb-6">🛒</div>
-              <h3 className="font-body font-bold text-[17px] text-charcoal mb-4">Tour Guide Marketplace</h3>
-              <p className="text-secondary/80 text-[15px] leading-[1.6]">Post your AI-generated itinerary to the marketplace. Verified local tour guides in your destination city browse listings, submit price offers, and negotiate via in-platform chat before you confirm a booking.</p>
-            </div>
-            <div className="bg-white p-8 rounded-[20px] border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-shadow">
-              <div className="text-[32px] mb-6">🔐</div>
-              <h3 className="font-body font-bold text-[17px] text-charcoal mb-4">Dual-Role Authentication</h3>
-              <p className="text-secondary/80 text-[15px] leading-[1.6]">Separate registration flows for travellers and tour guides. Guides undergo a simulated verification process — uploading documents for admin approval — before they can access the marketplace.</p>
-            </div>
-            <div className="bg-white p-8 rounded-[20px] border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-shadow">
-              <div className="text-[32px] mb-6">📊</div>
-              <h3 className="font-body font-bold text-[17px] text-charcoal mb-4">Admin Analytics Dashboard</h3>
-              <p className="text-secondary/80 text-[15px] leading-[1.6]">A data visualisation dashboard for administrators, showing descriptive statistics on popular destinations, itinerary trends, marketplace activity, user demographics, and transaction volume over time.</p>
-            </div>
-            <div className="bg-white p-8 rounded-[20px] border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-shadow">
-              <div className="text-[32px] mb-6">🗺️</div>
-              <h3 className="font-body font-bold text-[17px] text-charcoal mb-4">City Detail Pages</h3>
-              <p className="text-secondary/80 text-[15px] leading-[1.6]">Each destination has a full profile — thematic ratings across 9 categories, estimated daily budget, best travel season, external booking links, and a one-click entry point into the AI planner.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. TECHNOLOGY */}
-      <section className="bg-[#FAF9F7] py-28 px-8 lg:px-12 border-b border-border">
-        <div className="max-w-[1200px] mx-auto">
-          <p className="text-[#d48c44] font-extrabold tracking-[0.2em] text-[11px] uppercase mb-4 font-body">Technology</p>
-          <h2 className="font-display font-extrabold text-4xl md:text-[50px] text-charcoal mb-[72px]">How it's built</h2>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-[72px]">
-            <div className="flex flex-col gap-4">
-              {[
-                { k: 'FRAMEWORK', v: 'Next.js 14 — App Router, single codebase for frontend and API' },
-                { k: 'DATABASE', v: 'PostgreSQL hosted on Supabase — 11 tables, fully normalised' },
-                { k: 'STYLING', v: 'Tailwind CSS 3 with a custom design token system' },
-                { k: 'CHARTS', v: 'Recharts — used for admin dashboard analytics' },
-                { k: 'FONTS', v: 'Funnel Display (headings) + Noto Serif (body)' },
-                { k: 'DEPLOYMENT', v: 'Vercel — continuous deployment from GitHub' }
-              ].map(i => (
-                <div key={i.k} className="bg-white px-8 py-[22px] rounded-2xl border border-border flex items-center lg:gap-8 gap-4">
-                  <p className="text-[#d48c44] font-bold text-[11px] uppercase tracking-widest w-28 shrink-0">{i.k}</p>
-                  <p className="text-secondary/90 text-[15px] font-medium leading-snug">{i.v}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-[#1C1A1A] p-10 lg:p-12 rounded-[24px] shadow-2xl h-full text-white">
-              <p className="text-[#d48c44] font-extrabold text-[11px] uppercase tracking-[0.2em] mb-12">Database at a glance</p>
-
-              <div className="flex flex-col gap-7">
-                {[
-                  { t: 'destinations', d: 'City profiles, thematic ratings, JSONB climate data' },
-                  { t: 'users', d: 'Traveller and admin accounts with full profile' },
-                  { t: 'tour_guides', d: 'Guide accounts, city assignment, verification status' },
-                  { t: 'itineraries', d: 'Saved AI-generated plans, JSONB content' },
-                  { t: 'marketplace_listings', d: 'Posted itineraries with desired_budget' },
-                  { t: 'marketplace_offers', d: 'Guide price proposals per listing' },
-                  { t: 'marketplace_messages', d: 'Polymorphic chat between traveller and guide' },
-                  { t: 'transactions', d: 'Booking records with payout constraint' }
-                ].map(b => (
-                  <div key={b.t} className="border-b border-white/[0.08] pb-6 last:border-0 last:pb-0">
-                    <p className="font-bold text-[15px] font-body text-white mb-2 tracking-wide">{b.t}</p>
-                    <p className="text-[#A09D9A] text-[13px]">{b.d}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. USER JOURNEY & META */}
-      <section className="bg-white py-28 px-8 lg:px-12">
-        <div className="max-w-[1200px] mx-auto">
-          <p className="text-[#d48c44] font-extrabold tracking-[0.2em] text-[11px] uppercase mb-4 font-body">User Journey</p>
-          <h2 className="font-display font-extrabold text-4xl md:text-[50px] text-charcoal mb-[90px]">From sign-up to confirmed booking</h2>
-
-          <div className="relative flex-col md:flex-row justify-between pt-4 mb-[160px] hidden md:flex">
-            {/* Timeline horizontal line */}
-            <div className="absolute top-[28px] left-[5%] right-[5%] h-px bg-border -z-10" />
-
-            {[
-              { n: '01', t: 'Register', d: 'Create a traveller or tour guide account' },
-              { n: '02', t: 'Set Preferences', d: 'Answer the travel preference quiz' },
-              { n: '03', t: 'Get Recommendations', d: 'Receive scored city suggestions' },
-              { n: '04', t: 'Plan with AI', d: 'Build a day-by-day itinerary via chat' },
-              { n: '05', t: 'Post to Marketplace', d: 'List your itinerary with a desired budget' },
-              { n: '06', t: 'Confirm Booking', d: 'Accept a guide\'s offer and book', last: true },
-            ].map((s) => (
-              <div key={s.n} className="flex flex-col items-center flex-1 text-center">
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-sm tracking-widest shadow-[0_0_0_12px_white] mb-6 ${s.last ? 'bg-[#d48c44] text-white' : 'bg-[#1C1A1A] text-white'}`}>
-                  {s.n}
-                </div>
-                <h4 className="font-body font-bold text-[15px] text-charcoal mb-2">{s.t}</h4>
-                <p className="text-secondary/70 text-[11.5px] max-w-[140px] leading-relaxed mx-auto">{s.d}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12 max-w-4xl">
+            {PROJECT_FACTS.map((fact) => (
+              <div key={fact.label} className="border border-white/10 bg-white/10 rounded-xl p-5">
+                <p className="font-display font-extrabold text-3xl text-white mb-1">{fact.value}</p>
+                <p className="text-[#A09D9A] text-[11px] uppercase tracking-widest font-semibold font-body">{fact.label}</p>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          {/* Academic Block */}
-          <div className="bg-[#FAF9F7] py-24 px-8 rounded-[32px] max-w-[900px] mx-auto border border-border/60 text-center">
-            <p className="text-[#d48c44] font-extrabold tracking-[0.2em] text-[11px] uppercase mb-5 font-body text-center">Academic Project</p>
-            <h2 className="font-display font-extrabold text-[44px] text-charcoal mb-6 text-center">Built for AAPP011-4-2</h2>
-            <p className="text-secondary/80 max-w-[680px] mx-auto mb-14 text-[16px] leading-relaxed font-body">
-              MyHoliday is a capstone project developed by Group 1 of the Diploma in ICT (Data Informatics) programme at Asia Pacific University (APU), Malaysia. The system is built for academic assessment purposes.
+      <section className="bg-white py-16 lg:py-20 px-6 border-b border-border">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[0.8fr_1fr] gap-10 lg:gap-14">
+          <div>
+            <p className="text-amber font-extrabold tracking-[0.2em] text-[11px] uppercase mb-4 font-body">Why we built it</p>
+            <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-charcoal leading-tight mb-4">
+              Choosing where to go should feel less random.
+            </h2>
+            <p className="text-secondary text-sm sm:text-base leading-relaxed font-body">
+              Most travel websites start with endless lists of places. MyHoliday starts with the traveller instead: your preferred travel style, budget, climate, dates, and trip length shape the recommendations you see.
             </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {PURPOSE_POINTS.map((item) => (
+              <div key={item.title} className="rounded-xl border border-border bg-warmwhite p-6">
+                <p className="text-[11px] font-bold font-body text-amber uppercase tracking-[0.16em] mb-3">{item.kicker}</p>
+                <h3 className="font-body font-bold text-base text-charcoal mb-2">{item.title}</h3>
+                <p className="text-secondary text-sm leading-relaxed font-body">{item.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            <div className="flex flex-col items-center gap-4 mb-20 px-8">
-              <div className="flex flex-col md:flex-row gap-4 w-full justify-center max-w-[560px]">
-                <div className="bg-white px-8 py-5 rounded-2xl border border-border shadow-[0_2px_8px_rgba(0,0,0,0.02)] text-left flex-1">
-                  <p className="text-[#d48c44] text-[10px] uppercase tracking-[0.15em] font-bold mb-1.5">Group</p>
-                  <p className="text-charcoal font-medium text-[15px]">Group 1 — UCDF2407ICT(DI)</p>
-                </div>
-                <div className="bg-white px-8 py-5 rounded-2xl border border-border shadow-[0_2px_8px_rgba(0,0,0,0.02)] text-left flex-[1.4]">
-                  <p className="text-[#d48c44] text-[10px] uppercase tracking-[0.15em] font-bold mb-1.5">Subject</p>
-                  <p className="text-charcoal font-medium text-[15px]">AAPP011-4-2 Capstone Project</p>
-                </div>
+      <section className="bg-subtle py-16 lg:py-20 px-6 border-b border-border">
+        <div className="max-w-6xl mx-auto">
+          <div className="max-w-2xl mb-10">
+            <p className="text-amber font-extrabold tracking-[0.2em] text-[11px] uppercase mb-4 font-body">What we built</p>
+            <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-charcoal leading-tight">
+              A connected travel planning system.
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {FEATURES.map((feature) => (
+              <div key={feature.title} className="bg-white p-6 rounded-xl border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                <p className="text-[11px] font-bold font-body text-amber uppercase tracking-[0.16em] mb-4">{feature.kicker}</p>
+                <h3 className="font-body font-bold text-[17px] text-charcoal mb-3">{feature.title}</h3>
+                <p className="text-secondary text-[15px] leading-relaxed font-body">{feature.description}</p>
               </div>
-              <div className="w-full max-w-[560px]">
-                <div className="bg-white px-8 py-5 rounded-2xl border border-border shadow-[0_2px_8px_rgba(0,0,0,0.02)] text-center">
-                  <p className="text-[#d48c44] text-[10px] uppercase tracking-[0.15em] font-bold mb-1.5">Institution</p>
-                  <p className="text-charcoal font-medium text-[15px]">Asia Pacific University, Malaysia</p>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-16 lg:py-20 px-6 border-b border-border">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_0.95fr] gap-10 lg:gap-14 items-start">
+          <div>
+            <p className="text-amber font-extrabold tracking-[0.2em] text-[11px] uppercase mb-4 font-body">Recommendation logic</p>
+            <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-charcoal leading-tight mb-5">
+              Matching is based on profile fit, not paid placement.
+            </h2>
+            <p className="text-secondary text-sm sm:text-base leading-relaxed font-body mb-6">
+              The recommender compares traveller preferences with destination attributes using cosine similarity. The vector includes nine travel style scores, budget level, trip duration, and climate fit.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {MATCHING_FACTS.map((fact) => (
+                <div key={fact.label} className="rounded-xl border border-border bg-subtle p-5">
+                  <p className="font-display font-extrabold text-3xl text-charcoal">{fact.value}</p>
+                  <p className="text-[11px] font-body text-secondary uppercase tracking-[0.14em] leading-snug">{fact.label}</p>
                 </div>
-              </div>
-              <div className="w-full max-w-[560px] mt-4">
-                <div className="bg-white px-8 py-5 rounded-2xl border border-border shadow-[0_2px_12px_rgba(0,0,0,0.04)] text-center hover:border-charcoal/30 transition-colors">
-                  <p className="text-[#d48c44] text-[10px] uppercase tracking-[0.15em] font-bold mb-1.5">Payment Note</p>
-                  <p className="text-charcoal font-medium text-[14px]">Transactions are simulated — no real payments are processed</p>
-                </div>
-              </div>
+              ))}
             </div>
+          </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link href="/auth/login" className="bg-[#1A1A1A] hover:bg-black text-white px-9 py-4 rounded-[12px] transition-colors font-bold tracking-wide shadow-xl shadow-black/10 text-[15px] border-2 border-transparent w-full sm:w-auto">
-                Get Started
-              </Link>
-              <Link href="/destinations" className="bg-transparent hover:bg-white text-charcoal border-2 border-border px-9 py-4 rounded-[12px] transition-colors font-bold tracking-wide text-[15px] w-full sm:w-auto">
-                Browse Destinations
-              </Link>
+          <div className="bg-charcoal p-6 lg:p-8 rounded-xl text-white">
+            <p className="text-amber font-extrabold text-[11px] uppercase tracking-[0.2em] mb-6 font-body">Style categories</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {STYLE_CATEGORIES.map((style) => (
+                <div key={style} className="border border-white/10 bg-white/10 rounded-lg px-4 py-3">
+                  <p className="font-body font-semibold text-sm text-warmwhite">{style}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
+      <section className="bg-subtle py-16 lg:py-20 px-6 border-b border-border">
+        <div className="max-w-6xl mx-auto">
+          <div className="max-w-2xl mb-10">
+            <p className="text-amber font-extrabold tracking-[0.2em] text-[11px] uppercase mb-4 font-body">User journey</p>
+            <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-charcoal leading-tight">
+              From registration to confirmed booking history.
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            {JOURNEY.map((step) => (
+              <div key={step.number} className="bg-white rounded-xl border border-border p-5">
+                <div className="w-9 h-9 rounded-full bg-charcoal text-warmwhite flex items-center justify-center font-display font-extrabold text-sm mb-4">
+                  {step.number}
+                </div>
+                <h3 className="font-body font-bold text-sm text-charcoal mb-2">{step.title}</h3>
+                <p className="text-secondary text-xs leading-relaxed font-body">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-16 lg:py-20 px-6">
+        <div className="max-w-5xl mx-auto rounded-xl border border-border bg-subtle p-8 lg:p-12 text-center">
+          <p className="text-amber font-extrabold tracking-[0.2em] text-[11px] uppercase mb-4 font-body">Academic scope</p>
+          <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-charcoal mb-5">
+            Built for AAPP011-4-2 Capstone Project.
+          </h2>
+          <p className="text-secondary max-w-3xl mx-auto mb-8 text-[15px] leading-relaxed font-body">
+            MyHoliday is an academic capstone project for Asia Pacific University, Malaysia. Guide verification and payment workflows are represented as system features for assessment, and payment records are simulated rather than connected to real transaction processing.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {ACADEMIC_DETAILS.map((detail) => (
+              <div key={detail.label} className="bg-white px-5 py-4 rounded-xl border border-border text-left">
+                <p className="text-amber text-[10px] uppercase tracking-[0.15em] font-bold mb-1.5 font-body">{detail.label}</p>
+                <p className="text-charcoal font-medium text-[14px] leading-snug font-body">{detail.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+            <Link href="/quiz" className="bg-charcoal hover:bg-black text-white px-8 py-3 rounded-md transition-colors font-bold tracking-wide text-[15px] w-full sm:w-auto font-body">
+              Plan a trip
+            </Link>
+            <Link href="/destinations" className="bg-white hover:bg-warmwhite text-charcoal border border-border px-8 py-3 rounded-md transition-colors font-bold tracking-wide text-[15px] w-full sm:w-auto font-body">
+              Browse destinations
+            </Link>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
+
+const PROJECT_FACTS = [
+  { value: '560', label: 'Destination records' },
+  { value: '12', label: 'Recommendation inputs' },
+  { value: '9', label: 'Style categories' },
+]
+
+const PURPOSE_POINTS = [
+  {
+    kicker: 'Discover',
+    title: 'Find destinations that fit',
+    description: 'The recommendation flow compares traveller preferences with destination data so users can start from a focused shortlist.',
+  },
+  {
+    kicker: 'Plan',
+    title: 'Turn ideas into itineraries',
+    description: 'After choosing a destination, travellers can generate and refine a day-by-day plan instead of starting from a blank page.',
+  },
+  {
+    kicker: 'Connect',
+    title: 'Bring in local support',
+    description: 'Saved itineraries can be posted to the marketplace, where verified guides can review the plan and submit offers.',
+  },
+  {
+    kicker: 'Manage',
+    title: 'Keep the journey organized',
+    description: 'Travellers can save plans, revisit booking history, chat with guides, and keep planning activity inside the platform.',
+  },
+]
+
+const FEATURES = [
+  {
+    kicker: 'Traveller',
+    title: 'Preference-based recommendations',
+    description: 'Travellers submit style, region, budget, climate, group size, and date preferences to receive ranked destinations.',
+  },
+  {
+    kicker: 'Planning',
+    title: 'AI itinerary planner',
+    description: 'The planner turns a chosen destination into a day-by-day itinerary and supports refinement through chat.',
+  },
+  {
+    kicker: 'Marketplace',
+    title: 'Tour guide offers',
+    description: 'Saved itineraries can be posted to the marketplace for local guide proposals, price comparison, and chat.',
+  },
+  {
+    kicker: 'Guide',
+    title: 'Guide onboarding and approval',
+    description: 'Tour guides register through a separate flow and require admin approval before participating in the marketplace.',
+  },
+  {
+    kicker: 'Admin',
+    title: 'Operational dashboard',
+    description: 'Administrators can monitor users, guide requests, marketplace listings, reports, and suspended content.',
+  },
+  {
+    kicker: 'Research',
+    title: 'Traveller survey',
+    description: 'The survey flow captures supporting traveller information for the project and keeps survey options normalized.',
+  },
+]
+
+const MATCHING_FACTS = [
+  { value: '9', label: 'Travel style columns' },
+  { value: '3', label: 'Context inputs' },
+  { value: '560', label: 'Destination records' },
+]
+
+const STYLE_CATEGORIES = [
+  'Culture',
+  'Adventure',
+  'Nature',
+  'Beaches',
+  'Nightlife',
+  'Cuisine',
+  'Wellness',
+  'Urban',
+  'Seclusion',
+]
+
+const JOURNEY = [
+  { number: '01', title: 'Register', description: 'Create a traveller or tour guide account.' },
+  { number: '02', title: 'Set preferences', description: 'Complete the planning quiz and optional survey flow.' },
+  { number: '03', title: 'Compare matches', description: 'Review ranked destination suggestions and city details.' },
+  { number: '04', title: 'Plan with AI', description: 'Generate and refine a day-by-day itinerary.' },
+  { number: '05', title: 'Post listing', description: 'Save the itinerary and list it for guide offers.' },
+  { number: '06', title: 'Confirm booking', description: 'Accept an offer, chat, and record the simulated payment flow.' },
+]
+
+const ACADEMIC_DETAILS = [
+  { label: 'Subject', value: 'AAPP011-4-2 Capstone Project' },
+  { label: 'Institution', value: 'Asia Pacific University, Malaysia' },
+  { label: 'Environment', value: 'Academic prototype with simulated payments' },
+]
