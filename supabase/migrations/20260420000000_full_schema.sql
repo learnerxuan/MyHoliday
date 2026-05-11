@@ -103,6 +103,7 @@ CREATE TABLE public.itineraries (
     session_id      UUID         REFERENCES public.chat_sessions(id) ON DELETE SET NULL,
     title           VARCHAR(255) NOT NULL,
     content         JSONB        NOT NULL,
+    trip_metadata   JSONB,
     created_at      TIMESTAMP    DEFAULT NOW(),
     updated_at      TIMESTAMP    DEFAULT NOW()
 );

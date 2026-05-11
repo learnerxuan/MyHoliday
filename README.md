@@ -1,586 +1,353 @@
-# ✈️ MyHoliday — Travel & Tourism Recommendation System
-
-> A web-based platform that takes you from *"I have no idea where to go"* to *"my trip is planned and my local guide is confirmed"* — entirely in one place.
-
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%26%20Auth-3ECF8E?logo=supabase)](https://supabase.com/)
-[![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?logo=vercel)](https://vercel.com/)
-
----
-
-## 📌 Table of Contents
-
-- [The Problem](#-the-problem)
-- [The Solution](#-the-solution)
-- [How It Works](#-how-it-works)
-- [System Modules](#-system-modules)
-  - [User Authentication & Profiling](#1-user-authentication--profiling)
-  - [Destination Recommendation Engine](#2-destination-recommendation-engine)
-  - [AI Itinerary Planner](#3-ai-itinerary-planner)
-  - [Marketplace](#4-marketplace)
-  - [Admin Dashboard](#5-admin-dashboard)
-- [User Roles](#-user-roles)
-- [Tech Stack](#-tech-stack)
-- [System Architecture](#-system-architecture)
-- [Database Schema](#-database-schema)
-- [Environment Variables](#-environment-variables)
-- [Scope & Limitations](#-scope--limitations)
-- [Team](#-team)
-
----
-
-## ❗ The Problem
-
-The travel and tourism industry contributes 10% of global GDP and is projected to exceed USD 16.5 trillion by 2035. Online travel booking is growing at 8.2% CAGR, yet the experience of planning a trip remains fundamentally broken for the average traveller.
-
-**Problem 1 — Choice Overload**
-
-Platforms like TripAdvisor, Expedia, and Booking.com return broad, non-personalised results. A traveller who doesn't know where they want to go is met with hundreds of advertised destinations, none of which are filtered to their travel style, budget, group size, or preferences. Research shows that too many choices causes people to either make no decision at all, or make a poor one and regret it. The time spent researching does not justify the quality of the result.
-
-**Problem 2 — No Bridge Between Travellers and Private Local Guides**
-
-There is a growing preference for independent, private travel over generic group package tours. Travellers want customised experiences at their own pace. However, there is no structured platform where independent travellers can discover, communicate, and negotiate directly with verified local tour guides. Travellers end up paying for overpriced generic group tours, while local guides lose clients because they have no dedicated channel to reach independent travellers.
-
-**Problem 3 — No End-to-End Solution Exists**
-
-Existing platforms each solve only one piece of the puzzle:
-- **Google Search** — broad, non-personalised results
-- **TripAdvisor** — review-based, not preference-driven
-- **Travel Blogs** — static content, no personalisation or interactivity
-- **Expedia / Booking.com** — transaction-focused, not discovery-focused
-
-None of these guide a traveller from *not knowing where to go* all the way to *confirming a private local guide* for the trip.
-
----
-
-## 💡 The Solution
-
-**MyHoliday** is a web application built for two primary user groups: **independent travellers** who want personalised trips, and **local tour guides** who are looking for clients.
-
-It is structured around five interconnected modules that take a traveller through the full journey:
-
-1. A **preference quiz** collects what the user actually wants and matches them to a destination
-2. An **AI chatbot** generates a fully personalised, conversational day-by-day itinerary
-3. A **marketplace** lets travellers publish their finalised plan and receive proposals from verified local guides
-4. A **real-time chat system** lets travellers and guides negotiate directly before confirming
-5. An **admin dashboard** keeps the platform safe, verified, and data-informed
-
----
-
-## 🔄 How It Works
-
-### For a Traveller
-
-```
-Register & Build Profile
-        │
-        ▼
-Take the Preference Quiz
-(Travel style, budget, group size, duration, climate)
-        │
-        ▼
-View Ranked Destination Recommendations
-(Match score calculated per city)
-        │
-        ▼
-Select a City → View City Details
-(Description, attractions, estimated costs)
-        │
-        ▼
-Chat with AI Itinerary Planner
-(Generate → Refine → Confirm day-by-day plan)
-        │
-        ▼
-Save Plan to "My Plans" Dashboard
-        │
-        ▼
-Post Plan to Marketplace with a Budget
-        │
-        ▼
-Receive Proposals from Local Tour Guides
-        │
-        ▼
-Negotiate via In-Platform Chat → Accept Offer
-```
+# MyHoliday
 
-### For a Tour Guide
+MyHoliday is a capstone web application for travel discovery, AI-assisted itinerary planning, and traveller-to-tour-guide coordination. It helps a traveller move from destination discovery to a saved itinerary, then into a marketplace where verified tour guides can offer services for that itinerary.
 
-```
-Register as Tour Guide
-        │
-        ▼
-Upload Verification Documents
-(Licence / Identification)
-        │
-        ▼
-Wait for Admin Approval
-        │
-        ▼
-Browse Marketplace Listings in Registered City
-        │
-        ▼
-Submit Service Proposal with Quoted Price
-        │
-        ▼
-Chat with Traveller to Finalise Details
-        │
-        ▼
-Booking Confirmed
-```
+The system is built with Next.js App Router, Supabase Auth/PostgreSQL/RLS, OpenAI-powered itinerary chat, Google Places/Maps integrations, and a mock marketplace transaction flow.
 
----
+## Current System Capabilities
 
-## 🧩 System Modules
+- Traveller authentication, onboarding, profile management, and account deactivation checks.
+- Tour guide onboarding with city assignment, document upload, and admin approval.
+- Destination catalogue with city detail pages, imagery, booking links, and click tracking.
+- Preference quiz that scores destinations using vector similarity over style, budget, trip duration, climate, and region.
+- Personalized destination discovery based on saved itineraries, destination clicks, and prior AI planning sessions.
+- Conversational AI itinerary planner that stores chat sessions, planner state, itinerary updates, and map coordinates.
+- Saved itinerary history and individual itinerary viewer.
+- Marketplace listings created from saved itineraries.
+- Guide-side marketplace browsing scoped by guide role/profile, with offer submission and negotiation.
+- Marketplace chat between travellers and guides.
+- Mock transaction records for accepted offers, including platform service charge and guide payout calculation.
+- Admin dashboard for users, tour-guide requests, guide documents, marketplace moderation, live KPIs, and reports.
 
-### 1. User Authentication & Profiling
+## User Roles
 
-Handles account creation, session management, and personal profiling for all user types.
+| Role | What the role can do |
+| --- | --- |
+| Traveller | Complete onboarding/profile, take the quiz, browse destinations, plan itineraries with AI, save itineraries, create marketplace listings, review offers, chat with guides, and complete mock transactions. |
+| Tour guide | Complete guide onboarding, upload verification documents, wait for approval, browse marketplace requests, submit offers, chat with travellers, and enable mock payment for accepted work. |
+| Admin | Access the admin dashboard, view/manage travellers, review guide applications/documents, approve or reject guides, moderate listings, suspend listings, and view analytics/reports. |
 
-**Traveller accounts support:**
-- Register, login, logout
-- Password recovery via forgot password flow
-- Personal profile: age, nationality, dietary restrictions, accessibility needs, preferred language
-- Profile data is used downstream by the AI planner to personalise itineraries
+Access control is implemented in two layers:
 
-**Tour guide accounts support:**
-- Separate registration flow distinct from traveller registration
-- City assignment — guides are locked to a single city they serve
-- Document upload (licence or identification) for verification
-- Profile editing post-approval
+- `middleware.ts` protects role-specific route groups and blocks inactive traveller accounts.
+- Supabase Row Level Security policies protect database reads/writes for profiles, destinations, chat, itineraries, marketplace records, transactions, and admin reporting access.
 
----
+## Main User Flows
 
-### 2. Destination Recommendation Engine
+### Traveller Flow
 
-The core discovery feature of MyHoliday. Instead of showing the user a static catalogue of destinations, the engine offers two co-existing methods to discover travel locations: an explicit preference quiz, and a personalized discovery feed.
+1. Register or log in at `/auth/register` or `/auth/login`.
+2. Complete traveller onboarding at `/auth/onboarding/traveller`.
+3. Take the preference quiz at `/quiz`.
+4. Review ranked destination recommendations on `/destinations`.
+5. Open a destination detail page at `/destinations/[id]`.
+6. Launch the AI planner at `/itinerary?city=[destinationId]`.
+7. Chat with the planner, refine the trip, view itinerary/map panels, and save the plan.
+8. Review saved plans at `/itineraries`, `/history`, or `/saved-itinerary/[id]`.
+9. Publish a saved itinerary to the marketplace at `/marketplace/new`.
+10. Review offers and chat on `/marketplace/[id]`, `/marketplace/[id]/offer`, and `/marketplace/[id]/chat`.
 
-**1. The Preference Quiz (Primary)**
+### Tour Guide Flow
 
-The system works backwards from the user's stated preferences. The user answers a quiz with the following inputs:
+1. Register or log in with guide role.
+2. Complete guide onboarding at `/auth/onboarding/guide`.
+3. Wait for admin verification.
+4. Use `/marketplace` to view relevant traveller requests.
+5. Submit an offer, negotiate by chat, and enable a mock payment record after agreement.
+6. Review guide history/bookings from `/guide/history`, `/guide/bookings`, and `/guide/chats`.
 
-| Input | Options |
-|---|---|
-| Travel Style | Adventure, Cultural, Relaxation, Food & Dining, Nature, etc. |
-| Budget Level | Backpacker / Mid-range / Luxury |
-| Group Size | Solo / Couple / Small Group / Large Group |
-| Trip Duration | Weekend / 1 Week / 2 Weeks / Extended |
-| Climate Preference | Tropical / Temperate / Cold / Desert / Any |
+### Admin Flow
 
-The engine then analyzes the submitted preferences, filters the destination database, and returns a ranked list of cities explicitly matched with a **match score**.
+1. Log in with admin metadata.
+2. Use `/admin` for operational KPIs and action queues.
+3. Manage travellers at `/admin/users`.
+4. Review tour guides at `/admin/tour-guides` and pending guide requests at `/admin/tour-guides/requests`.
+5. Open uploaded guide documents through admin API routes.
+6. Moderate listings at `/admin/marketplace`, including suspension.
+7. View charts and reports at `/admin/reports`.
 
-**2. Explore Page Personalization (Discovery)**
+## Core Modules
 
-Users who skip the quiz or simply want to browse arrive at the "Explore" page. Here, the engine uses **multi-signal personalization** to dynamically rank destinations based on implicit user behavior:
-- **User Interactions (Clicks)**: Tracks which destinations a user views to boost affinity for specific regions and countries.
-- **Saved Itineraries & Chat History**: Analyzes past travel planning behavior to refine recommendations.
+### Authentication and Profiles
 
-To ensure a fresh experience, the engine avoids repetitive sorting, maintaining a mix of highly relevant personalized matches alongside randomized discovery.
+Supabase Auth handles email/password sessions and OAuth configuration. User role is stored in Supabase user metadata. Profile data is stored separately:
 
-**Destination dataset:** Both engines operate on a predefined, curated destination dataset rather than live travel data. Each destination entry includes thematic tags, allowing the scoring algorithm to compute reliable matches seamlessly.
+- `traveller_profiles` stores name, date of birth, nationality, dietary restrictions, accessibility needs, preferred language, and active status.
+- `tour_guides` stores guide profile data, city assignment, document URL, and verification status.
 
----
+### Destination Recommendation
 
-### 3. AI Itinerary Planner
+The quiz recommendation API is implemented at `/api/recommendation`.
 
-Once a traveller selects a destination, they enter the AI Itinerary Planner — a conversational interface powered by a large language model.
+It accepts preference data including:
 
-**City Detail Page**
+- preferred travel styles
+- destination regions
+- budget level
+- climate preference
+- group size
+- travel start and end dates
 
-Before entering the planner, users view a city detail page containing:
-- City description and overview
-- Popular attractions and points of interest
-- Estimated travel costs for the destination
+The engine filters destinations by selected regions, encodes user and destination attributes into normalized vectors, applies cosine similarity, and returns the top scored destinations with trip metadata.
 
-**Chatbot Interaction Flow**
+The discovery API at `/api/recommendation/discovery` generates "recommended for you" results from behavioural signals:
 
-The AI planner is not a form or a template generator. It is a full conversational interface where the user discusses the trip with the AI:
+- saved itinerary metadata
+- destination click interactions
+- previous chat session planner state
 
-1. **Generate Draft** — The AI uses the user's profile (dietary restrictions, accessibility needs, language, group size, nationality) and the selected destination to produce an initial day-by-day itinerary
-2. **Refine Plan** — The user can request changes through conversation: swap an activity, adjust pacing, add a specific type of restaurant, account for mobility needs, etc.
-3. **Confirm Plan** — Once satisfied, the user confirms and saves the itinerary
+It also applies region and country affinity boosts before returning personalized destinations.
 
-**My Plans Dashboard**
+### Destination Pages and External Data
 
-All saved itineraries are accessible from the user's personal dashboard. Users can:
-- Review any saved travel plan
-- Edit the plan (re-enters the chatbot with existing context)
-- Delete a plan
+Destination pages use stored destination data from Supabase and supporting API routes:
 
-**External Booking Links**
+- `/api/destinations`
+- `/api/city-image`
+- `/api/place-image`
+- `/api/nearby-places`
+- `/api/geocode`
+- `/api/interactions`
 
-City pages and itineraries include links to third-party sites for hotel and transport bookings. MyHoliday does not perform actual bookings — it redirects users to the appropriate external platforms.
+Google Places/Maps is used for place search, geocoding, nearby places, and images. Wikipedia can provide fallback city imagery. Destination click interactions are recorded for personalization and admin reports.
 
----
+### AI Itinerary Planner
 
-### 4. Marketplace
+The planner UI is at `/itinerary` and is backed by `/api/chat`.
 
-The marketplace connects travellers with verified local tour guides. It is the final step in the MyHoliday journey.
+The planner:
 
-**Traveller Side**
+- creates or resumes one active chat session per user/destination
+- stores messages in `chat_messages`
+- stores structured planner progress in `chat_sessions.planner_state`
+- uses traveller profile data for dietary, accessibility, language, and age context
+- accepts quiz context when available so the first itinerary draft can be fast-tracked
+- uses OpenAI chat completions with tool calls
+- returns newline-delimited JSON responses to the client
+- supports itinerary generation and incremental modification
+- enriches itinerary items with Google Places coordinates for the map panel
+- applies simple guardrails before calling the model
 
-After saving a finalised itinerary, the traveller can publish it as a marketplace listing:
-- Set a desired budget for the tour
-- The listing becomes visible to tour guides in the matching city
+Supporting AI files live in `lib/ai/`:
 
-Once listed, the traveller can:
-- View all incoming proposals from guides
-- See each guide's quoted price and profile
-- Use the in-platform chat to discuss trip details, ask questions, and negotiate
-- Accept a proposal to confirm the booking
+- `system-prompt.js`
+- `guardrails.js`
+- `tools/index.js`
+- `tools/search_places.js`
+- `tools/get_weather.js`
+- `tools/check_transport.js`
+- `tools/estimate_budget.js`
 
-**Tour Guide Side**
+### Saved Itineraries
 
-Verified guides see all active marketplace listings within their registered city:
-- Browse listings and read the traveller's full itinerary
-- Submit a service proposal with a custom quoted price
-- Communicate with the traveller directly via in-platform chat
+Saved itineraries are stored in `itineraries` with JSON content and optional trip metadata. Users can view itinerary lists/history and open individual saved itineraries through `/saved-itinerary/[id]`.
 
-**Chat System**
+### Marketplace
 
-Real-time messaging between traveller and tour guide is built into the marketplace. This allows both parties to negotiate, clarify details, and reach mutual agreement before committing.
+The marketplace is shared by travellers and guides at `/marketplace`, with role-aware behaviour.
 
-> ⚠️ MyHoliday facilitates the connection and agreement between travellers and guides but does not process payments or guarantee service quality.
+Travellers can:
 
----
+- create a listing from a saved itinerary
+- set a desired budget
+- view guide offers
+- chat with guides
+- accept or reject offers
+- complete a mock transaction after payment is enabled
 
-### 5. Admin Dashboard
+Guides can:
 
-The admin dashboard gives platform administrators full visibility and control over MyHoliday's operations.
+- view marketplace requests
+- submit offers with a proposed price
+- include an edited itinerary proposal
+- chat with travellers
+- enable payment for an accepted offer
 
-**User Management**
-- View and manage all registered traveller and tour guide accounts
-- Suspend or deactivate accounts where necessary
+Marketplace API routes live under `/api/marketplace`, including listings, offers, messages, profiles, history, and transactions.
 
-**Tour Guide Verification**
-- Review uploaded guide documents (licence, identification)
-- Approve or reject verification requests
-- Guides cannot access the marketplace until their account is approved
+### Mock Transactions
 
-**Marketplace Moderation**
-- View all active marketplace listings
-- Remove or flag inappropriate listings
+MyHoliday does not integrate with a real payment gateway. It creates internal transaction records in Supabase.
 
-**Analytics & Reports**
+The default platform fee is 10%, configured in `lib/marketplace/payment-config.ts`. Transaction logic calculates:
 
-The dashboard surfaces descriptive statistics from the platform database:
+- total amount
+- service charge
+- guide payout
+- payment reference
+- pending/completed/refunded status
 
-| Metric | Description |
-|---|---|
-| Popular Destinations | Which cities are most frequently selected by travellers |
-| Itineraries Generated | Total count of AI-generated plans over time |
-| Marketplace Activity | Number of active listings, offers submitted, bookings confirmed |
-| User Demographics | Basic breakdown of user nationalities, group sizes, travel styles |
+### Admin and Reporting
 
----
+Admin pages read operational data from Supabase through server actions and API routes. Current reporting includes:
 
-## 👥 User Roles
+- active travellers
+- approved guides
+- pending guide requests
+- open AI sessions
+- suspended listings
+- listings with no offers
+- marketplace offer status counts
+- completed GMV
+- platform revenue
+- top clicked destinations
+- report charts through Recharts
 
-| Role | Access |
-|---|---|
-| **Traveller** | Quiz, recommendations, city pages, AI planner, my plans, marketplace (post & accept) |
-| **Tour Guide** | Marketplace browser (city-scoped), proposal submission, guide chat |
-| **Administrator** | Full platform access — user management, guide verification, marketplace moderation, analytics |
+## Tech Stack
 
-Access control is enforced at the database level using **Supabase Row Level Security (RLS)** policies, ensuring each role can only read and write data they are authorised for.
+| Layer | Technology |
+| --- | --- |
+| Web framework | Next.js 16 App Router |
+| UI | React 19, Tailwind CSS 4, lucide-react, Recharts |
+| Database | Supabase PostgreSQL |
+| Auth | Supabase Auth with user metadata roles |
+| Database access | `@supabase/ssr`, `@supabase/supabase-js`, `pg` |
+| AI | OpenAI API |
+| Maps and places | Google Places/Maps APIs, Leaflet, React Leaflet, Leaflet Routing Machine |
+| Supporting APIs | Wikipedia fallback imagery, Open-Meteo weather fallback, OSRM routing estimates |
+| Deployment target | Vercel-compatible Next.js deployment |
 
----
+## Project Structure
 
-## 🛠️ Tech Stack
-
-| Layer | Technology | Reason |
-|---|---|---|
-| **Framework** | [Next.js 15](https://nextjs.org/) (App Router) | Full-stack in one codebase — API routes handle backend logic, SSR renders city and recommendation pages, route groups cleanly separate the three user role layouts |
-| **Database** | [Supabase (PostgreSQL)](https://supabase.com/) | Relational database suits the structured, multi-role data model; built-in Row Level Security for access control; Realtime for marketplace chat; Storage for guide document uploads |
-| **Authentication** | Supabase Auth | Email/password auth with session management; role-based access enforced via RLS policies and user metadata |
-| **AI Chatbot** | OpenAI API / Gemini API | Powers the conversational itinerary planner via Next.js API routes — the LLM call is server-side, keeping the API key out of the client |
-| **File Storage** | Supabase Storage | Stores tour guide verification documents with secure, access-controlled bucket policies |
-| **Deployment** | [Vercel](https://vercel.com/) | Native Next.js deployment with zero config; environment variables managed in the Vercel dashboard; edge network for fast global access |
-
----
-
-## 🏗️ System Architecture
-
-### Application Structure
-
-```
+```text
 myholiday/
-├── app/
-│   ├── (auth)/
-│   │   ├── login/
-│   │   ├── register/
-│   │   └── forgot-password/
-│   │
-│   ├── (traveller)/
-│   │   ├── quiz/                  # Preference collection flow
-│   │   ├── destinations/
-│   │   │   ├── page.tsx           # Ranked recommendation results
-│   │   │   └── [city]/            # Individual city detail page
-│   │   ├── planner/               # AI chatbot itinerary interface
-│   │   ├── my-plans/              # Saved itinerary dashboard
-│   │   └── marketplace/
-│   │       ├── new/               # Create a listing
-│   │       └── [listingId]/       # View offers, accept, chat
-│   │
-│   ├── (guide)/
-│   │   ├── register/              # Guide onboarding & document upload
-│   │   ├── marketplace/           # Browse city listings
-│   │   └── chat/[listingId]/      # Negotiate with traveller
-│   │
-│   ├── (admin)/
-│   │   ├── users/                 # Account management
-│   │   ├── verifications/         # Guide approval queue
-│   │   ├── marketplace/           # Listing moderation
-│   │   └── reports/               # Analytics dashboard
-│   │
-│   └── api/
-│       ├── recommendation/        # Preference matching & scoring logic
-│       ├── chat/                  # LLM proxy — AI itinerary generation
-│       └── marketplace/           # Listing and offer CRUD
-│
-├── components/                    # Shared UI components
-├── lib/
-│   ├── supabase/                  # Supabase client (server & browser)
-│   └── ai/                        # LLM client & system prompt templates
-└── supabase/
-    └── migrations/                # Database schema migrations
+  app/
+    admin/                         Admin dashboard, users, guides, marketplace, reports
+    api/                           Next.js API routes
+      admin/                       Admin traveller/marketplace/tour-guide endpoints
+      chat/                        AI itinerary planner endpoint
+      recommendation/              Quiz and discovery recommendation endpoints
+      marketplace/                 Listings, offers, messages, profiles, history, transactions
+    auth/                          Login, register, onboarding, callback, password flows
+    destinations/                  Destination list and detail pages
+    guide/                         Guide redirects, history, bookings, chats
+    itinerary/                     AI planner page and planner component
+    itineraries/                   Saved itinerary list
+    marketplace/                   Traveller/guide marketplace screens
+    profile/                       Traveller profile
+    quiz/                          Preference quiz
+    saved-itinerary/[id]/          Saved itinerary viewer
+    survey/                        Survey capture
+  components/
+    admin/                         Admin charts and live stats
+    sections/                      Planner, map, chat, listing and marketplace panels
+    ui/                            Shared UI primitives
+  lib/
+    actions/                       Server actions for reports
+    ai/                            System prompt, guardrails and AI tools
+    marketplace/                   Mock payment calculations
+    supabase/                      Browser/server Supabase clients and auth helpers
+    recommendation.ts              Discovery preference inference/scoring helpers
+    survey-options.ts              Survey/quiz option data
+  supabase/
+    migrations/                    Consolidated database schema and RLS policies
+  docs/
+    context-diagram.md             System context diagram
 ```
 
-### Request Flow
+## Database Overview
 
-```
-Browser
-  │
-  ├─── Page Request ──► Next.js App Router (SSR/SSG)
-  │                           │
-  │                           ▼
-  │                    Supabase (data fetch)
-  │                           │```sql
--- ============================================================
--- MyHoliday — Consolidated Database Schema
--- Travel and Tourism Recommendation System
--- ============================================================
+The consolidated schema is in `supabase/migrations/20260420000000_full_schema.sql`.
 
--- ── EXTENSIONS ──────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+Main tables:
 
--- ============================================================
--- 1. DESTINATIONS
--- ============================================================
-CREATE TABLE public.destinations (
-    id                  UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    city                VARCHAR(100)  NOT NULL,
-    country             VARCHAR(100)  NOT NULL,
-    region              VARCHAR(100),
-    short_description   TEXT,
-    latitude            FLOAT,
-    longitude           FLOAT,
-    avg_temp_monthly    JSONB,
-    ideal_durations     JSONB,
-    budget_level        VARCHAR(20)   CHECK (budget_level IN ('Budget', 'Mid-range', 'Luxury')),
-    culture             SMALLINT      CHECK (culture    BETWEEN 0 AND 5),
-    adventure           SMALLINT      CHECK (adventure  BETWEEN 0 AND 5),
-    nature              SMALLINT      CHECK (nature     BETWEEN 0 AND 5),
-    beaches             SMALLINT      CHECK (beaches    BETWEEN 0 AND 5),
-    nightlife           SMALLINT      CHECK (nightlife  BETWEEN 0 AND 5),
-    cuisine             SMALLINT      CHECK (cuisine    BETWEEN 0 AND 5),
-    wellness            SMALLINT      CHECK (wellness   BETWEEN 0 AND 5),
-    urban               SMALLINT      CHECK (urban      BETWEEN 0 AND 5),
-    seclusion           SMALLINT      CHECK (seclusion  BETWEEN 0 AND 5),
-    categories          TEXT,
-    best_time_to_visit  TEXT
-);
+- `destinations`
+- `traveller_profiles`
+- `tour_guides`
+- `chat_sessions`
+- `chat_messages`
+- `itineraries`
+- `marketplace_listings`
+- `marketplace_offers`
+- `marketplace_messages`
+- `transactions`
+- `historical_trips`
+- `user_interactions`
 
--- ============================================================
--- 2. TRAVELLER PROFILES (Linked to auth.users)
--- ============================================================
-CREATE TABLE public.traveller_profiles (
-    id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id                 UUID          NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-    full_name               VARCHAR(150),
-    age                     INTEGER,
-    nationality             VARCHAR(100),
-    dietary_restrictions    VARCHAR(100),
-    accessibility_needs     BOOLEAN       DEFAULT FALSE,
-    preferred_language      VARCHAR(50)   DEFAULT 'English',
-    created_at              TIMESTAMP     DEFAULT NOW()
-);
+Important later schema additions in the consolidated migration include:
 
--- ============================================================
--- 3. TOUR_GUIDES (Linked to auth.users)
--- ============================================================
-CREATE TABLE public.tour_guides (
-    id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id                 UUID          NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-    full_name               VARCHAR(150),
-    city_id                 UUID          REFERENCES public.destinations(id) ON DELETE SET NULL,
-    document_url            VARCHAR(500),
-    verification_status     VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (verification_status IN ('pending', 'approved', 'rejected')),
-    created_at              TIMESTAMP     DEFAULT NOW()
-);
+- `traveller_profiles.is_active` for admin deactivation.
+- `marketplace_listings.is_suspended` for moderation.
+- `marketplace_offers.edited_itinerary` for guide proposal changes.
+- `marketplace_offers.payment_enabled` for the mock payment flow.
+- RLS policies allowing admins to read analytics tables.
+- RLS policies for marketplace participants, transactions, historical trips, and profile summaries.
 
--- ============================================================
--- 4. CHAT_SESSIONS
--- ============================================================
-CREATE TABLE public.chat_sessions (
-    id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    destination_id  UUID        NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
-    status          VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed')),
-    planner_state   JSONB       NOT NULL DEFAULT '{}'::jsonb,
-    created_at      TIMESTAMP   DEFAULT NOW()
-);
+## Environment Variables
 
--- ============================================================
--- 5. CHAT_MESSAGES
--- ============================================================
-CREATE TABLE public.chat_messages (
-    id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id  UUID        NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
-    role        VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
-    content     TEXT        NOT NULL,
-    created_at  TIMESTAMP   DEFAULT NOW()
-);
-
--- ============================================================
--- 6. ITINERARIES
--- ============================================================
-CREATE TABLE public.itineraries (
-    id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    destination_id  UUID         NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
-    session_id      UUID         REFERENCES public.chat_sessions(id) ON DELETE SET NULL,
-    title           VARCHAR(255) NOT NULL,
-    content         JSONB        NOT NULL,
-    created_at      TIMESTAMP    DEFAULT NOW(),
-    updated_at      TIMESTAMP    DEFAULT NOW()
-);
-
--- ============================================================
--- 7. MARKETPLACE_LISTINGS
--- ============================================================
-CREATE TABLE public.marketplace_listings (
-    id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID          NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    itinerary_id    UUID          NOT NULL REFERENCES public.itineraries(id) ON DELETE CASCADE,
-    destination_id  UUID          NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
-    desired_budget  NUMERIC(10,2),
-    status          VARCHAR(20)   NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'negotiating', 'confirmed', 'closed')),
-    created_at      TIMESTAMP     DEFAULT NOW()
-);
-
--- ============================================================
--- 8. MARKETPLACE_OFFERS
--- ============================================================
-CREATE TABLE public.marketplace_offers (
-    id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    listing_id      UUID          NOT NULL REFERENCES public.marketplace_listings(id) ON DELETE CASCADE,
-    guide_id        UUID          NOT NULL REFERENCES public.tour_guides(id) ON DELETE CASCADE,
-    proposed_price  NUMERIC(10,2) NOT NULL,
-    status          VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'withdrawn')),
-    created_at      TIMESTAMP     DEFAULT NOW()
-);
-
--- ============================================================
--- 9. MARKETPLACE_MESSAGES
--- ============================================================
-CREATE TABLE public.marketplace_messages (
-    id          UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    listing_id  UUID          NOT NULL REFERENCES public.marketplace_listings(id) ON DELETE CASCADE,
-    sender_type VARCHAR(20)   NOT NULL CHECK (sender_type IN ('traveler', 'guide')),
-    sender_id   UUID          NOT NULL,
-    content     TEXT          NOT NULL,
-    created_at  TIMESTAMP     DEFAULT NOW()
-);
-
--- ============================================================
--- 10. TRANSACTIONS
--- ============================================================
-CREATE TABLE public.transactions (
-    id                  UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    offer_id            UUID          NOT NULL REFERENCES marketplace_offers(id) ON DELETE RESTRICT,
-    payer_id            UUID          NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
-    payee_id            UUID          NOT NULL REFERENCES public.tour_guides(id) ON DELETE RESTRICT,
-    total_amount        NUMERIC(10,2) NOT NULL,
-    service_charge      NUMERIC(10,2) NOT NULL DEFAULT 0,
-    guide_payout        NUMERIC(10,2) NOT NULL,
-    status              VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'refunded')),
-    payment_reference   VARCHAR(100)  UNIQUE,
-    created_at          TIMESTAMP     DEFAULT NOW(),
-    CONSTRAINT payout_check CHECK (guide_payout = total_amount - service_charge)
-);
-
--- ============================================================
--- 11. HISTORICAL_TRIPS (ML Dataset)
--- ============================================================
-CREATE TABLE public.historical_trips (
-    id                      SERIAL        PRIMARY KEY,
-    destination             VARCHAR(150),
-    duration_days           FLOAT,
-    traveler_age            FLOAT,
-    traveler_gender         VARCHAR(20),
-    traveler_nationality    VARCHAR(100),
-    accommodation_type      VARCHAR(50),
-    accommodation_cost      NUMERIC(10,2),
-    transportation_type     VARCHAR(50),
-    transportation_cost     NUMERIC(10,2)
-);
-
--- ============================================================
--- 12. USER_INTERACTIONS
--- ============================================================
-CREATE TABLE public.user_interactions (
-    id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID        REFERENCES auth.users(id) ON DELETE CASCADE,
-    destination_id  UUID        REFERENCES public.destinations(id) ON DELETE CASCADE,
-    type            TEXT,
-    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
-
----
-
-## 🔐 Environment Variables
+Create `.env.local` from `.env.example`.
 
 ```env
-# ── Supabase ──────────────────────────────────────
-NEXT_PUBLIC_SUPABASE_URL=           # Your Supabase project URL
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=      # Public anon key (safe for browser)
-SUPABASE_SERVICE_ROLE_KEY=          # Service role key (server-side only, never expose)
+DATABASE_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+OPENAI_API_KEY=
+GOOGLE_PLACES_API_KEY=
 
-# ── AI Chatbot (choose one) ───────────────────────
-OPENAI_API_KEY=                     # OpenAI API key
-# or
-GEMINI_API_KEY=                     # Google Gemini API key
-
-# ── App ───────────────────────────────────────────
-NEXT_PUBLIC_APP_URL=                # e.g. https://myholiday.vercel.app
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 ```
 
-> ⚠️ `SUPABASE_SERVICE_ROLE_KEY` and AI API keys must **never** be exposed to the browser. These are used only inside Next.js API routes which run server-side.
+Optional:
 
----
+```env
+OPENAI_CHAT_MODEL=gpt-4o
+```
 
-## ⚠️ Scope & Limitations
+Notes:
 
-### What MyHoliday Does Not Do
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is used by browser/server Supabase clients.
+- `OPENAI_API_KEY` is required for `/api/chat`.
+- `GOOGLE_PLACES_API_KEY` is required for place search, geocoding, and place/city imagery.
+- `DATABASE_URL` supports server-side reporting/database access.
+- OAuth variables are present for Google auth configuration.
 
-| Limitation | Detail |
-|---|---|
-| **No real payment processing** | The platform handle mock financial transactions |
-| **No real bookings** | Hotel and transport links redirect to third-party platforms — no in-app booking |
-| **Simulated guide verification** | Document review is performed by the admin within the system; not validated by actual licensing authorities |
-| **Static destination data** | The recommendation engine uses a predefined dataset, not live travel APIs or real-time pricing |
-| **No mobile app** | MyHoliday is web-only — no iOS or Android application |
-| **English only** | The UI is English only; user language preference is recorded in the profile for AI personalisation purposes but does not change the UI language |
-| **No service guarantees** | MyHoliday does not mediate or guarantee the quality of service between travellers and tour guides post-booking |
+## Local Development
 
----
+Install dependencies:
 
-## 👥 Team
+```bash
+npm install
+```
+
+Run the development server:
+
+```bash
+npm run dev
+```
+
+Build the application:
+
+```bash
+npm run build
+```
+
+Run linting:
+
+```bash
+npm run lint
+```
+
+## Current Limitations
+
+- Payments are mock records only; there is no live payment gateway.
+- Hotel and transport booking links are external; MyHoliday does not book travel inventory directly.
+- Guide verification is an admin review workflow, not a live licensing authority check.
+- Destination and historical trip data are seeded/static, not live travel pricing data.
+- The UI is web-only.
+- The interface is English-first; preferred language is stored for planner context but does not localize the full UI.
+- Marketplace service delivery after agreement is outside the platform.
+
+## Documentation
+
+- System context diagram: `docs/context-diagram.md`
+- Design reference: `design-guide.md`
+- Database schema: `supabase/migrations/20260420000000_full_schema.sql`
+
+## Team
 
 | Name |
-|---|
+| --- |
 | Laeu Zi-Li |
 | Low Ze Xuan |
 | Heng Ee Sern |
@@ -588,6 +355,6 @@ NEXT_PUBLIC_APP_URL=                # e.g. https://myholiday.vercel.app
 | Muhammad Farris Bin Razman |
 | Soo Jian Wen |
 
-> **Course:** AAPP011-4-2 Capstone Project
-> **Institution:** Asia Pacific University of Technology & Innovation
-> **Intake:** UCDF2407ICT(DI) | 032026
+Course: AAPP011-4-2 Capstone Project  
+Institution: Asia Pacific University of Technology & Innovation  
+Intake: UCDF2407ICT(DI) | 032026
