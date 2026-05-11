@@ -1,6 +1,6 @@
 # MyHoliday
 
-MyHoliday is a capstone web application for travel discovery, AI-assisted itinerary planning, and traveller-to-tour-guide coordination. It helps a traveller move from destination discovery to a saved itinerary, then into a marketplace where verified tour guides can offer services for that itinerary.
+MyHoliday is a web application for travel discovery, AI-assisted itinerary planning, and traveller-to-tour-guide coordination. It helps a traveller move from destination discovery to a saved itinerary, then into a marketplace where verified tour guides can offer services for that itinerary.
 
 The system is built with Next.js App Router, Supabase Auth/PostgreSQL/RLS, OpenAI-powered itinerary chat, Google Places/Maps integrations, and a mock marketplace transaction flow.
 
