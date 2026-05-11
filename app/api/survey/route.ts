@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { COUNTRIES } from '@/lib/countries'
-import { query } from '@/lib/supabase/db'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ACCOMMODATION_TYPES, TRANSPORTATION_TYPES } from '@/lib/survey-options'
 
 const GENDERS = ['Male', 'Female']
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createSupabaseServerClient()
     const body = await request.json()
     const destination = cleanString(body.destination)
     const duration = Number(body.duration_days)
@@ -42,42 +43,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid survey submission.', errors }, { status: 400 })
     }
 
-    const destinationResult = await query(
-      'select city from destinations where city = $1 limit 1',
-      [destination]
-    )
+    const { data: destinationRow, error: destinationError } = await supabase
+      .from('destinations')
+      .select('city')
+      .eq('city', destination)
+      .maybeSingle()
 
-    if (destinationResult.rowCount === 0) {
+    if (destinationError || !destinationRow) {
       return NextResponse.json({
         error: 'Invalid survey submission.',
         errors: { destination: 'Please select a destination from the list.' }
       }, { status: 400 })
     }
 
-    await query(`
-      insert into historical_trips (
+    const { error: insertError } = await supabase
+      .from('historical_trips')
+      .insert({
         destination,
-        duration_days,
-        traveler_age,
-        traveler_gender,
-        traveler_nationality,
-        accommodation_type,
-        accommodation_cost,
-        transportation_type,
-        transportation_cost
-      )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [
-      destination,
-      duration,
-      age,
-      gender,
-      nationality,
-      accommodationType,
-      accommodationCost,
-      transportationType,
-      transportationCost
-    ])
+        duration_days: duration,
+        traveler_age: age,
+        traveler_gender: gender,
+        traveler_nationality: nationality,
+        accommodation_type: accommodationType,
+        accommodation_cost: accommodationCost,
+        transportation_type: transportationType,
+        transportation_cost: transportationCost
+      })
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error: any) {

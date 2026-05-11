@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { Funnel_Display, Noto_Serif } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
@@ -30,13 +31,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${funnelDisplay.variable} ${notoSerif.variable} antialiased min-h-screen flex flex-col bg-warmwhite`}>
-        <PageTransitionProvider>
-          <Navbar />
-          <main className="flex-1 flex flex-col pt-16 pt-safe">
-            {children}
-          </main>
-          <Footer />
-        </PageTransitionProvider>
+        <Suspense>
+          <PageTransitionProvider>
+            <Navbar />
+            <main className="flex-1 flex flex-col pt-16 pt-safe">
+              {children}
+            </main>
+            <Footer />
+          </PageTransitionProvider>
+        </Suspense>
       </body>
     </html>
   )

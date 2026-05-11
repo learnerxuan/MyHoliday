@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import PageHeader from '@/components/ui/PageHeader'
@@ -120,15 +120,13 @@ const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
 const PAYMENT_ENABLED_TOKEN = '__PAYMENT_ENABLED__:'
 const PAYMENT_COMPLETED_TOKEN = '__PAYMENT_COMPLETED__:'
 
-export default function ListingDetailPage() {
+function ListingDetailContent() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
   const showSuccess = searchParams ? searchParams.get('success') === 'true' : false
   const listingId = Array.isArray(params?.id) ? params.id[0] : params?.id
 
-  console.log('params =', params)
-  console.log('listingId =', listingId)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [listing, setListing] = useState(null)
@@ -690,14 +688,6 @@ export default function ListingDetailPage() {
       className: 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]'
     }
   ].filter(Boolean)
-
-  console.log("DEBUGGING DATA:", {
-    user,
-    isTraveller,
-    offersCount: offers.length,
-    myGuideOffer,
-    listingStatus: listing?.status
-  })
 
   return (
     <div className={`bg-warmwhite flex flex-col font-body [&_button:not(:disabled)]:cursor-pointer [&_button:disabled]:cursor-not-allowed ${!isTraveller ? 'min-h-screen -mt-7 md:-mt-6 p-4 sm:p-6 pb-20' : 'min-h-[calc(100vh-64px)] -mt-7 md:-mt-6 p-4 sm:p-6 pb-20'}`}>
@@ -1303,5 +1293,13 @@ export default function ListingDetailPage() {
         </Modal>
       )}
     </div>
+  )
+}
+
+export default function ListingDetailPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-20"><Spinner /></div>}>
+      <ListingDetailContent />
+    </Suspense>
   )
 }

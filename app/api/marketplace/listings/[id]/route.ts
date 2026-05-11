@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { Client } from 'pg'
 
 export async function GET(
   request: Request,
@@ -57,23 +56,17 @@ export async function GET(
   let travellerName = 'Anonymous Traveller'
   let travellerDietaryRestrictions = null
   let travellerAccessibilityNeeds = false
-  try {
-    const client = new Client({ connectionString: process.env.DATABASE_URL })
-    await client.connect()
-    const profileResult = await client.query(
-      'SELECT full_name, dietary_restrictions, accessibility_needs FROM public.traveller_profiles WHERE user_id = $1::uuid LIMIT 1',
-      [data.user_id]
-    )
-    await client.end()
-    const travellerProfile = profileResult.rows?.[0]
-    if (travellerProfile?.full_name) {
-      travellerName = travellerProfile.full_name
-    }
-    travellerDietaryRestrictions = travellerProfile?.dietary_restrictions || null
-    travellerAccessibilityNeeds = Boolean(travellerProfile?.accessibility_needs)
-  } catch {
-    travellerName = 'Anonymous Traveller'
+  const { data: travellerProfile } = await supabase
+    .from('traveller_profiles')
+    .select('full_name, dietary_restrictions, accessibility_needs')
+    .eq('user_id', data.user_id)
+    .maybeSingle()
+
+  if (travellerProfile?.full_name) {
+    travellerName = travellerProfile.full_name
   }
+  travellerDietaryRestrictions = travellerProfile?.dietary_restrictions || null
+  travellerAccessibilityNeeds = Boolean(travellerProfile?.accessibility_needs)
 
   const formattedData = {
     ...data,

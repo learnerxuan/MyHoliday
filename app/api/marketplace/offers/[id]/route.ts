@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { Client } from 'pg'
 
 type OfferWithGuide = Record<string, unknown> & {
   tour_guides?: { full_name?: string } | null
@@ -157,54 +156,46 @@ export async function PATCH(
       return NextResponse.json({ error: 'Offer is missing its listing reference' }, { status: 400 })
     }
 
-    const client = new Client({ connectionString: process.env.DATABASE_URL })
-    try {
-      await client.connect()
-      await client.query('BEGIN')
+    const { data: acceptedData, error: acceptError } = await supabase
+      .from('marketplace_offers')
+      .update({ status: 'accepted' })
+      .eq('id', offerId)
+      .select()
 
-      const acceptedResult = await client.query(
-        `UPDATE public.marketplace_offers
-         SET status = 'accepted'
-         WHERE id = $1::uuid
-         RETURNING *`,
-        [offerId]
-      )
-
-      if (acceptedResult.rowCount !== 1) {
-        throw new Error('Offer status was not updated.')
-      }
-
-      await client.query(
-        `UPDATE public.marketplace_offers
-         SET status = 'rejected'
-         WHERE listing_id = $1::uuid
-           AND id <> $2::uuid
-           AND status <> 'withdrawn'`,
-        [relatedListingId, offerId]
-      )
-
-      await client.query(
-        `UPDATE public.marketplace_listings
-         SET status = 'confirmed'
-         WHERE id = $1::uuid`,
-        [relatedListingId]
-      )
-
-      await client.query(
-        `INSERT INTO public.marketplace_messages (offer_id, sender_id, sender_type, content)
-         VALUES ($1::uuid, $2::uuid, 'traveler', $3)`,
-        [offerId, user.id, `__OFFER_ACCEPTED__:${proposedPrice}`]
-      )
-
-      await client.query('COMMIT')
-      return NextResponse.json(acceptedResult.rows)
-    } catch (error: unknown) {
-      await client.query('ROLLBACK').catch(() => {})
-      const message = error instanceof Error ? error.message : 'Failed to accept offer'
-      return NextResponse.json({ error: message }, { status: 400 })
-    } finally {
-      await client.end().catch(() => {})
+    if (acceptError || !acceptedData?.length) {
+      return NextResponse.json({ error: acceptError?.message || 'Offer status was not updated.' }, { status: 400 })
     }
+
+    const { error: rejectError } = await supabase
+      .from('marketplace_offers')
+      .update({ status: 'rejected' })
+      .eq('listing_id', relatedListingId)
+      .neq('id', offerId)
+      .neq('status', 'withdrawn')
+
+    if (rejectError) {
+      return NextResponse.json({ error: rejectError.message }, { status: 400 })
+    }
+
+    const { error: listingUpdateError } = await supabase
+      .from('marketplace_listings')
+      .update({ status: 'confirmed' })
+      .eq('id', relatedListingId)
+
+    if (listingUpdateError) {
+      return NextResponse.json({ error: listingUpdateError.message }, { status: 400 })
+    }
+
+    await supabase
+      .from('marketplace_messages')
+      .insert({
+        offer_id: offerId,
+        sender_id: user.id,
+        sender_type: 'traveler',
+        content: `__OFFER_ACCEPTED__:${proposedPrice}`
+      })
+
+    return NextResponse.json(acceptedData)
   }
 
   const { data, error } = await supabase
@@ -234,76 +225,73 @@ export async function DELETE(
 
   const offerId = (await params).id
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL })
   try {
-    await client.connect()
-    await client.query('BEGIN')
+    const { data: offer, error: offerError } = await supabase
+      .from('marketplace_offers')
+      .select(`
+        status,
+        payment_enabled,
+        listing_id,
+        marketplace_listings(status),
+        tour_guides(user_id),
+        transactions(id)
+      `)
+      .eq('id', offerId)
+      .single()
 
-    const offerResult = await client.query(
-      `SELECT
-         mo.status,
-         mo.payment_enabled,
-         mo.listing_id,
-         ml.status AS listing_status,
-         tg.user_id AS guide_user_id,
-         tx.id AS transaction_id
-       FROM public.marketplace_offers mo
-       JOIN public.marketplace_listings ml ON ml.id = mo.listing_id
-       JOIN public.tour_guides tg ON tg.id = mo.guide_id
-       LEFT JOIN public.transactions tx ON tx.offer_id = mo.id
-       WHERE mo.id = $1::uuid
-       LIMIT 1`,
-      [offerId]
-    )
-
-    const offer = offerResult.rows[0]
-    if (!offer) {
-      await client.query('ROLLBACK')
+    if (offerError || !offer) {
       return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
     }
 
-    if (offer.guide_user_id !== user.id) {
-      await client.query('ROLLBACK')
+    const relatedListing = Array.isArray(offer.marketplace_listings)
+      ? offer.marketplace_listings[0]
+      : offer.marketplace_listings
+    const relatedGuide = Array.isArray(offer.tour_guides)
+      ? offer.tour_guides[0]
+      : offer.tour_guides
+    const relatedTransactions = Array.isArray(offer.transactions)
+      ? offer.transactions
+      : offer.transactions ? [offer.transactions] : []
+
+    if (relatedGuide?.user_id !== user.id) {
       return NextResponse.json({ error: 'Only the guide who submitted this offer can withdraw it' }, { status: 403 })
     }
 
     const isLocked =
       offer.status === 'accepted' ||
-      offer.listing_status === 'confirmed' ||
+      relatedListing?.status === 'confirmed' ||
       offer.payment_enabled === true ||
-      Boolean(offer.transaction_id)
+      relatedTransactions.length > 0
 
     if (isLocked) {
-      await client.query('ROLLBACK')
       return NextResponse.json({ error: 'Accepted offers cannot be withdrawn' }, { status: 409 })
     }
 
-    await client.query(
-      'DELETE FROM public.marketplace_offers WHERE id = $1::uuid',
-      [offerId]
-    )
+    const { error: deleteError } = await supabase
+      .from('marketplace_offers')
+      .delete()
+      .eq('id', offerId)
 
-    const remainingOffers = await client.query(
-      'SELECT 1 FROM public.marketplace_offers WHERE listing_id = $1::uuid LIMIT 1',
-      [offer.listing_id]
-    )
-
-    if (remainingOffers.rowCount === 0 && !['confirmed', 'closed'].includes(offer.listing_status)) {
-      await client.query(
-        `UPDATE public.marketplace_listings
-         SET status = 'open'
-         WHERE id = $1::uuid`,
-        [offer.listing_id]
-      )
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 400 })
     }
 
-    await client.query('COMMIT')
+    const { data: remainingOffers } = await supabase
+      .from('marketplace_offers')
+      .select('id')
+      .eq('listing_id', offer.listing_id)
+      .limit(1)
+
+    if ((remainingOffers?.length || 0) === 0 && !['confirmed', 'closed'].includes(relatedListing?.status || '')) {
+      await supabase
+        .from('marketplace_listings')
+        .update({ status: 'open' })
+        .eq('id', offer.listing_id)
+    }
+
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
-    await client.query('ROLLBACK').catch(() => {})
     const message = error instanceof Error ? error.message : 'Failed to withdraw offer'
     return NextResponse.json({ error: message }, { status: 400 })
-  } finally {
-    await client.end().catch(() => {})
   }
 }

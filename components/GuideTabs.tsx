@@ -8,9 +8,6 @@ export default function GuideTabs() {
 
   return (
     <div className="flex items-center gap-8 mb-8 border-b border-border/60">
-      <TabLink href="/guide/itinerary" active={pathname?.startsWith('/guide/itinerary') || pathname === '/guide'}>
-        Itinerary
-      </TabLink>
       <TabLink href="/guide/chats" active={pathname?.startsWith('/guide/chats')}>
         Chats
       </TabLink>

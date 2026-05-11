@@ -1,6 +1,6 @@
 'use server'
 
-import { query } from '@/lib/supabase/db'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export interface GrowthData {
   month: string
@@ -83,361 +83,504 @@ export interface AdminReportsData {
 
 const toNumber = (value: unknown) => Number(value || 0)
 
-async function one<T>(sql: string, params?: unknown[]): Promise<T> {
-  const result = await query(sql, params)
-  return result.rows[0] as T
+const emptyAdminDashboardData: AdminDashboardData = {
+  activeTravellers: 0,
+  approvedGuides: 0,
+  openAiSessions: 0,
+  suspendedListings: 0,
+  pendingGuides: 0,
+  completedGmv: 0,
+  platformRevenue: 0,
+  listingsCount: 0,
+  listingsWithNoOffers: 0,
+  offers: [],
+  topClickedDestinations: []
 }
 
-async function many<T>(sql: string, params?: unknown[]): Promise<T[]> {
-  const result = await query(sql, params)
-  return result.rows as T[]
+const emptyAdminReportsData: AdminReportsData = {
+  overview: {
+    totalTravellers: 0,
+    activeTravellers: 0,
+    approvedGuides: 0,
+    completedGmv: 0,
+    platformRevenue: 0,
+    averageTransactionValue: 0,
+    completedTransactions: 0
+  },
+  growth: [],
+  journeyFunnel: [
+    { name: 'Register', value: 0 },
+    { name: 'Browse', value: 0 },
+    { name: 'Plan', value: 0 },
+    { name: 'Save', value: 0 },
+    { name: 'List', value: 0 },
+    { name: 'Negotiate', value: 0 },
+    { name: 'Pay', value: 0 }
+  ],
+  marketplace: {
+    listingStatus: [],
+    offerStatus: [],
+    averageOffersPerListing: 0,
+    matchRate: 0
+  },
+  aiPlanner: {
+    completionRate: 0,
+    averageMessagesPerSession: 0,
+    itineraryVolume: []
+  },
+  destinations: {
+    topDestinations: [],
+    supplyDemand: []
+  },
+  mlDataset: {
+    totalRecords: 0,
+    distinctDestinations: 0,
+    averageDuration: 0,
+    accommodationMix: [],
+    transportMix: []
+  }
 }
 
-export async function getAdminDashboardData(): Promise<AdminDashboardData> {
+function logReportsError(source: string, error: unknown) {
+  void source
+  void error
+}
+
+async function countRows(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  table: string,
+  apply?: (builder: any) => any
+) {
+  let builder = supabase
+    .from(table)
+    .select('*', { count: 'exact', head: true })
+
+  if (apply) builder = apply(builder)
+
+  const { count, error } = await builder
+  if (error) throw error
+  return count || 0
+}
+
+async function safeCountRows(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  table: string,
+  apply?: (builder: any) => any
+) {
+  try {
+    return await countRows(supabase, table, apply)
+  } catch {
+    return 0
+  }
+}
+
+async function fetchAllRows<T>(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  table: string,
+  columns: string,
+  apply?: (builder: any) => any
+): Promise<T[]> {
+  const pageSize = 1000
+  let page = 0
+  let rows: T[] = []
+
+  while (true) {
+    let builder = supabase
+      .from(table)
+      .select(columns)
+      .range(page * pageSize, (page + 1) * pageSize - 1)
+
+    if (apply) builder = apply(builder)
+
+    const { data, error } = await builder
+    if (error) throw error
+
+    const batch = (data || []) as T[]
+    rows = rows.concat(batch)
+
+    if (batch.length < pageSize) return rows
+    page += 1
+  }
+}
+
+async function safeFetchAllRows<T>(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  table: string,
+  columns: string,
+  apply?: (builder: any) => any
+): Promise<T[]> {
+  try {
+    return await fetchAllRows<T>(supabase, table, columns, apply)
+  } catch {
+    return []
+  }
+}
+
+async function getAdminDashboardDataFromSupabase(): Promise<AdminDashboardData> {
+  const supabase = await createSupabaseServerClient()
+
   const [
-    summary,
+    totalTravellers,
+    inactiveTravellers,
+    approvedGuides,
+    openAiSessions,
+    suspendedListings,
+    pendingGuides,
+    listingsCount,
+    completedTransactions,
+    listings,
     offers,
-    topClickedDestinations
+    clickedInteractions
   ] = await Promise.all([
-    one<{
-      active_travellers: number
-      approved_guides: number
-      open_ai_sessions: number
-      suspended_listings: number
-      pending_guides: number
-      completed_gmv: string
-      platform_revenue: string
-      listings_count: number
-      listings_with_no_offers: number
-    }>(`
-      select
-        (select count(*)::int from traveller_profiles where coalesce(is_active, true) = true) as active_travellers,
-        (select count(*)::int from tour_guides where verification_status = 'approved') as approved_guides,
-        (select count(*)::int from chat_sessions where status = 'active') as open_ai_sessions,
-        (select count(*)::int from marketplace_listings where coalesce(is_suspended, false) = true) as suspended_listings,
-        (select count(*)::int from tour_guides where verification_status = 'pending') as pending_guides,
-        coalesce((select sum(total_amount) from transactions where status = 'completed'), 0)::text as completed_gmv,
-        coalesce((select sum(service_charge) from transactions where status = 'completed'), 0)::text as platform_revenue,
-        (select count(*)::int from marketplace_listings) as listings_count,
-        (
-          select count(*)::int
-          from marketplace_listings ml
-          where not exists (
-            select 1 from marketplace_offers mo where mo.listing_id = ml.id
-          )
-        ) as listings_with_no_offers
-    `),
-    many<{ id: string; listing_id: string; status: string }>(`
-      select id::text, listing_id::text, status
-      from marketplace_offers
-    `),
-    many<{ city: string; country: string; click_count: number }>(`
-      select d.city, d.country, count(*)::int as click_count
-      from user_interactions ui
-      join destinations d on d.id = ui.destination_id
-      where ui.type = 'click'
-      group by d.city, d.country
-      order by click_count desc, d.city asc
-      limit 3
-    `)
+    safeCountRows(supabase, 'traveller_profiles'),
+    safeCountRows(supabase, 'traveller_profiles', builder => builder.eq('is_active', false)),
+    safeCountRows(supabase, 'tour_guides', builder => builder.eq('verification_status', 'approved')),
+    safeCountRows(supabase, 'chat_sessions', builder => builder.eq('status', 'active')),
+    safeCountRows(supabase, 'marketplace_listings', builder => builder.eq('is_suspended', true)),
+    safeCountRows(supabase, 'tour_guides', builder => builder.eq('verification_status', 'pending')),
+    safeCountRows(supabase, 'marketplace_listings'),
+    safeFetchAllRows<{ total_amount: number | string | null; service_charge: number | string | null }>(
+      supabase,
+      'transactions',
+      'total_amount, service_charge',
+      builder => builder.eq('status', 'completed')
+    ),
+    safeFetchAllRows<{ id: string }>(supabase, 'marketplace_listings', 'id'),
+    safeFetchAllRows<{ id: string; listing_id: string; status: string }>(
+      supabase,
+      'marketplace_offers',
+      'id, listing_id, status'
+    ),
+    safeFetchAllRows<{ destination_id: string | null; destinations: { city: string | null; country: string | null } | null }>(
+      supabase,
+      'user_interactions',
+      'destination_id, destinations(city, country)',
+      builder => builder.eq('type', 'click').not('destination_id', 'is', null)
+    )
   ])
 
+  const offerListingIds = new Set(offers.map(offer => offer.listing_id).filter(Boolean))
+  const listingsWithNoOffers = listings.filter(listing => !offerListingIds.has(listing.id)).length
+
+  const completedGmv = completedTransactions.reduce(
+    (sum, tx) => sum + toNumber(tx.total_amount),
+    0
+  )
+  const platformRevenue = completedTransactions.reduce(
+    (sum, tx) => sum + toNumber(tx.service_charge),
+    0
+  )
+
+  const clicksByDestination = new Map<string, { city: string; country: string; click_count: number }>()
+  for (const interaction of clickedInteractions) {
+    const city = interaction.destinations?.city
+    const country = interaction.destinations?.country
+    if (!interaction.destination_id || !city || !country) continue
+
+    const current = clicksByDestination.get(interaction.destination_id)
+    if (current) {
+      current.click_count += 1
+    } else {
+      clicksByDestination.set(interaction.destination_id, { city, country, click_count: 1 })
+    }
+  }
+
+  const topClickedDestinations = [...clicksByDestination.values()]
+    .sort((a, b) => b.click_count - a.click_count || a.city.localeCompare(b.city))
+    .slice(0, 3)
+
   return {
-    activeTravellers: toNumber(summary.active_travellers),
-    approvedGuides: toNumber(summary.approved_guides),
-    openAiSessions: toNumber(summary.open_ai_sessions),
-    suspendedListings: toNumber(summary.suspended_listings),
-    pendingGuides: toNumber(summary.pending_guides),
-    completedGmv: toNumber(summary.completed_gmv),
-    platformRevenue: toNumber(summary.platform_revenue),
-    listingsCount: toNumber(summary.listings_count),
-    listingsWithNoOffers: toNumber(summary.listings_with_no_offers),
+    activeTravellers: totalTravellers - inactiveTravellers,
+    approvedGuides,
+    openAiSessions,
+    suspendedListings,
+    pendingGuides,
+    completedGmv,
+    platformRevenue,
+    listingsCount,
+    listingsWithNoOffers,
     offers,
     topClickedDestinations
   }
 }
 
-export async function getUserGrowthData(): Promise<GrowthData[]> {
-  const rows = await many<{ month: string; travellers: number; guides: number }>(`
-    with bounds as (
-      select date_trunc('month', min(created_at)) as start_month
-      from (
-        select created_at from traveller_profiles
-        union all
-        select created_at from tour_guides
-      ) all_growth
-    ),
-    months as (
-      select generate_series(
-        coalesce((select start_month from bounds), date_trunc('month', now())),
-        date_trunc('month', now()),
-        interval '1 month'
-      ) as month_start
-    ),
-    traveller_counts as (
-      select date_trunc('month', created_at) as month_start, count(*)::int as total
-      from traveller_profiles
-      group by 1
-    ),
-    guide_counts as (
-      select date_trunc('month', created_at) as month_start, count(*)::int as total
-      from tour_guides
-      group by 1
-    )
-    select
-      to_char(m.month_start, 'YYYY-MM') as month,
-      coalesce(tc.total, 0)::int as travellers,
-      coalesce(gc.total, 0)::int as guides
-    from months m
-    left join traveller_counts tc on tc.month_start = m.month_start
-    left join guide_counts gc on gc.month_start = m.month_start
-    order by m.month_start
-  `)
-
-  return rows.map(row => ({
-    month: row.month,
-    travellers: toNumber(row.travellers),
-    guides: toNumber(row.guides)
-  }))
+const monthKey = (value: string | null | undefined) => {
+  if (!value) return ''
+  return new Date(value).toISOString().slice(0, 7)
 }
 
-export async function getAdminReportsData(): Promise<AdminReportsData> {
+const weekLabel = (value: string | null | undefined) => {
+  if (!value) return 'Unknown'
+  const date = new Date(value)
+  date.setDate(date.getDate() - date.getDay())
+  return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
+}
+
+const increment = <T extends string>(map: Map<T, number>, key: T, amount = 1) => {
+  map.set(key, (map.get(key) || 0) + amount)
+}
+
+function mapToLabelValues(map: Map<string, number>): LabelValue[] {
+  return [...map.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function getAdminReportsDataFromSupabase(): Promise<AdminReportsData> {
+  const supabase = await createSupabaseServerClient()
+
   const [
-    overview,
-    growth,
-    journey,
-    listingStatus,
-    offerStatus,
-    marketplaceHealth,
-    aiPlanner,
-    itineraryVolume,
-    topDestinations,
-    supplyDemand,
-    mlSummary,
-    accommodationMix,
-    transportMix
+    travellers,
+    guides,
+    transactions,
+    chatSessions,
+    chatMessagesCount,
+    itineraries,
+    listings,
+    offers,
+    destinations,
+    interactions,
+    historicalTrips
   ] = await Promise.all([
-    one<{
-      total_travellers: number
-      active_travellers: number
-      approved_guides: number
-      completed_gmv: string
-      platform_revenue: string
-      average_transaction_value: string
-      completed_transactions: number
-    }>(`
-      select
-        (select count(*)::int from traveller_profiles) as total_travellers,
-        (select count(*)::int from traveller_profiles where coalesce(is_active, true) = true) as active_travellers,
-        (select count(*)::int from tour_guides where verification_status = 'approved') as approved_guides,
-        coalesce((select sum(total_amount) from transactions where status = 'completed'), 0)::text as completed_gmv,
-        coalesce((select sum(service_charge) from transactions where status = 'completed'), 0)::text as platform_revenue,
-        coalesce((select avg(total_amount) from transactions where status = 'completed'), 0)::text as average_transaction_value,
-        (select count(*)::int from transactions where status = 'completed') as completed_transactions
-    `),
-    getUserGrowthData(),
-    one<{
-      travellers: number
-      interacting_users: number
-      chat_sessions: number
-      saved_itineraries: number
-      marketplace_listings: number
-      listings_with_offers: number
-      completed_transactions: number
-    }>(`
-      select
-        (select count(*)::int from traveller_profiles) as travellers,
-        (select count(distinct user_id)::int from user_interactions where user_id is not null) as interacting_users,
-        (select count(*)::int from chat_sessions) as chat_sessions,
-        (select count(*)::int from itineraries) as saved_itineraries,
-        (select count(*)::int from marketplace_listings) as marketplace_listings,
-        (select count(distinct listing_id)::int from marketplace_offers) as listings_with_offers,
-        (select count(*)::int from transactions where status = 'completed') as completed_transactions
-    `),
-    many<{ name: string; value: number }>(`
-      select initcap(status) as name, count(*)::int as value
-      from marketplace_listings
-      group by status
-      order by status
-    `),
-    many<{ name: string; value: number }>(`
-      select initcap(status) as name, count(*)::int as value
-      from marketplace_offers
-      group by status
-      order by status
-    `),
-    one<{ average_offers_per_listing: string; match_rate: string }>(`
-      select
-        coalesce(
-          (select count(*)::numeric from marketplace_offers) /
-          nullif((select count(*)::numeric from marketplace_listings), 0),
-          0
-        )::text as average_offers_per_listing,
-        coalesce(
-          (select count(*)::numeric from marketplace_listings where status = 'confirmed') * 100 /
-          nullif((select count(*)::numeric from marketplace_listings), 0),
-          0
-        )::text as match_rate
-    `),
-    one<{ completion_rate: string; average_messages_per_session: string }>(`
-      select
-        coalesce(
-          (select count(*)::numeric from chat_sessions where status = 'completed') * 100 /
-          nullif((select count(*)::numeric from chat_sessions), 0),
-          0
-        )::text as completion_rate,
-        coalesce(
-          (select count(*)::numeric from chat_messages) /
-          nullif((select count(*)::numeric from chat_sessions), 0),
-          0
-        )::text as average_messages_per_session
-    `),
-    many<{ name: string; value: number }>(`
-      select to_char(date_trunc('week', created_at), 'Mon DD') as name, count(*)::int as value
-      from itineraries
-      group by date_trunc('week', created_at)
-      order by date_trunc('week', created_at)
-    `),
-    many<DestinationMetric>(`
-      with listing_counts as (
-        select destination_id, count(*)::int as listings
-        from marketplace_listings
-        group by destination_id
-      ),
-      itinerary_counts as (
-        select destination_id, count(*)::int as itineraries
-        from itineraries
-        group by destination_id
-      ),
-      interaction_counts as (
-        select destination_id, count(*)::int as interactions
-        from user_interactions
-        group by destination_id
-      )
-      select
-        d.city || ', ' || d.country as destination,
-        coalesce(lc.listings, 0)::int as listings,
-        coalesce(ic.itineraries, 0)::int as itineraries,
-        coalesce(uc.interactions, 0)::int as interactions
-      from destinations d
-      left join listing_counts lc on lc.destination_id = d.id
-      left join itinerary_counts ic on ic.destination_id = d.id
-      left join interaction_counts uc on uc.destination_id = d.id
-      where coalesce(lc.listings, 0) + coalesce(ic.itineraries, 0) + coalesce(uc.interactions, 0) > 0
-      order by interactions desc, listings desc, itineraries desc, destination asc
-      limit 8
-    `),
-    many<SupplyDemandMetric>(`
-      with demand as (
-        select destination_id, count(*)::int as listings
-        from marketplace_listings
-        group by destination_id
-      ),
-      supply as (
-        select city_id as destination_id, count(*)::int as approved_guides
-        from tour_guides
-        where verification_status = 'approved'
-        group by city_id
-      )
-      select
-        d.city || ', ' || d.country as destination,
-        coalesce(demand.listings, 0)::int as listings,
-        coalesce(supply.approved_guides, 0)::int as "approvedGuides"
-      from destinations d
-      left join demand on demand.destination_id = d.id
-      left join supply on supply.destination_id = d.id
-      where coalesce(demand.listings, 0) + coalesce(supply.approved_guides, 0) > 0
-      order by coalesce(demand.listings, 0) desc, coalesce(supply.approved_guides, 0) asc, destination asc
-      limit 8
-    `),
-    one<{ total_records: number; distinct_destinations: number; average_duration: string }>(`
-      select
-        count(*)::int as total_records,
-        count(distinct destination)::int as distinct_destinations,
-        coalesce(avg(duration_days), 0)::text as average_duration
-      from historical_trips
-    `),
-    many<MlMixMetric>(`
-      select coalesce(accommodation_type, 'Unknown') as name, count(*)::int as value
-      from historical_trips
-      group by accommodation_type
-      order by value desc, name asc
-      limit 6
-    `),
-    many<MlMixMetric>(`
-      select coalesce(transportation_type, 'Unknown') as name, count(*)::int as value
-      from historical_trips
-      group by transportation_type
-      order by value desc, name asc
-      limit 6
-    `)
+    safeFetchAllRows<{ user_id: string | null; is_active: boolean | null; created_at: string | null }>(
+      supabase,
+      'traveller_profiles',
+      'user_id, is_active, created_at'
+    ),
+    safeFetchAllRows<{ id: string; verification_status: string | null; created_at: string | null; city_id: string | null }>(
+      supabase,
+      'tour_guides',
+      'id, verification_status, created_at, city_id'
+    ),
+    safeFetchAllRows<{ status: string | null; total_amount: number | string | null; service_charge: number | string | null }>(
+      supabase,
+      'transactions',
+      'status, total_amount, service_charge'
+    ),
+    safeFetchAllRows<{ status: string | null; created_at: string | null }>(
+      supabase,
+      'chat_sessions',
+      'status, created_at'
+    ),
+    safeCountRows(supabase, 'chat_messages'),
+    safeFetchAllRows<{ destination_id: string | null; created_at: string | null }>(
+      supabase,
+      'itineraries',
+      'destination_id, created_at'
+    ),
+    safeFetchAllRows<{ id: string; status: string | null; destination_id: string | null; created_at: string | null }>(
+      supabase,
+      'marketplace_listings',
+      'id, status, destination_id, created_at'
+    ),
+    safeFetchAllRows<{ listing_id: string | null; status: string | null }>(
+      supabase,
+      'marketplace_offers',
+      'listing_id, status'
+    ),
+    safeFetchAllRows<{ id: string; city: string | null; country: string | null }>(
+      supabase,
+      'destinations',
+      'id, city, country'
+    ),
+    safeFetchAllRows<{ user_id: string | null; destination_id: string | null }>(
+      supabase,
+      'user_interactions',
+      'user_id, destination_id'
+    ),
+    safeFetchAllRows<{
+      destination: string | null
+      duration_days: number | string | null
+      accommodation_type: string | null
+      transportation_type: string | null
+    }>(
+      supabase,
+      'historical_trips',
+      'destination, duration_days, accommodation_type, transportation_type'
+    )
   ])
+
+  const activeTravellers = travellers.filter(row => row.is_active !== false).length
+  const approvedGuides = guides.filter(row => row.verification_status === 'approved')
+  const completedTransactions = transactions.filter(row => row.status === 'completed')
+  const completedGmv = completedTransactions.reduce((sum, tx) => sum + toNumber(tx.total_amount), 0)
+  const platformRevenue = completedTransactions.reduce((sum, tx) => sum + toNumber(tx.service_charge), 0)
+
+  const growthByMonth = new Map<string, { travellers: number; guides: number }>()
+  for (const traveller of travellers) {
+    const month = monthKey(traveller.created_at)
+    if (!month) continue
+    growthByMonth.set(month, {
+      travellers: (growthByMonth.get(month)?.travellers || 0) + 1,
+      guides: growthByMonth.get(month)?.guides || 0
+    })
+  }
+  for (const guide of guides) {
+    const month = monthKey(guide.created_at)
+    if (!month) continue
+    growthByMonth.set(month, {
+      travellers: growthByMonth.get(month)?.travellers || 0,
+      guides: (growthByMonth.get(month)?.guides || 0) + 1
+    })
+  }
+
+  const listingStatus = new Map<string, number>()
+  for (const listing of listings) increment(listingStatus, listing.status ? listing.status[0].toUpperCase() + listing.status.slice(1) : 'Unknown')
+
+  const offerStatus = new Map<string, number>()
+  for (const offer of offers) increment(offerStatus, offer.status ? offer.status[0].toUpperCase() + offer.status.slice(1) : 'Unknown')
+
+  const itineraryVolume = new Map<string, number>()
+  for (const itinerary of itineraries) increment(itineraryVolume, weekLabel(itinerary.created_at))
+
+  const destinationMap = new Map(destinations.map(dest => [
+    dest.id,
+    `${dest.city || 'Unknown'}, ${dest.country || 'Unknown'}`
+  ]))
+  const destinationMetrics = new Map<string, DestinationMetric>()
+
+  const ensureDestinationMetric = (destinationId: string | null) => {
+    if (!destinationId) return null
+    const destination = destinationMap.get(destinationId)
+    if (!destination) return null
+    if (!destinationMetrics.has(destination)) {
+      destinationMetrics.set(destination, { destination, listings: 0, itineraries: 0, interactions: 0 })
+    }
+    return destinationMetrics.get(destination)!
+  }
+
+  for (const listing of listings) {
+    const metric = ensureDestinationMetric(listing.destination_id)
+    if (metric) metric.listings += 1
+  }
+  for (const itinerary of itineraries) {
+    const metric = ensureDestinationMetric(itinerary.destination_id)
+    if (metric) metric.itineraries += 1
+  }
+  for (const interaction of interactions) {
+    const metric = ensureDestinationMetric(interaction.destination_id)
+    if (metric) metric.interactions += 1
+  }
+
+  const approvedGuidesByDestination = new Map<string, number>()
+  for (const guide of approvedGuides) {
+    if (guide.city_id) increment(approvedGuidesByDestination, guide.city_id)
+  }
+  const listingsByDestination = new Map<string, number>()
+  for (const listing of listings) {
+    if (listing.destination_id) increment(listingsByDestination, listing.destination_id)
+  }
+
+  const supplyDemand = destinations
+    .map(dest => ({
+      destination: `${dest.city || 'Unknown'}, ${dest.country || 'Unknown'}`,
+      listings: listingsByDestination.get(dest.id) || 0,
+      approvedGuides: approvedGuidesByDestination.get(dest.id) || 0
+    }))
+    .filter(row => row.listings + row.approvedGuides > 0)
+    .sort((a, b) => b.listings - a.listings || a.approvedGuides - b.approvedGuides || a.destination.localeCompare(b.destination))
+    .slice(0, 8)
+
+  const accommodationMix = new Map<string, number>()
+  const transportMix = new Map<string, number>()
+  let durationTotal = 0
+  for (const trip of historicalTrips) {
+    durationTotal += toNumber(trip.duration_days)
+    increment(accommodationMix, trip.accommodation_type || 'Unknown')
+    increment(transportMix, trip.transportation_type || 'Unknown')
+  }
 
   return {
     overview: {
-      totalTravellers: toNumber(overview.total_travellers),
-      activeTravellers: toNumber(overview.active_travellers),
-      approvedGuides: toNumber(overview.approved_guides),
-      completedGmv: toNumber(overview.completed_gmv),
-      platformRevenue: toNumber(overview.platform_revenue),
-      averageTransactionValue: toNumber(overview.average_transaction_value),
-      completedTransactions: toNumber(overview.completed_transactions)
+      totalTravellers: travellers.length,
+      activeTravellers,
+      approvedGuides: approvedGuides.length,
+      completedGmv,
+      platformRevenue,
+      averageTransactionValue: completedTransactions.length ? completedGmv / completedTransactions.length : 0,
+      completedTransactions: completedTransactions.length
     },
-    growth,
+    growth: [...growthByMonth.entries()]
+      .map(([month, value]) => ({ month, travellers: value.travellers, guides: value.guides }))
+      .sort((a, b) => a.month.localeCompare(b.month)),
     journeyFunnel: [
-      { name: 'Register', value: toNumber(journey.travellers) },
-      { name: 'Browse', value: toNumber(journey.interacting_users) },
-      { name: 'Plan', value: toNumber(journey.chat_sessions) },
-      { name: 'Save', value: toNumber(journey.saved_itineraries) },
-      { name: 'List', value: toNumber(journey.marketplace_listings) },
-      { name: 'Negotiate', value: toNumber(journey.listings_with_offers) },
-      { name: 'Pay', value: toNumber(journey.completed_transactions) }
+      { name: 'Register', value: travellers.length },
+      { name: 'Browse', value: new Set(interactions.map(row => row.user_id).filter(Boolean)).size },
+      { name: 'Plan', value: chatSessions.length },
+      { name: 'Save', value: itineraries.length },
+      { name: 'List', value: listings.length },
+      { name: 'Negotiate', value: new Set(offers.map(row => row.listing_id).filter(Boolean)).size },
+      { name: 'Pay', value: completedTransactions.length }
     ],
     marketplace: {
-      listingStatus: listingStatus.map(row => ({ name: row.name, value: toNumber(row.value) })),
-      offerStatus: offerStatus.map(row => ({ name: row.name, value: toNumber(row.value) })),
-      averageOffersPerListing: toNumber(marketplaceHealth.average_offers_per_listing),
-      matchRate: toNumber(marketplaceHealth.match_rate)
+      listingStatus: mapToLabelValues(listingStatus),
+      offerStatus: mapToLabelValues(offerStatus),
+      averageOffersPerListing: listings.length ? offers.length / listings.length : 0,
+      matchRate: listings.length ? listings.filter(row => row.status === 'confirmed').length * 100 / listings.length : 0
     },
     aiPlanner: {
-      completionRate: toNumber(aiPlanner.completion_rate),
-      averageMessagesPerSession: toNumber(aiPlanner.average_messages_per_session),
-      itineraryVolume: itineraryVolume.map(row => ({ name: row.name, value: toNumber(row.value) }))
+      completionRate: chatSessions.length ? chatSessions.filter(row => row.status === 'completed').length * 100 / chatSessions.length : 0,
+      averageMessagesPerSession: chatSessions.length ? chatMessagesCount / chatSessions.length : 0,
+      itineraryVolume: mapToLabelValues(itineraryVolume)
     },
     destinations: {
-      topDestinations: topDestinations.map(row => ({
-        destination: row.destination,
-        listings: toNumber(row.listings),
-        itineraries: toNumber(row.itineraries),
-        interactions: toNumber(row.interactions)
-      })),
-      supplyDemand: supplyDemand.map(row => ({
-        destination: row.destination,
-        listings: toNumber(row.listings),
-        approvedGuides: toNumber(row.approvedGuides)
-      }))
+      topDestinations: [...destinationMetrics.values()]
+        .sort((a, b) => b.interactions - a.interactions || b.listings - a.listings || b.itineraries - a.itineraries || a.destination.localeCompare(b.destination))
+        .slice(0, 8),
+      supplyDemand
     },
     mlDataset: {
-      totalRecords: toNumber(mlSummary.total_records),
-      distinctDestinations: toNumber(mlSummary.distinct_destinations),
-      averageDuration: toNumber(mlSummary.average_duration),
-      accommodationMix: accommodationMix.map(row => ({ name: row.name, value: toNumber(row.value) })),
-      transportMix: transportMix.map(row => ({ name: row.name, value: toNumber(row.value) }))
+      totalRecords: historicalTrips.length,
+      distinctDestinations: new Set(historicalTrips.map(row => row.destination).filter(Boolean)).size,
+      averageDuration: historicalTrips.length ? durationTotal / historicalTrips.length : 0,
+      accommodationMix: mapToLabelValues(accommodationMix).sort((a, b) => b.value - a.value).slice(0, 6),
+      transportMix: mapToLabelValues(transportMix).sort((a, b) => b.value - a.value).slice(0, 6)
     }
   }
 }
 
-export async function getDashboardStats() {
-  const row = await one<{ traveller_count: number; guide_count: number; pending_guides: number }>(`
-    select
-      (select count(*)::int from traveller_profiles) as traveller_count,
-      (select count(*)::int from tour_guides) as guide_count,
-      (select count(*)::int from tour_guides where verification_status = 'pending') as pending_guides
-  `)
+export async function getAdminDashboardData(): Promise<AdminDashboardData> {
+  try {
+    return await getAdminDashboardDataFromSupabase()
+  } catch (error) {
+    logReportsError('getAdminDashboardData', error)
+    return emptyAdminDashboardData
+  }
+}
 
-  return {
-    travellerCount: toNumber(row.traveller_count),
-    guideCount: toNumber(row.guide_count),
-    pendingGuides: toNumber(row.pending_guides)
+export async function getUserGrowthData(): Promise<GrowthData[]> {
+  return (await getAdminReportsDataFromSupabase()).growth
+}
+
+export async function getAdminReportsData(): Promise<AdminReportsData> {
+  try {
+    return await getAdminReportsDataFromSupabase()
+  } catch (error) {
+    logReportsError('getAdminReportsData', error)
+    return emptyAdminReportsData
+  }
+}
+
+export async function getDashboardStats() {
+  try {
+    const supabase = await createSupabaseServerClient()
+    const [travellerCount, guideCount, pendingGuides] = await Promise.all([
+      safeCountRows(supabase, 'traveller_profiles'),
+      safeCountRows(supabase, 'tour_guides'),
+      safeCountRows(supabase, 'tour_guides', builder => builder.eq('verification_status', 'pending'))
+    ])
+
+    return {
+      travellerCount,
+      guideCount,
+      pendingGuides
+    }
+  } catch (error) {
+    logReportsError('getDashboardStats', error)
+    return {
+      travellerCount: 0,
+      guideCount: 0,
+      pendingGuides: 0
+    }
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
@@ -149,7 +149,7 @@ const PAYMENT_COMPLETED_TOKEN = '__PAYMENT_COMPLETED__:'
 const ITINERARY_UPDATED_TOKEN = '__ITINERARY_UPDATED__'
 const OFFER_WITHDRAWN_TOKEN = '__OFFER_WITHDRAWN__'
 
-export default function ChatPage() {
+function ChatContent() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -938,5 +938,13 @@ export default function ChatPage() {
         </Modal>
       )}
     </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-20"><Spinner /></div>}>
+      <ChatContent />
+    </Suspense>
   )
 }

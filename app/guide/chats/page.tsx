@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
@@ -35,7 +35,7 @@ const formatThreadPreview = (content?: string | null) => {
   return content
 }
 
-export default function ChatsPage() {
+function ChatsContent() {
   const searchParams = useSearchParams()
   const offerQuery = searchParams?.get('offer')
 
@@ -1027,5 +1027,13 @@ export default function ChatsPage() {
         )}
 
     </div>
+  )
+}
+
+export default function ChatsPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-20"><Spinner /></div>}>
+      <ChatsContent />
+    </Suspense>
   )
 }
