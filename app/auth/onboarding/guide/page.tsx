@@ -41,7 +41,7 @@ export default function GuideOnboarding() {
         .eq('user_id', user.id)
         .maybeSingle()
 
-      if (existing) { router.replace('/guide/marketplace'); return }
+      if (existing) { router.replace('/marketplace'); return }
 
       setUser(user)
       setForm(f => ({ ...f, full_name: user.user_metadata?.full_name ?? '' }))
@@ -122,10 +122,10 @@ export default function GuideOnboarding() {
             This usually takes 1–2 business days.
           </p>
           <button
-            onClick={() => router.replace('/')}
+            onClick={() => router.replace('/marketplace')}
             className="py-2.5 px-5 rounded-xl bg-amber hover:bg-amberdark transition-colors text-sm font-semibold font-body text-white"
           >
-            Back to Home
+            Go to Marketplace
           </button>
         </div>
       </section>

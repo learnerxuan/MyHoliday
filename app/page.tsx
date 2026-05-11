@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import HeroCarousel from '@/components/ui/HeroCarousel'
 
@@ -60,6 +61,18 @@ async function getFeaturedDestinations(): Promise<(Destination & { imageUrl: str
 }
 
 export default async function HomePage() {
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = user?.user_metadata?.role
+
+  if (role === 'admin') {
+    redirect('/admin')
+  }
+
+  if (role === 'guide') {
+    redirect('/marketplace')
+  }
+
   const destinations = await getFeaturedDestinations()
 
   return (
