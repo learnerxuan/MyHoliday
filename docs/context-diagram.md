@@ -1,72 +1,46 @@
-# MyHoliday System Context Diagram
+# MyHoliday Context Diagram
 
 ```mermaid
-flowchart LR
-  Traveller["Traveller<br/>Plans trips, saves itineraries,<br/>posts listings, chats and confirms offers"]
-  Guide["Tour Guide<br/>Registers for verification,<br/>browses city listings,<br/>submits offers and chats"]
-  Admin["Administrator<br/>Manages users, verifies guides,<br/>moderates marketplace and views reports"]
+flowchart TB
+  Traveller["Traveller"]
+  Guide["Tour Guide"]
+  Admin["Administrator"]
+  OpenAI["OpenAI API"]
+  Google["Google Places / Maps API"]
+  Wikipedia["Wikipedia REST API"]
+  Weather["Open-Meteo API"]
+  Routing["OSRM Routing API"]
 
-  subgraph Boundary["MyHoliday System Boundary"]
-    App["MyHoliday Web Application<br/>Next.js App Router UI, middleware and API routes"]
-    Recommender["Recommendation Engine<br/>Quiz matching and destination discovery"]
-    Planner["AI Itinerary Planner<br/>Chat orchestration, itinerary tools and guardrails"]
-    Marketplace["Marketplace Module<br/>Listings, offers, messages and mock transactions"]
-    AdminModule["Admin Module<br/>User management, guide approval, moderation and analytics"]
-  end
+  System(("MyHoliday<br/>Travel Planning and Tour Guide Marketplace System"))
 
-  Supabase["Supabase<br/>Auth, PostgreSQL, Row Level Security,<br/>Realtime data and guide document storage"]
-  OpenAI["OpenAI API<br/>Conversational itinerary generation"]
-  GooglePlaces["Google Places / Maps APIs<br/>Place search, geocoding and place photos"]
-  Wikipedia["Wikipedia REST API<br/>Fallback destination images"]
-  OpenMeteo["Open-Meteo API<br/>Fallback weather estimates"]
-  OSRM["OSRM Routing API<br/>Transport distance and duration estimates"]
-  StaticData["Destination Datasets<br/>Seed CSV files and historical destination attributes"]
+  Traveller -->|"Personal information"| System
+  System -->|"Travel recommendation"| Traveller
 
-  Traveller -->|"Uses browser UI"| App
-  Guide -->|"Uses browser UI"| App
-  Admin -->|"Uses browser UI"| App
+  Guide -->|"Guide information"| System
+  System -->|"Marketplace notification"| Guide
 
-  App -->|"Authenticates sessions and enforces role access"| Supabase
-  App -->|"Reads/writes profiles, destinations, itineraries,<br/>chat sessions, listings, offers, messages,<br/>transactions, reports and documents"| Supabase
+  Admin -->|"Administrative request"| System
+  System -->|"Management report"| Admin
 
-  App --> Recommender
-  App --> Planner
-  App --> Marketplace
-  App --> AdminModule
+  System -->|"Planning request"| OpenAI
+  OpenAI -->|"Generated itinerary"| System
 
-  Recommender -->|"Loads destination attributes and saved interactions"| Supabase
-  Recommender -->|"Uses seeded destination data"| StaticData
+  System -->|"Location request"| Google
+  Google -->|"Place information"| System
 
-  Planner -->|"Sends prompts and tool calls"| OpenAI
-  Planner -->|"Stores chat sessions, messages and planner state"| Supabase
-  Planner -->|"Searches places and enriches itinerary items"| GooglePlaces
-  Planner -->|"Gets weather fallback"| OpenMeteo
-  Planner -->|"Checks route estimates"| OSRM
+  System -->|"Image request"| Wikipedia
+  Wikipedia -->|"Destination image"| System
 
-  Marketplace -->|"Publishes listings, records offers,<br/>messages and simulated payment records"| Supabase
-  AdminModule -->|"Approves guides, accesses documents,<br/>suspends listings and reads analytics"| Supabase
+  System -->|"Weather request"| Weather
+  Weather -->|"Weather estimate"| System
 
-  App -->|"Fetches city and place images"| GooglePlaces
-  App -->|"Fetches fallback city images"| Wikipedia
+  System -->|"Route request"| Routing
+  Routing -->|"Route estimate"| System
 ```
 
-## External Actors
+## Checklist Alignment
 
-- **Traveller**: registers, completes quiz/profile data, receives destination recommendations, builds AI-assisted itineraries, saves plans, posts marketplace listings, chats with guides, and confirms mock transactions.
-- **Tour Guide**: registers through guide onboarding, uploads verification documents, waits for admin approval, views matching city listings, submits offers, chats with travellers, and enables mock payment records.
-- **Administrator**: manages traveller accounts, reviews guide applications/documents, moderates marketplace listings, and views dashboard/reporting analytics.
-
-## External Systems
-
-- **Supabase**: provides authentication, PostgreSQL data storage, row-level security, realtime-supported marketplace/chat data, and guide document storage.
-- **OpenAI API**: powers the conversational AI itinerary planner through server-side API routes.
-- **Google Places / Maps APIs**: support place search, geocoding, nearby places, map coordinates, and place/city imagery.
-- **Wikipedia REST API**: provides fallback city imagery when Google imagery is unavailable.
-- **Open-Meteo API**: provides fallback weather estimates when destination climate data is unavailable.
-- **OSRM Routing API**: provides approximate routing distance and duration for itinerary transport checks.
-- **Destination Datasets**: local CSV datasets used to seed and support destination recommendation data.
-
-## Notes
-
-- Payment handling is represented as **mock transactions inside MyHoliday/Supabase**, not a live external payment gateway.
-- Role access is enforced in both the Next.js middleware/API layer and Supabase Row Level Security policies.
+- Uses **one process symbol** for the entire MyHoliday information system.
+- Places all people and third-party services as **external entities** around the process.
+- Shows only **data flows** between each external entity and the system.
+- Does **not** show data stores, databases, internal modules, or implementation components.

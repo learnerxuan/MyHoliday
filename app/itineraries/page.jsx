@@ -158,6 +158,7 @@ export default function ItinerariesPage() {
             .from('marketplace_listings')
             .select(`id, itinerary_id, status, marketplace_offers ( id )`)
             .eq('user_id', user.id)
+            .neq('status', 'closed')
         ])
 
         if (itinError) {
