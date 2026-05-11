@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signInWithGoogle, signInWithEmail } from '@/lib/supabase/auth'
-import { supabase } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -24,7 +24,7 @@ export default function LoginPage() {
       window.history.replaceState(null, '', '/auth/login')
     }
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser().then(user => {
       // Only auto-redirect if there was no error param, preventing infinite loops
       if (user && !urlError) {
         router.replace('/')

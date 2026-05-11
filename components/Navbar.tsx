@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase/client'
+import { getCurrentUser, supabase } from '@/lib/supabase/client'
 import { signOut } from '@/lib/supabase/auth'
 
 export default function Navbar() {
@@ -15,7 +15,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser().then(user => {
       setUser(user)
       setRole(user?.user_metadata?.role ?? '')
     })

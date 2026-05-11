@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signInWithGoogle, signUpWithEmail } from '@/lib/supabase/auth'
-import { supabase } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client'
 
 type Role = 'traveller' | 'guide'
 
@@ -19,7 +19,7 @@ export default function RegisterPage() {
   const [sent, setSent]         = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser().then(user => {
       if (user) {
         router.replace('/')
         router.refresh()

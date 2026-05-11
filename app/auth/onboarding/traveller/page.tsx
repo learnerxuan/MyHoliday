@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import CountrySelect from '@/components/ui/CountrySelect'
-import { supabase } from '@/lib/supabase/client'
+import { getCurrentUser, supabase } from '@/lib/supabase/client'
 
 const LANGUAGES = ['English', 'Mandarin Chinese', 'Spanish', 'Hindi', 'Arabic', 'French', 'Bengali', 'Portuguese', 'Russian', 'Japanese', 'German', 'Korean', 'Malay', 'Tamil', 'Other']
 
@@ -25,7 +25,7 @@ export default function TravellerOnboarding() {
   })
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getCurrentUser().then(async user => {
       if (!user) { router.replace('/auth/login'); return }
 
       // Check if profile already exists — skip onboarding
