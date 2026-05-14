@@ -202,13 +202,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Offer is missing its listing reference' }, { status: 400 })
     }
 
-    const { error: acceptError } = await supabase
+    const { data: acceptedOffer, error: acceptError } = await supabase
       .from('marketplace_offers')
       .update({ status: 'accepted' })
       .eq('id', offerId)
+      .select('id, listing_id, proposed_price, status')
+      .maybeSingle()
 
-    if (acceptError) {
-      return NextResponse.json({ error: acceptError.message }, { status: 400 })
+    if (acceptError || !acceptedOffer) {
+      return NextResponse.json({ error: acceptError?.message || 'Offer status was not updated.' }, { status: 400 })
     }
 
     const { error: rejectError } = await supabase
@@ -222,13 +224,15 @@ export async function PATCH(
       return NextResponse.json({ error: rejectError.message }, { status: 400 })
     }
 
-    const { error: listingUpdateError } = await supabase
+    const { data: updatedListing, error: listingUpdateError } = await supabase
       .from('marketplace_listings')
       .update({ status: 'confirmed' })
       .eq('id', relatedListingId)
+      .select('id, status')
+      .maybeSingle()
 
-    if (listingUpdateError) {
-      return NextResponse.json({ error: listingUpdateError.message }, { status: 400 })
+    if (listingUpdateError || !updatedListing) {
+      return NextResponse.json({ error: listingUpdateError?.message || 'Listing status was not updated.' }, { status: 400 })
     }
 
     await supabase
@@ -240,7 +244,7 @@ export async function PATCH(
         content: `__OFFER_ACCEPTED__:${proposedPrice}`
       })
 
-    return NextResponse.json([{ ...offerToAccept, status: 'accepted' }])
+    return NextResponse.json([acceptedOffer])
   }
 
   const { data, error } = await supabase

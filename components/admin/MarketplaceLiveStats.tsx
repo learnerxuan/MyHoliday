@@ -9,6 +9,7 @@ interface MarketplaceOffer {
   id: string
   listing_id: string
   status: string
+  marketplace_listings?: { status?: string | null } | Array<{ status?: string | null }> | null
 }
 
 interface MarketplaceLiveStatsProps {
@@ -24,6 +25,33 @@ const statusMeta: Record<string, { label: string; color: string; icon: Component
   withdrawn: { label: 'Withdrawn', color: '#94a3b8', icon: PauseCircle }
 }
 
+const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
+
+function getListingStatus(offer: MarketplaceOffer) {
+  const listing = offer.marketplace_listings
+  return Array.isArray(listing) ? listing[0]?.status : listing?.status
+}
+
+function applyMarketplaceStatusRules(offers: MarketplaceOffer[], acceptedOfferIds: Set<string>) {
+  const acceptedListingIds = new Set(
+    offers
+      .filter(offer => offer.status === 'accepted' || acceptedOfferIds.has(offer.id))
+      .map(offer => offer.listing_id)
+      .filter(Boolean)
+  )
+
+  return offers.map(offer => {
+    if (offer.status === 'withdrawn') return offer
+    if (offer.status === 'accepted' || acceptedOfferIds.has(offer.id)) {
+      return { ...offer, status: 'accepted' }
+    }
+    if (acceptedListingIds.has(offer.listing_id) || getListingStatus(offer) === 'confirmed') {
+      return { ...offer, status: 'rejected' }
+    }
+    return offer
+  })
+}
+
 export default function MarketplaceLiveStats({
   initialListingsCount,
   initialListingsWithNoOffers,
@@ -37,7 +65,7 @@ export default function MarketplaceLiveStats({
     const refreshListings = async () => {
       const [listingsRes, offersRes] = await Promise.all([
         supabase.from('marketplace_listings').select('id'),
-        supabase.from('marketplace_offers').select('listing_id')
+        supabase.from('marketplace_offers').select('listing_id, status')
       ])
 
       if (listingsRes.data) {
@@ -45,7 +73,11 @@ export default function MarketplaceLiveStats({
       }
 
       if (listingsRes.data && offersRes.data) {
-        const offerListingIds = new Set(offersRes.data.map(offer => offer.listing_id))
+        const offerListingIds = new Set(
+          offersRes.data
+            .filter(offer => offer.status !== 'withdrawn')
+            .map(offer => offer.listing_id)
+        )
         setListingsWithNoOffers(listingsRes.data.filter(listing => !offerListingIds.has(listing.id)).length)
       }
     }
@@ -53,8 +85,19 @@ export default function MarketplaceLiveStats({
     const refreshOffers = async () => {
       const { data } = await supabase
         .from('marketplace_offers')
-        .select('id, listing_id, status')
-      if (data) setOffers(data)
+        .select('id, listing_id, status, marketplace_listings(status)')
+      if (data) {
+        const offerIds = data.map(offer => offer.id).filter(Boolean)
+        const { data: acceptedMessages } = offerIds.length
+          ? await supabase
+            .from('marketplace_messages')
+            .select('offer_id')
+            .in('offer_id', offerIds)
+            .like('content', `${OFFER_ACCEPTED_TOKEN}%`)
+          : { data: [] }
+        const acceptedOfferIds = new Set((acceptedMessages || []).map(message => message.offer_id))
+        setOffers(applyMarketplaceStatusRules(data, acceptedOfferIds))
+      }
     }
 
     const listingsChannel = supabase
@@ -69,9 +112,17 @@ export default function MarketplaceLiveStats({
       })
       .subscribe()
 
+    const messagesChannel = supabase
+      .channel('live-marketplace-messages')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'marketplace_messages' }, async () => {
+        await refreshOffers()
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(listingsChannel)
       supabase.removeChannel(offersChannel)
+      supabase.removeChannel(messagesChannel)
     }
   }, [])
 

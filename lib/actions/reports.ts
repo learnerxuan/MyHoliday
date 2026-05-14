@@ -82,6 +82,48 @@ export interface AdminReportsData {
 }
 
 const toNumber = (value: unknown) => Number(value || 0)
+const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
+
+type DashboardOfferRow = {
+  id: string
+  listing_id: string
+  status: string
+  marketplace_listings?: { status?: string | null } | Array<{ status?: string | null }> | null
+}
+
+const getOfferListingStatus = (offer: DashboardOfferRow) => {
+  const listing = offer.marketplace_listings
+  return Array.isArray(listing) ? listing[0]?.status : listing?.status
+}
+
+const applyMarketplaceStatusRules = (
+  offers: DashboardOfferRow[],
+  acceptedOfferIds: Set<string>
+): Array<{ id: string; listing_id: string; status: string }> => {
+  const acceptedListingIds = new Set(
+    offers
+      .filter(offer => offer.status === 'accepted' || acceptedOfferIds.has(offer.id))
+      .map(offer => offer.listing_id)
+      .filter(Boolean)
+  )
+
+  return offers.map(offer => {
+    let status = offer.status
+    if (status !== 'withdrawn') {
+      if (status === 'accepted' || acceptedOfferIds.has(offer.id)) {
+        status = 'accepted'
+      } else if (acceptedListingIds.has(offer.listing_id) || getOfferListingStatus(offer) === 'confirmed') {
+        status = 'rejected'
+      }
+    }
+
+    return {
+      id: offer.id,
+      listing_id: offer.listing_id,
+      status
+    }
+  })
+}
 
 const emptyAdminDashboardData: AdminDashboardData = {
   activeTravellers: 0,
@@ -229,7 +271,8 @@ async function getAdminDashboardDataFromSupabase(): Promise<AdminDashboardData> 
     listingsCount,
     completedTransactions,
     listings,
-    offers,
+    rawOffers,
+    acceptedMessages,
     clickedInteractions
   ] = await Promise.all([
     safeCountRows(supabase, 'traveller_profiles'),
@@ -246,10 +289,16 @@ async function getAdminDashboardDataFromSupabase(): Promise<AdminDashboardData> 
       builder => builder.eq('status', 'completed')
     ),
     safeFetchAllRows<{ id: string }>(supabase, 'marketplace_listings', 'id'),
-    safeFetchAllRows<{ id: string; listing_id: string; status: string }>(
+    safeFetchAllRows<DashboardOfferRow>(
       supabase,
       'marketplace_offers',
-      'id, listing_id, status'
+      'id, listing_id, status, marketplace_listings(status)'
+    ),
+    safeFetchAllRows<{ offer_id: string | null }>(
+      supabase,
+      'marketplace_messages',
+      'offer_id',
+      builder => builder.like('content', `${OFFER_ACCEPTED_TOKEN}%`)
     ),
     safeFetchAllRows<{ destination_id: string | null; destinations: { city: string | null; country: string | null } | null }>(
       supabase,
@@ -259,7 +308,9 @@ async function getAdminDashboardDataFromSupabase(): Promise<AdminDashboardData> 
     )
   ])
 
-  const offerListingIds = new Set(offers.map(offer => offer.listing_id).filter(Boolean))
+  const acceptedOfferIds = new Set(acceptedMessages.map(message => message.offer_id).filter(Boolean) as string[])
+  const offers = applyMarketplaceStatusRules(rawOffers, acceptedOfferIds)
+  const offerListingIds = new Set(offers.filter(offer => offer.status !== 'withdrawn').map(offer => offer.listing_id).filter(Boolean))
   const listingsWithNoOffers = listings.filter(listing => !offerListingIds.has(listing.id)).length
 
   const completedGmv = completedTransactions.reduce(
