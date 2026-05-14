@@ -1,6 +1,33 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
+
+async function applyAcceptedMessageStatus(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  offers: Record<string, unknown>[]
+) {
+  const offerIds = offers.map((offer) => offer.id).filter(Boolean)
+
+  if (!offerIds.length) {
+    return offers
+  }
+
+  const { data: acceptedMessages } = await supabase
+    .from('marketplace_messages')
+    .select('offer_id')
+    .in('offer_id', offerIds)
+    .like('content', `${OFFER_ACCEPTED_TOKEN}%`)
+
+  const acceptedOfferIds = new Set((acceptedMessages || []).map((message) => message.offer_id))
+
+  return offers.map((offer) => (
+    acceptedOfferIds.has(offer.id)
+      ? { ...offer, status: 'accepted' }
+      : offer
+  ))
+}
+
 export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -36,7 +63,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(data || [])
+    const offersWithAcceptedStatus = await applyAcceptedMessageStatus(supabase, (data || []) as Record<string, unknown>[])
+
+    return NextResponse.json(offersWithAcceptedStatus)
   }
 
   return NextResponse.json({ error: 'Unsupported scope' }, { status: 400 })

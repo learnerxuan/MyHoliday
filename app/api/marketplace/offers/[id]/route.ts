@@ -10,6 +10,33 @@ type RelatedListing =
   | Array<{ user_id?: string; status?: string; is_suspended?: boolean }>
   | null
 
+const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
+
+async function applyAcceptedMessageStatus(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  offers: OfferWithGuide[]
+) {
+  const offerIds = offers.map((offer) => offer.id).filter(Boolean)
+
+  if (!offerIds.length) {
+    return offers
+  }
+
+  const { data: acceptedMessages } = await supabase
+    .from('marketplace_messages')
+    .select('offer_id')
+    .in('offer_id', offerIds)
+    .like('content', `${OFFER_ACCEPTED_TOKEN}%`)
+
+  const acceptedOfferIds = new Set((acceptedMessages || []).map((message) => message.offer_id))
+
+  return offers.map((offer) => (
+    acceptedOfferIds.has(offer.id)
+      ? { ...offer, status: 'accepted' }
+      : offer
+  ))
+}
+
 // ID is listingId for GET, offerId for PATCH
 export async function GET(
   request: Request,
@@ -36,7 +63,9 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
-  const formattedData = ((data || []) as OfferWithGuide[]).map((offer) => ({
+  const offersWithAcceptedStatus = await applyAcceptedMessageStatus(supabase, (data || []) as OfferWithGuide[])
+
+  const formattedData = offersWithAcceptedStatus.map((offer) => ({
     ...offer,
     marketplace_listings: undefined,
     guide_name: offer.tour_guides?.full_name || 'Guide'
