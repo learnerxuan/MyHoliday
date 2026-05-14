@@ -68,8 +68,8 @@ export default function SubmitOfferPage() {
         const tripMeta = data.trip_metadata || {}
         
         const days = parsedMeta.trip_days || tripMeta.trip_days || parsedMeta.duration_days || 5
-        const startDate = parsedMeta.start_date || tripMeta.start_date || tripMeta.travel_dates?.start
-        const endDate = parsedMeta.end_date || tripMeta.end_date || tripMeta.travel_dates?.end
+        const startDate = parsedMeta.start_date || tripMeta.travel_date_start || tripMeta.start_date || tripMeta.travel_dates?.start
+        const endDate = parsedMeta.end_date || tripMeta.travel_date_end || tripMeta.end_date || tripMeta.travel_dates?.end
         
         let formattedDateRange = 'Dates not specified'
         if (startDate && endDate) {
