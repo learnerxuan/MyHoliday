@@ -49,7 +49,7 @@ erDiagram
     TOUR_GUIDES {
         uuid id PK
         uuid user_id FK
-        varchar full_name
+        varchar full_name "NOT NULL"
         uuid city_id FK
         varchar document_url
         varchar verification_status
@@ -88,7 +88,7 @@ erDiagram
     MARKETPLACE_LISTINGS {
         uuid id PK
         uuid user_id FK
-        uuid itinerary_id FK
+        uuid itinerary_id
         uuid destination_id FK
         numeric desired_budget
         varchar status
@@ -102,6 +102,7 @@ erDiagram
         uuid guide_id FK
         numeric proposed_price
         varchar status
+        text intro_message
         jsonb edited_itinerary
         boolean payment_enabled
         timestamp created_at
@@ -180,5 +181,6 @@ erDiagram
 - `AUTH_USERS` represents Supabase Auth's `auth.users` table. It is external to the public schema but is referenced by traveller profiles, tour guides, chat sessions, itineraries, listings, transactions, and interactions.
 - `traveller_profiles.user_id` and `tour_guides.user_id` are both unique, so each auth user can have at most one traveller profile and at most one tour guide profile.
 - `marketplace_messages.sender_id` is polymorphic in application logic. The migration does not define a foreign key for it; `sender_type` determines whether the sender is a traveller user or guide user.
+- `marketplace_listings.itinerary_id` stores the source itinerary id, but the current live Supabase public schema does not declare a database foreign key for it.
 - `historical_trips` is an ML/survey dataset table and does not declare foreign keys to the operational tables.
 - `itineraries.trip_metadata` stores trip context captured during itinerary planning, such as trip dates, duration, pace, group details, and budget preferences.

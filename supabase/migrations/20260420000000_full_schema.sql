@@ -14,6 +14,7 @@
 
 -- EXTENSIONS ------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
 -- 1. DESTINATIONS
@@ -47,7 +48,7 @@ CREATE TABLE public.destinations (
 -- ============================================================
 CREATE TABLE public.traveller_profiles (
     id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id                 UUID          NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id                 UUID          NOT NULL UNIQUE REFERENCES auth.users(id),
     full_name               VARCHAR(150),
     date_of_birth           DATE,
     nationality             VARCHAR(100),
@@ -62,9 +63,9 @@ CREATE TABLE public.traveller_profiles (
 -- ============================================================
 CREATE TABLE public.tour_guides (
     id                      UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id                 UUID          NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-    full_name               VARCHAR(150),
-    city_id                 UUID          REFERENCES public.destinations(id) ON DELETE SET NULL,
+    user_id                 UUID          UNIQUE REFERENCES auth.users(id),
+    full_name               VARCHAR(150)  NOT NULL,
+    city_id                 UUID          REFERENCES public.destinations(id),
     document_url            VARCHAR(500),
     verification_status     VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (verification_status IN ('pending', 'approved', 'rejected')),
     created_at              TIMESTAMP     DEFAULT NOW()
@@ -75,8 +76,8 @@ CREATE TABLE public.tour_guides (
 -- ============================================================
 CREATE TABLE public.chat_sessions (
     id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    destination_id  UUID        NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
+    user_id         UUID        NOT NULL REFERENCES auth.users(id),
+    destination_id  UUID        NOT NULL REFERENCES public.destinations(id),
     status          VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed')),
     planner_state   JSONB       NOT NULL DEFAULT '{}'::jsonb,
     created_at      TIMESTAMP   DEFAULT NOW()
@@ -87,7 +88,7 @@ CREATE TABLE public.chat_sessions (
 -- ============================================================
 CREATE TABLE public.chat_messages (
     id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id  UUID        NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
+    session_id  UUID        NOT NULL REFERENCES public.chat_sessions(id),
     role        VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
     content     TEXT        NOT NULL,
     created_at  TIMESTAMP   DEFAULT NOW()
@@ -98,12 +99,12 @@ CREATE TABLE public.chat_messages (
 -- ============================================================
 CREATE TABLE public.itineraries (
     id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    destination_id  UUID         NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
-    session_id      UUID         REFERENCES public.chat_sessions(id) ON DELETE SET NULL,
+    user_id         UUID         NOT NULL REFERENCES auth.users(id),
+    destination_id  UUID         NOT NULL REFERENCES public.destinations(id),
+    session_id      UUID         REFERENCES public.chat_sessions(id),
     title           VARCHAR(255) NOT NULL,
     content         JSONB        NOT NULL,
-    trip_metadata   JSONB,
+    trip_metadata   JSONB        DEFAULT '{}'::jsonb,
     created_at      TIMESTAMP    DEFAULT NOW(),
     updated_at      TIMESTAMP    DEFAULT NOW()
 );
@@ -113,9 +114,9 @@ CREATE TABLE public.itineraries (
 -- ============================================================
 CREATE TABLE public.marketplace_listings (
     id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID          NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    itinerary_id    UUID          NOT NULL REFERENCES public.itineraries(id) ON DELETE CASCADE,
-    destination_id  UUID          NOT NULL REFERENCES public.destinations(id) ON DELETE CASCADE,
+    user_id         UUID          NOT NULL REFERENCES auth.users(id),
+    itinerary_id    UUID          NOT NULL,
+    destination_id  UUID          NOT NULL REFERENCES public.destinations(id),
     desired_budget  NUMERIC(10,2),
     status          VARCHAR(20)   NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'negotiating', 'confirmed', 'closed')),
     created_at      TIMESTAMP     DEFAULT NOW()
@@ -126,10 +127,11 @@ CREATE TABLE public.marketplace_listings (
 -- ============================================================
 CREATE TABLE public.marketplace_offers (
     id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    listing_id      UUID          NOT NULL REFERENCES public.marketplace_listings(id) ON DELETE CASCADE,
-    guide_id        UUID          NOT NULL REFERENCES public.tour_guides(id) ON DELETE CASCADE,
+    listing_id      UUID          NOT NULL REFERENCES public.marketplace_listings(id),
+    guide_id        UUID          NOT NULL REFERENCES public.tour_guides(id),
     proposed_price  NUMERIC(10,2) NOT NULL,
     status          VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'withdrawn')),
+    intro_message   TEXT,
     created_at      TIMESTAMP     DEFAULT NOW()
 );
 
@@ -138,7 +140,7 @@ CREATE TABLE public.marketplace_offers (
 -- ============================================================
 CREATE TABLE public.marketplace_messages (
     id          UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    offer_id    UUID          NOT NULL REFERENCES public.marketplace_offers(id) ON DELETE CASCADE,
+    offer_id    UUID          NOT NULL REFERENCES public.marketplace_offers(id),
     sender_type VARCHAR(20)   NOT NULL CHECK (sender_type IN ('traveler', 'guide')),
     sender_id   UUID          NOT NULL,
     content     TEXT          NOT NULL,
@@ -150,16 +152,15 @@ CREATE TABLE public.marketplace_messages (
 -- ============================================================
 CREATE TABLE public.transactions (
     id                  UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-    offer_id            UUID          NOT NULL REFERENCES marketplace_offers(id) ON DELETE RESTRICT,
-    payer_id            UUID          NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
-    payee_id            UUID          NOT NULL REFERENCES public.tour_guides(id) ON DELETE RESTRICT,
+    offer_id            UUID          NOT NULL REFERENCES marketplace_offers(id),
+    payer_id            UUID          NOT NULL REFERENCES auth.users(id),
+    payee_id            UUID          NOT NULL REFERENCES public.tour_guides(id),
     total_amount        NUMERIC(10,2) NOT NULL,
     service_charge      NUMERIC(10,2) NOT NULL DEFAULT 0,
     guide_payout        NUMERIC(10,2) NOT NULL,
     status              VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'refunded')),
     payment_reference   VARCHAR(100)  UNIQUE,
-    created_at          TIMESTAMP     DEFAULT NOW(),
-    CONSTRAINT payout_check CHECK (guide_payout = total_amount - service_charge)
+    created_at          TIMESTAMP     DEFAULT NOW()
 );
 
 -- ============================================================
@@ -182,11 +183,11 @@ CREATE TABLE public.historical_trips (
 -- 12. USER_INTERACTIONS
 -- ============================================================
 CREATE TABLE public.user_interactions (
-    id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID        REFERENCES auth.users(id) ON DELETE CASCADE,
-    destination_id  UUID        REFERENCES public.destinations(id) ON DELETE CASCADE,
-    type            TEXT,
-    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID        REFERENCES auth.users(id),
+    destination_id  UUID        REFERENCES public.destinations(id),
+    type            TEXT        DEFAULT 'click',
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- ============================================================

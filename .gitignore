@@ -84,7 +84,7 @@ desktop.ini
 # database / supabase
 supabase/.temp/
 .supabase/
+database-export/
 
 # logs
 *.log
-
