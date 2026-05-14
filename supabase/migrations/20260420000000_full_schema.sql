@@ -208,6 +208,45 @@ CREATE INDEX idx_offers_guide             ON public.marketplace_offers(guide_id)
 CREATE INDEX idx_messages_offer           ON public.marketplace_messages(offer_id);
 
 -- ============================================================
+-- DATA API GRANTS
+-- ============================================================
+GRANT SELECT ON public.destinations TO anon;
+GRANT SELECT, INSERT ON public.historical_trips TO anon;
+GRANT USAGE, SELECT ON SEQUENCE public.historical_trips_id_seq TO anon;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+    public.destinations,
+    public.traveller_profiles,
+    public.tour_guides,
+    public.chat_sessions,
+    public.chat_messages,
+    public.itineraries,
+    public.marketplace_listings,
+    public.marketplace_offers,
+    public.marketplace_messages,
+    public.transactions,
+    public.historical_trips,
+    public.user_interactions
+TO authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.historical_trips_id_seq TO authenticated;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+    public.destinations,
+    public.traveller_profiles,
+    public.tour_guides,
+    public.chat_sessions,
+    public.chat_messages,
+    public.itineraries,
+    public.marketplace_listings,
+    public.marketplace_offers,
+    public.marketplace_messages,
+    public.transactions,
+    public.historical_trips,
+    public.user_interactions
+TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.historical_trips_id_seq TO service_role;
+
+-- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 ALTER TABLE public.destinations       ENABLE ROW LEVEL SECURITY;
