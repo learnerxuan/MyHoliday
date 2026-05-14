@@ -293,7 +293,7 @@ export default function MarketplacePage() {
           }
           const budgetType = parsedMeta.budget || tripMeta.budget || parsedMeta.budget_profile || tripMeta.budget_profile
 
-          const offers = l.marketplace_offers || []
+          const offers = (l.marketplace_offers || []).filter(o => o.status !== 'withdrawn')
           const paidOffer = offers.find(o => o.transactions?.some?.(tx => tx.status === 'completed'))
           const acceptedOffer = offers.find(o => String(o.status || '').toLowerCase() === 'accepted')
           const bookingOffer = acceptedOffer || paidOffer
@@ -680,7 +680,7 @@ export default function MarketplacePage() {
                 <p className="text-secondary/70 font-medium">No records found for this filter in your city.</p>
               </div>
             ) : filteredListings.map(listing => {
-              const myOffer = listing.offers?.find(o => o.guide_id === guideProfile?.id)
+              const myOffer = listing.offers?.find(o => o.guide_id === guideProfile?.id && o.status !== 'withdrawn')
               const guideCardStatus = myOffer
                 ? (myOffer.status === 'accepted' && listing.displayStatus === 'confirmed' ? 'confirmed' : myOffer.status)
                 : listing.status

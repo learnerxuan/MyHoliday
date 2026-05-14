@@ -194,7 +194,7 @@ function ListingDetailContent() {
 
       const offersRes = await fetch(`/api/marketplace/offers/${listingId}`)
       if (offersRes.ok) {
-        const offersData = await offersRes.json()
+        const offersData = (await offersRes.json()).filter(o => o.status !== 'withdrawn')
         setOffers(offersData)
 
         const transactionOffer = currentUser.user_metadata?.role === 'guide'
@@ -558,7 +558,7 @@ function ListingDetailContent() {
   }
 
   useEffect(() => {
-    const currentGuideOffer = offers.find(o => o.guide_id === user?.guide_id)
+    const currentGuideOffer = offers.find(o => o.guide_id === user?.guide_id && o.status !== 'withdrawn')
     const currentGuideOfferStatus = String(currentGuideOffer?.status || '').toLowerCase()
     const locked = Boolean(
       currentGuideOffer && (
@@ -583,7 +583,7 @@ function ListingDetailContent() {
 
   const isGuide = user?.role === 'guide'
 
-  const myGuideOffer = isTraveller ? null : offers.find(o => o.guide_id === user?.guide_id)
+  const myGuideOffer = isTraveller ? null : offers.find(o => o.guide_id === user?.guide_id && o.status !== 'withdrawn')
   const myGuideOfferStatus = String(myGuideOffer?.status || '').toLowerCase()
   const isMyGuideOfferAccepted = myGuideOfferStatus === 'accepted'
   const isGuideOfferLocked = Boolean(

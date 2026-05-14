@@ -27,6 +27,7 @@ export async function GET(
     .from('marketplace_offers')
     .select('*, tour_guides(full_name), marketplace_listings!inner(user_id, status, is_suspended)')
     .eq('listing_id', (await params).id)
+    .neq('status', 'withdrawn')
     .neq('marketplace_listings.status', 'closed')
     .eq('marketplace_listings.is_suspended', false)
     .order('created_at', { ascending: false })
@@ -267,19 +268,20 @@ export async function DELETE(
       return NextResponse.json({ error: 'Accepted offers cannot be withdrawn' }, { status: 409 })
     }
 
-    const { error: deleteError } = await supabase
+    const { error: withdrawError } = await supabase
       .from('marketplace_offers')
-      .delete()
+      .update({ status: 'withdrawn' })
       .eq('id', offerId)
 
-    if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 400 })
+    if (withdrawError) {
+      return NextResponse.json({ error: withdrawError.message }, { status: 400 })
     }
 
     const { data: remainingOffers } = await supabase
       .from('marketplace_offers')
       .select('id')
       .eq('listing_id', offer.listing_id)
+      .neq('status', 'withdrawn')
       .limit(1)
 
     if ((remainingOffers?.length || 0) === 0 && !['confirmed', 'closed'].includes(relatedListing?.status || '')) {

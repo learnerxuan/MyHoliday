@@ -27,6 +27,7 @@ export async function GET(request: Request) {
       .from('marketplace_offers')
       .select('*, marketplace_listings!inner(status, is_suspended)')
       .eq('guide_id', guideData.id)
+      .neq('status', 'withdrawn')
       .neq('marketplace_listings.status', 'closed')
       .eq('marketplace_listings.is_suspended', false)
       .order('created_at', { ascending: false })
