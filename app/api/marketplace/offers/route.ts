@@ -3,6 +3,16 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
 
+function getOfferListingStatus(offer: Record<string, unknown>) {
+  const listing = offer.marketplace_listings
+  if (Array.isArray(listing)) {
+    return listing[0]?.status
+  }
+  return typeof listing === 'object' && listing !== null && 'status' in listing
+    ? (listing as { status?: string }).status
+    : undefined
+}
+
 async function applyAcceptedMessageStatus(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   offers: Record<string, unknown>[]
@@ -21,11 +31,17 @@ async function applyAcceptedMessageStatus(
 
   const acceptedOfferIds = new Set((acceptedMessages || []).map((message) => message.offer_id))
 
-  return offers.map((offer) => (
-    acceptedOfferIds.has(offer.id)
-      ? { ...offer, status: 'accepted' }
-      : offer
-  ))
+  return offers.map((offer) => {
+    if (acceptedOfferIds.has(offer.id)) {
+      return { ...offer, status: 'accepted' }
+    }
+
+    if (acceptedOfferIds.size > 0 || getOfferListingStatus(offer) === 'confirmed') {
+      return { ...offer, status: 'rejected' }
+    }
+
+    return offer
+  })
 }
 
 export async function GET(request: Request) {

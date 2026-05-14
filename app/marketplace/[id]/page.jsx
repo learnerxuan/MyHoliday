@@ -586,9 +586,11 @@ function ListingDetailContent() {
   const myGuideOffer = isTraveller ? null : offers.find(o => o.guide_id === user?.guide_id && o.status !== 'withdrawn')
   const myGuideOfferStatus = String(myGuideOffer?.status || '').toLowerCase()
   const isMyGuideOfferAccepted = myGuideOfferStatus === 'accepted'
+  const isMyGuideOfferRejected = myGuideOfferStatus === 'rejected'
   const isGuideOfferLocked = Boolean(
     myGuideOffer && (
       isMyGuideOfferAccepted ||
+      isMyGuideOfferRejected ||
       myGuideOffer.payment_enabled ||
       transaction
     )
@@ -931,10 +933,10 @@ function ListingDetailContent() {
                   <div className="absolute inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '20px 20px', }} />
                   <div className="relative z-10">
                     <div className="inline-flex w-fit items-center gap-2 bg-white/10 text-amber text-[11px] font-bold px-3 py-1 rounded-full border border-amber/20 mb-3 uppercase tracking-widest leading-none">
-                      {myGuideOffer ? (isGuideOfferLocked ? 'Accepted' : 'In Progress') : 'Available Request'}
+                      {myGuideOffer ? (isMyGuideOfferRejected ? 'Rejected' : isGuideOfferLocked ? 'Accepted' : 'In Progress') : 'Available Request'}
                     </div>
                     <h1 className="text-2xl sm:text-[30px] font-extrabold text-white font-display mb-1 tracking-tight leading-tight">
-                      {myGuideOffer ? (isEditingOffer ? 'Edit Your Offer' : 'Your Active Offer') : 'Submit an Offer'}
+                      {myGuideOffer ? (isEditingOffer ? 'Edit Your Offer' : isMyGuideOfferRejected ? 'Your Offer Was Rejected' : 'Your Active Offer') : 'Submit an Offer'}
                     </h1>
                     <p className="text-[12px] font-body text-white/60 leading-relaxed">
                       {myGuideOffer 
@@ -1027,11 +1029,17 @@ function ListingDetailContent() {
                               <p className="text-[9px] text-secondary uppercase font-bold tracking-widest mb-1 opacity-60">Submitted Quote</p>
                               <p className="text-amber font-display font-extrabold text-2xl">{formatMYR(myGuideOffer.proposed_price)}</p>
                             </div>
-                            <div className={`${isGuideOfferLocked ? 'bg-[#ECFDF5] text-[#047857]' : 'bg-[#FEF9C3] text-[#A16207]'} px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider`}>
-                              {isGuideOfferLocked ? 'Accepted' : 'Pending'}
+                            <div className={`${isMyGuideOfferRejected ? 'bg-[#FEF2F2] text-[#B91C1C]' : isGuideOfferLocked ? 'bg-[#ECFDF5] text-[#047857]' : 'bg-[#FEF9C3] text-[#A16207]'} px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider`}>
+                              {isMyGuideOfferRejected ? 'Rejected' : isGuideOfferLocked ? 'Accepted' : 'Pending'}
                             </div>
                           </div>
                         </div>
+                        {isMyGuideOfferRejected && (
+                          <div className="p-4 bg-[#FEF2F2] border border-red-200 rounded-[16px]">
+                            <p className="text-[13px] font-extrabold text-[#B91C1C]">Traveller chose another guide</p>
+                            <p className="text-[12px] text-[#DC2626] mt-1">This offer is no longer active.</p>
+                          </div>
+                        )}
                         {!isGuideOfferLocked && (
                           <div className="flex gap-2">
                             <button onClick={handleEditOfferClick} className="flex-1 py-2 bg-white border border-[#E5E0DA] rounded-lg font-bold text-[12px] hover:bg-[#FAF9F7] transition-all">Edit Offer</button>

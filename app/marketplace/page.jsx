@@ -8,6 +8,7 @@ import ListingCard from '@/components/ui/ListingCard'
 import Modal from '@/components/ui/Modal'
 
 const formatMYR = (amount) => `RM ${Number(amount).toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+const OFFER_ACCEPTED_TOKEN = '__OFFER_ACCEPTED__:'
 
 const normaliseList = (value) => {
   if (Array.isArray(value)) return value.filter(Boolean)
@@ -206,6 +207,24 @@ export default function MarketplacePage() {
           throw new Error(listingsError.message || JSON.stringify(listingsError))
         }
 
+        const offerIds = [
+          ...new Set((listingsData || [])
+            .flatMap(l => l.marketplace_offers || [])
+            .map(o => o.id)
+            .filter(Boolean))
+        ]
+        let acceptedOfferIds = new Set()
+
+        if (offerIds.length > 0) {
+          const { data: acceptedMessages } = await supabase
+            .from('marketplace_messages')
+            .select('offer_id')
+            .in('offer_id', offerIds)
+            .like('content', `${OFFER_ACCEPTED_TOKEN}%`)
+
+          acceptedOfferIds = new Set((acceptedMessages || []).map(message => message.offer_id))
+        }
+
         const itineraryIds = [
           ...new Set((listingsData || []).map(l => l.itinerary_id).filter(Boolean))
         ]
@@ -295,14 +314,19 @@ export default function MarketplacePage() {
 
           const offers = (l.marketplace_offers || []).filter(o => o.status !== 'withdrawn')
           const paidOffer = offers.find(o => o.transactions?.some?.(tx => tx.status === 'completed'))
-          const acceptedOffer = offers.find(o => String(o.status || '').toLowerCase() === 'accepted')
+          const acceptedOffer = offers.find(o =>
+            String(o.status || '').toLowerCase() === 'accepted' ||
+            acceptedOfferIds.has(o.id)
+          )
           const bookingOffer = acceptedOffer || paidOffer
           const effectiveOffers = bookingOffer
             ? offers.map(o => (
                 o.id !== bookingOffer.id && o.status !== 'withdrawn'
                   ? { ...o, status: 'rejected' }
-                  : o
+                  : { ...o, status: 'accepted' }
               ))
+            : l.status === 'confirmed'
+              ? offers.map(o => o.status !== 'withdrawn' ? { ...o, status: 'rejected' } : o)
             : offers
           const activeOffer =
             bookingOffer ||
@@ -430,7 +454,7 @@ export default function MarketplacePage() {
          if (myOffer) return false;
          return item.status === 'open' || item.status === 'awaiting'
       }
-      if (filter === 'my_offers') return !!myOffer && item.displayStatus !== 'confirmed';
+      if (filter === 'my_offers') return !!myOffer && myOffer.status !== 'rejected' && item.displayStatus !== 'confirmed';
       if (filter === 'confirmed') return !!myAcceptedOffer && item.displayStatus === 'confirmed';
       return false
     } else {
