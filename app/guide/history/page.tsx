@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react'
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
 import Spinner from '@/components/ui/Spinner'
 import Link from 'next/link'
 
@@ -37,140 +36,35 @@ export default function SchedulePage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let cancelled = false
+
     const fetchData = async () => {
+      setLoading(true)
+      setError('')
+
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        if (authError || !user) throw new Error('Not authenticated')
+        const res = await fetch('/api/guide/schedule')
+        const payload = await res.json()
 
-        // Get guide profile
-        const { data: guide, error: guideError } = await supabase
-          .from('tour_guides')
-          .select('id')
-          .eq('user_id', user.id)
-          .single()
-        
-        if (guideError || !guide) throw new Error('Could not find guide profile')
-
-        // 1. Get this guide's accepted offers where the associated listing is confirmed.
-        const { data: acceptedOffers, error: offersError } = await supabase
-          .from('marketplace_offers')
-          .select(`
-            id,
-            proposed_price,
-            created_at,
-            guide_id,
-            marketplace_listings!inner (
-              id,
-              status,
-              itinerary_id,
-              destinations (
-                id,
-                city,
-                country
-              )
-            )
-          `)
-          .eq('guide_id', guide.id)
-          .eq('status', 'accepted')
-          .eq('marketplace_listings.status', 'confirmed')
-
-        if (offersError) throw new Error(offersError.message)
-
-        if (!acceptedOffers || acceptedOffers.length === 0) {
-          setOffers([])
-          setLoading(false)
-          return
+        if (!res.ok) {
+          throw new Error(payload.error || 'Failed to load schedule.')
         }
 
-        // Extract itinerary IDs to fetch them
-        const itineraryIds = acceptedOffers
-          .map(o => {
-            const listing = Array.isArray(o.marketplace_listings) ? o.marketplace_listings[0] : o.marketplace_listings
-            return listing?.itinerary_id
-          })
-          .filter(Boolean)
-
-        let itinerariesMap: Record<string, any> = {}
-
-        if (itineraryIds.length > 0) {
-          // 2. Fetch itineraries
-          const { data: itinerariesData, error: itinsError } = await supabase
-            .from('itineraries')
-            .select('id, title, content, trip_metadata')
-            .in('id', itineraryIds)
-
-          if (!itinsError && itinerariesData) {
-            itinerariesMap = itinerariesData.reduce((acc, curr) => {
-              acc[curr.id] = curr
-              return acc
-            }, {} as Record<string, any>)
-          }
+        if (!cancelled) {
+          setOffers(Array.isArray(payload.records) ? payload.records : [])
         }
-
-        // Process data
-        const processedOffers = acceptedOffers.map(offer => {
-          const listing = Array.isArray(offer.marketplace_listings) ? offer.marketplace_listings[0] : offer.marketplace_listings
-          if (!listing) return null
-          
-          const destination = Array.isArray(listing.destinations) ? listing.destinations[0] : listing.destinations
-          const itinerary = itinerariesMap[listing.itinerary_id]
-
-          const rawContent = itinerary?.content || {}
-          const content = typeof rawContent === 'string' ? JSON.parse(rawContent) : rawContent
-          const tripMeta = itinerary?.trip_metadata || {}
-
-          const days = content?.trip_days || content?.duration_days || tripMeta?.trip_days || null
-          const startDate = content?.start_date || tripMeta?.travel_date_start || tripMeta?.start_date || tripMeta?.travel_dates?.start || null
-          const endDate = content?.end_date || tripMeta?.travel_date_end || tripMeta?.end_date || tripMeta?.travel_dates?.end || null
-
-          let timingStatus = 'Upcoming'
-          const now = new Date()
-          if (startDate && endDate) {
-            const start = new Date(startDate)
-            const end = new Date(endDate)
-            end.setHours(23, 59, 59, 999)
-            if (now > end) timingStatus = 'Completed'
-            else if (now >= start && now <= end) timingStatus = 'Ongoing'
-            else timingStatus = 'Upcoming'
-          } else if (startDate) {
-            const start = new Date(startDate)
-            if (now >= start) timingStatus = 'Ongoing'
-          }
-
-          return {
-            id: offer.id,
-            price: offer.proposed_price,
-            acceptedAt: offer.created_at,
-            guideId: offer.guide_id,
-            listingId: listing.id,
-            title: itinerary?.title || 'Trip',
-            city: destination?.city || 'Unknown Location',
-            country: destination?.country || '',
-            startDate: startDate,
-            endDate: endDate,
-            days: days ? `${days} Days` : '',
-            pax: content?.group_size || content?.pax || tripMeta?.group_size || tripMeta?.pax || '1 pax',
-            timingStatus: timingStatus,
-          }
-        }).filter((offer): offer is NonNullable<typeof offer> => offer !== null && offer.timingStatus !== 'Completed')
-
-        // Sort by start date if available, otherwise by acceptedAt (latest first)
-        processedOffers.sort((a, b) => {
-          if (a.startDate && b.startDate) {
-            return new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-          }
-          return new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt).getTime()
-        })
-
-        setOffers(processedOffers)
       } catch (err: any) {
-        setError(err.message)
+        if (!cancelled) setError(err.message)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchData()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const formatDate = (dateStr: string) => {

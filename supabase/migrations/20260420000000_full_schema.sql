@@ -658,6 +658,45 @@ WITH CHECK (
 
 
 -- ============================================================
+-- Source: 20260515000000_fix_marketplace_offer_acceptance_rls.sql
+-- ============================================================
+
+-- Allow travellers to accept/reject offers on their own marketplace listings.
+-- The API verifies ownership first; these policies let the verified status updates
+-- actually persist under RLS instead of relying on chat message fallbacks.
+
+DROP POLICY IF EXISTS "traveller: update offers on own listings" ON public.marketplace_offers;
+
+CREATE POLICY "traveller: update offers on own listings"
+ON public.marketplace_offers
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.marketplace_listings ml
+    WHERE ml.id = marketplace_offers.listing_id
+      AND ml.user_id = auth.uid()
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.marketplace_listings ml
+    WHERE ml.id = marketplace_offers.listing_id
+      AND ml.user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "traveller: update own marketplace listings" ON public.marketplace_listings;
+
+CREATE POLICY "traveller: update own marketplace listings"
+ON public.marketplace_listings
+FOR UPDATE
+USING (user_id = auth.uid())
+WITH CHECK (user_id = auth.uid());
+
+
+-- ============================================================
 -- Source: 20260511000000_normalize_survey_nationalities.sql
 -- ============================================================
 

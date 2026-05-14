@@ -151,20 +151,16 @@ export default function MarketplacePage() {
           setGuideProfile(guideData)
           setFilter('requests')
 
-          const { data: myOffersData } = await supabase
-            .from('marketplace_offers')
-            .select('status, proposed_price, marketplace_listings(status)')
-            .eq('guide_id', guideData.id)
+          const analyticsRes = await fetch('/api/guide/analytics')
+          const analytics = await analyticsRes.json().catch(() => null)
 
-          if (myOffersData) {
-            const offersAccepted = myOffersData.filter(o => o.status === 'accepted').length
-            const offersSent = myOffersData.length - offersAccepted
-            const completedTrips = myOffersData.filter(o => o.status === 'accepted' && o.marketplace_listings?.status === 'completed').length
-            const totalEarnings = myOffersData
-              .filter(o => o.status === 'accepted' && o.marketplace_listings?.status === 'completed')
-              .reduce((sum, o) => sum + (Number(o.proposed_price) || 0), 0)
-            
-            setGuideAnalytics({ offersSent, offersAccepted, completedTrips, totalEarnings })
+          if (analyticsRes.ok && analytics) {
+            setGuideAnalytics({
+              offersSent: Number(analytics.offersSent) || 0,
+              offersAccepted: Number(analytics.offersAccepted) || 0,
+              completedTrips: Number(analytics.completedTrips) || 0,
+              totalEarnings: Number(analytics.totalEarnings) || 0,
+            })
           }
         }
 
