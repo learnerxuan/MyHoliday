@@ -179,16 +179,6 @@ export default function ListingList({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      {l.itinerary_id && (
-                        <a
-                          href={`/saved-itinerary/${l.itinerary_id}?admin=true`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center px-4 py-1 text-xs h-8 font-semibold rounded-lg bg-[#C4874A] hover:bg-[#8B6A3E] text-white shadow-sm transition-colors"
-                        >
-                          View Plan
-                        </a>
-                      )}
                       {!l.is_suspended && (
                         <Button variant="danger" className="bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm px-4 py-1 text-xs h-8" onClick={() => setClosing(l)}>
                           Suspend
