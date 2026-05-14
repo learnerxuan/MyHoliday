@@ -600,7 +600,7 @@ function ChatContent() {
                    </div>
                    <div>
                      <div className="text-[11px] text-secondary uppercase font-bold tracking-wider mb-0.5">Traveller Target</div>
-                     <div className="text-[14px] font-bold text-charcoal line-through decoration-secondary/40">{formatMYR(listing.desired_budget)}</div>
+                     <div className="text-[14px] font-bold text-charcoal">{formatMYR(listing.desired_budget)}</div>
                    </div>
                  </div>
                  <p className="text-[13px] text-secondary leading-relaxed border-t border-border pt-4">

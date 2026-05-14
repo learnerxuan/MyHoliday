@@ -157,14 +157,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Offer is missing its listing reference' }, { status: 400 })
     }
 
-    const { data: acceptedData, error: acceptError } = await supabase
+    const { error: acceptError } = await supabase
       .from('marketplace_offers')
       .update({ status: 'accepted' })
       .eq('id', offerId)
-      .select()
 
-    if (acceptError || !acceptedData?.length) {
-      return NextResponse.json({ error: acceptError?.message || 'Offer status was not updated.' }, { status: 400 })
+    if (acceptError) {
+      return NextResponse.json({ error: acceptError.message }, { status: 400 })
     }
 
     const { error: rejectError } = await supabase
@@ -196,7 +195,7 @@ export async function PATCH(
         content: `__OFFER_ACCEPTED__:${proposedPrice}`
       })
 
-    return NextResponse.json(acceptedData)
+    return NextResponse.json([{ ...offerToAccept, status: 'accepted' }])
   }
 
   const { data, error } = await supabase
