@@ -132,11 +132,7 @@ export async function GET() {
           ON t.offer_id = mo.id
         WHERE tg.user_id = $1
           AND mo.status <> 'withdrawn'
-          AND (
-            mo.status = 'accepted'
-            OR mo.payment_enabled = true
-            OR t.status = 'completed'
-          )
+          AND t.status = 'completed'
         ORDER BY
           COALESCE(
             i.content->>'start_date',
