@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Client } from 'pg'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 type DbRecord = Record<string, unknown>
@@ -52,6 +53,33 @@ function deriveTimingStatus(startDate: string, endDate: string) {
   return 'Upcoming'
 }
 
+function mapScheduleRow(row: DbRecord) {
+  const content = parseObject(row.content)
+  const tripMeta = parseObject(row.trip_metadata)
+  const travelDates = parseObject(tripMeta.travel_dates)
+
+  const days = content.trip_days || content.duration_days || tripMeta.trip_days || tripMeta.duration_days || null
+  const startDate = firstString(content.start_date, tripMeta.travel_date_start, tripMeta.start_date, travelDates.start)
+  const endDate = firstString(content.end_date, tripMeta.travel_date_end, tripMeta.end_date, travelDates.end)
+  const timingStatus = deriveTimingStatus(startDate, endDate)
+
+  return {
+    id: asString(row.offer_id),
+    price: asNumber(row.proposed_price),
+    acceptedAt: asString(row.accepted_at),
+    guideId: asString(row.guide_id),
+    listingId: asString(row.listing_id),
+    title: asString(row.title) || 'Trip',
+    city: asString(row.city) || 'Unknown Location',
+    country: asString(row.country),
+    startDate,
+    endDate,
+    days: days ? `${String(days)} Days` : '',
+    pax: String(content.group_size || content.pax || tripMeta.group_size || tripMeta.pax || '1 pax'),
+    timingStatus,
+  }
+}
+
 export async function GET() {
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -64,123 +92,64 @@ export async function GET() {
     return NextResponse.json({ error: 'Only guides can access schedule data' }, { status: 403 })
   }
 
+  const connectionString = process.env.DATABASE_URL
+  if (!connectionString) {
+    return NextResponse.json({ error: 'Database connection is not configured' }, { status: 500 })
+  }
+
+  const client = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+  })
+
   try {
-    // Get guide profile
-    const { data: guide, error: guideError } = await supabase
-      .from('tour_guides')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
+    await client.connect()
 
-    if (guideError || !guide) {
-      return NextResponse.json({ error: 'Guide profile not found' }, { status: 404 })
-    }
-
-    // Get offers where marketplace_listing is 'confirmed'
-    const { data: offersData, error: offersError } = await supabase
-      .from('marketplace_offers')
-      .select(`
-        id,
-        proposed_price,
-        created_at,
-        guide_id,
-        status,
-        marketplace_listings!inner (
-          id,
-          status,
-          itinerary_id,
-          destinations (
-            city,
-            country
+    const result = await client.query(
+      `
+        SELECT
+          mo.id AS offer_id,
+          mo.proposed_price,
+          mo.created_at AS accepted_at,
+          mo.guide_id,
+          ml.id AS listing_id,
+          d.city,
+          d.country,
+          i.title,
+          i.content,
+          i.trip_metadata,
+          t.status AS transaction_status
+        FROM public.tour_guides tg
+        JOIN public.marketplace_offers mo
+          ON mo.guide_id = tg.id
+        JOIN public.marketplace_listings ml
+          ON ml.id = mo.listing_id
+        JOIN public.destinations d
+          ON d.id = ml.destination_id
+        LEFT JOIN public.itineraries i
+          ON i.id = ml.itinerary_id
+        LEFT JOIN public.transactions t
+          ON t.offer_id = mo.id
+        WHERE tg.user_id = $1
+          AND mo.status <> 'withdrawn'
+          AND (
+            mo.status = 'accepted'
+            OR mo.payment_enabled = true
+            OR t.status = 'completed'
           )
-        )
-      `)
-      .eq('guide_id', guide.id)
-      .eq('marketplace_listings.status', 'confirmed')
-      .neq('status', 'withdrawn')
+        ORDER BY
+          COALESCE(
+            i.content->>'start_date',
+            i.trip_metadata->>'travel_date_start',
+            i.trip_metadata->>'start_date',
+            i.trip_metadata->'travel_dates'->>'start'
+          ) ASC NULLS LAST,
+          mo.created_at DESC
+      `,
+      [user.id]
+    )
 
-    if (offersError) {
-      return NextResponse.json({ error: offersError.message }, { status: 500 })
-    }
-
-    if (!offersData || offersData.length === 0) {
-      return NextResponse.json({ records: [] })
-    }
-
-    // Collect itinerary IDs
-    const itineraryIds = offersData
-      .map(o => {
-        const listing = Array.isArray(o.marketplace_listings) ? o.marketplace_listings[0] : o.marketplace_listings
-        return listing?.itinerary_id
-      })
-      .filter(Boolean) as string[]
-
-    // Fetch itineraries separately to avoid schema cache issues
-    let itinerariesMap: Record<string, { id: string; title: string; content: unknown; trip_metadata: unknown }> = {}
-
-    if (itineraryIds.length > 0) {
-      const { data: itinerariesData } = await supabase
-        .from('itineraries')
-        .select('id, title, content, trip_metadata')
-        .in('id', itineraryIds)
-
-      if (itinerariesData) {
-        itinerariesMap = itinerariesData.reduce((acc, curr) => {
-          acc[curr.id] = curr
-          return acc
-        }, {} as typeof itinerariesMap)
-      }
-    }
-
-    // Process and map records
-    const records = offersData
-      .map(offer => {
-        const listing = Array.isArray(offer.marketplace_listings) ? offer.marketplace_listings[0] : offer.marketplace_listings
-        if (!listing) return null
-
-        const destination = Array.isArray(listing.destinations) ? listing.destinations[0] : listing.destinations
-        const itinerary = itinerariesMap[listing.itinerary_id]
-
-        const content = parseObject(itinerary?.content)
-        const tripMeta = parseObject(itinerary?.trip_metadata)
-        const travelDates = parseObject(tripMeta.travel_dates)
-
-        const days = content.trip_days || content.duration_days || tripMeta.trip_days || tripMeta.duration_days || null
-        const startDate = firstString(content.start_date, tripMeta.travel_date_start, tripMeta.start_date, travelDates.start)
-        const endDate = firstString(content.end_date, tripMeta.travel_date_end, tripMeta.end_date, travelDates.end)
-        const timingStatus = deriveTimingStatus(startDate, endDate)
-
-        // Skip completed tours
-        if (timingStatus === 'Completed') return null
-
-        return {
-          id: offer.id,
-          price: asNumber(offer.proposed_price),
-          acceptedAt: asString(offer.created_at),
-          guideId: asString(offer.guide_id),
-          listingId: asString(listing.id),
-          title: asString(itinerary?.title) || 'Trip',
-          city: asString(destination?.city) || 'Unknown Location',
-          country: asString(destination?.country),
-          startDate,
-          endDate,
-          days: days ? `${String(days)} Days` : '',
-          pax: String(content.group_size || content.pax || tripMeta.group_size || tripMeta.pax || '1 pax'),
-          timingStatus,
-        }
-      })
-      .filter(Boolean)
-
-    // Sort: Ongoing first, then Upcoming by start date
-    records.sort((a, b) => {
-      if (!a || !b) return 0
-      if (a.timingStatus === 'Ongoing' && b.timingStatus !== 'Ongoing') return -1
-      if (a.timingStatus !== 'Ongoing' && b.timingStatus === 'Ongoing') return 1
-      if (a.startDate && b.startDate) {
-        return new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-      }
-      return new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt).getTime()
-    })
+    const records = result.rows.map((row) => mapScheduleRow(row))
 
     return NextResponse.json({ records })
   } catch (error) {
@@ -188,5 +157,7 @@ export async function GET() {
       { error: error instanceof Error ? error.message : 'Failed to load schedule' },
       { status: 500 }
     )
+  } finally {
+    await client.end().catch(() => {})
   }
 }
