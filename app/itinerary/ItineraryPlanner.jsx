@@ -202,6 +202,7 @@ export default function ItineraryPlanner() {
         .maybeSingle()
 
       let savedQuizContext = null
+      let shouldShowQuickIntake = !sessionParam
       try {
         const rawPrefs = sessionStorage.getItem('quiz_prefs')
         const rawMeta  = sessionStorage.getItem('quiz_trip_meta')
@@ -219,9 +220,7 @@ export default function ItineraryPlanner() {
             dietary:           profile?.dietary_restrictions && profile.dietary_restrictions !== 'None' ? profile.dietary_restrictions : null,
           }
           setTripContext(savedQuizContext)
-        } else if (!sessionParam) {
-          // No quiz data and not resuming a specific shared session -> show quick intake
-          setShowIntake(true)
+          shouldShowQuickIntake = false
         }
       } catch { /* ignore */ }
 
@@ -281,6 +280,8 @@ export default function ItineraryPlanner() {
             dietary:           s.needs?.dietary    ?? prev?.dietary,
           }))
         }
+
+        shouldShowQuickIntake = false
       }
 
       // Restore itinerary from localStorage (survives page refresh)
@@ -290,12 +291,14 @@ export default function ItineraryPlanner() {
         const saved = localStorage.getItem(lsKey)
         if (saved && hasSessionHistory) {
           setItinerary(JSON.parse(saved))
+          shouldShowQuickIntake = false
         } else if (saved) {
           localStorage.removeItem(lsKey)
           setItinerary({})
         }
       } catch { /* ignore parse errors */ }
 
+      setShowIntake(shouldShowQuickIntake)
       setPageReady(true)
     }
 
