@@ -57,7 +57,7 @@ function deriveTimingStatus(startDate: string, endDate: string) {
 function mapScheduleRow(row: DbRecord) {
   const listing = asRecord(row.listing)
   const destination = asRecord(listing.destinations)
-  const itinerary = asRecord(listing.itineraries)
+  const itinerary = asRecord(row.itinerary)
   const content = parseObject(itinerary.content)
   const tripMeta = parseObject(itinerary.trip_metadata)
   const travelDates = parseObject(tripMeta.travel_dates)
@@ -158,7 +158,7 @@ export async function GET() {
 
     const { data: listingsData, error: listingsError } = await supabase
       .from('marketplace_listings')
-      .select('id, destination_id, itinerary_id, destinations(id, city, country), itineraries(id, title, content, trip_metadata)')
+      .select('id, destination_id, itinerary_id, destinations(id, city, country)')
       .in('id', listingIds)
 
     if (listingsError) {
@@ -166,8 +166,31 @@ export async function GET() {
     }
 
     const listingMap = asRecordMap(asRecords(listingsData))
+    const itineraryIds = [
+      ...new Set(asRecords(listingsData).map((listing) => asString(listing.itinerary_id)).filter(Boolean)),
+    ]
+    const { data: itinerariesData, error: itinerariesError } = itineraryIds.length
+      ? await supabase
+        .from('itineraries')
+        .select('id, title, content, trip_metadata')
+        .in('id', itineraryIds)
+      : { data: [], error: null }
+
+    if (itinerariesError) {
+      return NextResponse.json({ error: itinerariesError.message }, { status: 400 })
+    }
+
+    const itineraryMap = asRecordMap(asRecords(itinerariesData))
     const records = offers
-      .map((offer) => mapScheduleRow({ ...offer, listing: listingMap.get(asString(offer.listing_id)) || {} }))
+      .map((offer) => {
+        const listing = listingMap.get(asString(offer.listing_id)) || {}
+
+        return mapScheduleRow({
+          ...offer,
+          listing,
+          itinerary: itineraryMap.get(asString(listing.itinerary_id)) || {},
+        })
+      })
       .sort(sortScheduleRecords)
 
     return NextResponse.json({ records })
