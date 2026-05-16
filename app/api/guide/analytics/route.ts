@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
-import { Client } from 'pg'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+
+type DbRecord = Record<string, unknown>
+
+const asRecords = (value: unknown): DbRecord[] => Array.isArray(value) ? value as DbRecord[] : []
+const asString = (value: unknown) => typeof value === 'string' ? value : ''
+const asNumber = (value: unknown) => Number(value || 0)
 
 export async function GET() {
   const supabase = await createSupabaseServerClient()
@@ -14,54 +19,67 @@ export async function GET() {
     return NextResponse.json({ error: 'Only guides can access analytics' }, { status: 403 })
   }
 
-  const connectionString = process.env.DATABASE_URL
-  if (!connectionString) {
-    return NextResponse.json({ error: 'Database connection is not configured' }, { status: 500 })
-  }
-
-  const client = new Client({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-  })
-
   try {
-    await client.connect()
-
-    const result = await client.query(
-      `
-        WITH guide AS (
-          SELECT id
-          FROM public.tour_guides
-          WHERE user_id = $1
-          LIMIT 1
-        )
-        SELECT
-          COALESCE(COUNT(mo.id), 0)::int AS "offersSent",
-          COALESCE(COUNT(mo.id) FILTER (WHERE mo.status = 'accepted'), 0)::int AS "offersAccepted",
-          COALESCE(COUNT(t.id) FILTER (WHERE t.status = 'completed'), 0)::int AS "completedTrips",
-          COALESCE(SUM(t.guide_payout) FILTER (WHERE t.status = 'completed'), 0)::float AS "totalEarnings"
-        FROM guide
-        LEFT JOIN public.marketplace_offers mo
-          ON mo.guide_id = guide.id
-          AND mo.status <> 'withdrawn'
-        LEFT JOIN public.transactions t
-          ON t.offer_id = mo.id
-      `,
-      [user.id]
-    )
-
-    return NextResponse.json(result.rows[0] || {
+    const emptyAnalytics = {
       offersSent: 0,
       offersAccepted: 0,
       completedTrips: 0,
       totalEarnings: 0,
+    }
+
+    const { data: guide, error: guideError } = await supabase
+      .from('tour_guides')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (guideError) {
+      return NextResponse.json({ error: guideError.message }, { status: 400 })
+    }
+
+    if (!guide?.id) {
+      return NextResponse.json(emptyAnalytics)
+    }
+
+    const { data: offersData, error: offersError } = await supabase
+      .from('marketplace_offers')
+      .select('id, status')
+      .eq('guide_id', guide.id)
+      .neq('status', 'withdrawn')
+
+    if (offersError) {
+      return NextResponse.json({ error: offersError.message }, { status: 400 })
+    }
+
+    const offers = asRecords(offersData)
+    const offerIds = offers.map((offer) => asString(offer.id)).filter(Boolean)
+
+    if (!offerIds.length) {
+      return NextResponse.json(emptyAnalytics)
+    }
+
+    const { data: transactionsData, error: transactionsError } = await supabase
+      .from('transactions')
+      .select('id, offer_id, status, guide_payout')
+      .eq('status', 'completed')
+      .in('offer_id', offerIds)
+
+    if (transactionsError) {
+      return NextResponse.json({ error: transactionsError.message }, { status: 400 })
+    }
+
+    const completedTransactions = asRecords(transactionsData)
+
+    return NextResponse.json({
+      offersSent: offers.length,
+      offersAccepted: offers.filter((offer) => asString(offer.status) === 'accepted').length,
+      completedTrips: completedTransactions.length,
+      totalEarnings: completedTransactions.reduce((total, transaction) => total + asNumber(transaction.guide_payout), 0),
     })
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to load guide analytics' },
       { status: 500 }
     )
-  } finally {
-    await client.end().catch(() => {})
   }
 }

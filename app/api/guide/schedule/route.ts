@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { Client } from 'pg'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 type DbRecord = Record<string, unknown>
@@ -7,6 +6,8 @@ type DbRecord = Record<string, unknown>
 const asRecord = (value: unknown): DbRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? value as DbRecord : {}
 
+const asRecords = (value: unknown): DbRecord[] => Array.isArray(value) ? value as DbRecord[] : []
+const asRecordMap = (records: DbRecord[]) => new Map(records.map((record) => [String(record.id), record]))
 const asString = (value: unknown) => typeof value === 'string' ? value : ''
 const asNumber = (value: unknown) => Number(value || 0)
 
@@ -54,8 +55,11 @@ function deriveTimingStatus(startDate: string, endDate: string) {
 }
 
 function mapScheduleRow(row: DbRecord) {
-  const content = parseObject(row.content)
-  const tripMeta = parseObject(row.trip_metadata)
+  const listing = asRecord(row.listing)
+  const destination = asRecord(listing.destinations)
+  const itinerary = asRecord(listing.itineraries)
+  const content = parseObject(itinerary.content)
+  const tripMeta = parseObject(itinerary.trip_metadata)
   const travelDates = parseObject(tripMeta.travel_dates)
 
   const days = content.trip_days || content.duration_days || tripMeta.trip_days || tripMeta.duration_days || null
@@ -64,20 +68,29 @@ function mapScheduleRow(row: DbRecord) {
   const timingStatus = deriveTimingStatus(startDate, endDate)
 
   return {
-    id: asString(row.offer_id),
+    id: asString(row.id),
     price: asNumber(row.proposed_price),
-    acceptedAt: asString(row.accepted_at),
+    acceptedAt: asString(row.created_at),
     guideId: asString(row.guide_id),
     listingId: asString(row.listing_id),
-    title: asString(row.title) || 'Trip',
-    city: asString(row.city) || 'Unknown Location',
-    country: asString(row.country),
+    title: asString(itinerary.title) || 'Trip',
+    city: asString(destination.city) || 'Unknown Location',
+    country: asString(destination.country),
     startDate,
     endDate,
     days: days ? `${String(days)} Days` : '',
     pax: String(content.group_size || content.pax || tripMeta.group_size || tripMeta.pax || '1 pax'),
     timingStatus,
   }
+}
+
+function sortScheduleRecords(a: ReturnType<typeof mapScheduleRow>, b: ReturnType<typeof mapScheduleRow>) {
+  const aTime = a.startDate ? new Date(a.startDate).getTime() : Number.POSITIVE_INFINITY
+  const bTime = b.startDate ? new Date(b.startDate).getTime() : Number.POSITIVE_INFINITY
+
+  if (aTime !== bTime) return aTime - bTime
+
+  return new Date(b.acceptedAt || 0).getTime() - new Date(a.acceptedAt || 0).getTime()
 }
 
 export async function GET() {
@@ -92,60 +105,70 @@ export async function GET() {
     return NextResponse.json({ error: 'Only guides can access schedule data' }, { status: 403 })
   }
 
-  const connectionString = process.env.DATABASE_URL
-  if (!connectionString) {
-    return NextResponse.json({ error: 'Database connection is not configured' }, { status: 500 })
-  }
-
-  const client = new Client({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-  })
-
   try {
-    await client.connect()
+    const { data: guide, error: guideError } = await supabase
+      .from('tour_guides')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
 
-    const result = await client.query(
-      `
-        SELECT
-          mo.id AS offer_id,
-          mo.proposed_price,
-          mo.created_at AS accepted_at,
-          mo.guide_id,
-          ml.id AS listing_id,
-          d.city,
-          d.country,
-          i.title,
-          i.content,
-          i.trip_metadata,
-          t.status AS transaction_status
-        FROM public.tour_guides tg
-        JOIN public.marketplace_offers mo
-          ON mo.guide_id = tg.id
-        JOIN public.marketplace_listings ml
-          ON ml.id = mo.listing_id
-        JOIN public.destinations d
-          ON d.id = ml.destination_id
-        LEFT JOIN public.itineraries i
-          ON i.id = ml.itinerary_id
-        LEFT JOIN public.transactions t
-          ON t.offer_id = mo.id
-        WHERE tg.user_id = $1
-          AND mo.status <> 'withdrawn'
-          AND t.status = 'completed'
-        ORDER BY
-          COALESCE(
-            i.content->>'start_date',
-            i.trip_metadata->>'travel_date_start',
-            i.trip_metadata->>'start_date',
-            i.trip_metadata->'travel_dates'->>'start'
-          ) ASC NULLS LAST,
-          mo.created_at DESC
-      `,
-      [user.id]
-    )
+    if (guideError) {
+      return NextResponse.json({ error: guideError.message }, { status: 400 })
+    }
 
-    const records = result.rows.map((row) => mapScheduleRow(row))
+    if (!guide?.id) {
+      return NextResponse.json({ records: [] })
+    }
+
+    const { data: transactionsData, error: transactionsError } = await supabase
+      .from('transactions')
+      .select('offer_id')
+      .eq('payee_id', guide.id)
+      .eq('status', 'completed')
+
+    if (transactionsError) {
+      return NextResponse.json({ error: transactionsError.message }, { status: 400 })
+    }
+
+    const completedOfferIds = [
+      ...new Set(asRecords(transactionsData).map((transaction) => asString(transaction.offer_id)).filter(Boolean)),
+    ]
+
+    if (!completedOfferIds.length) {
+      return NextResponse.json({ records: [] })
+    }
+
+    const { data: offersData, error: offersError } = await supabase
+      .from('marketplace_offers')
+      .select('id, proposed_price, created_at, guide_id, listing_id, status')
+      .eq('guide_id', guide.id)
+      .neq('status', 'withdrawn')
+      .in('id', completedOfferIds)
+
+    if (offersError) {
+      return NextResponse.json({ error: offersError.message }, { status: 400 })
+    }
+
+    const offers = asRecords(offersData)
+    const listingIds = [...new Set(offers.map((offer) => asString(offer.listing_id)).filter(Boolean))]
+
+    if (!listingIds.length) {
+      return NextResponse.json({ records: [] })
+    }
+
+    const { data: listingsData, error: listingsError } = await supabase
+      .from('marketplace_listings')
+      .select('id, destination_id, itinerary_id, destinations(id, city, country), itineraries(id, title, content, trip_metadata)')
+      .in('id', listingIds)
+
+    if (listingsError) {
+      return NextResponse.json({ error: listingsError.message }, { status: 400 })
+    }
+
+    const listingMap = asRecordMap(asRecords(listingsData))
+    const records = offers
+      .map((offer) => mapScheduleRow({ ...offer, listing: listingMap.get(asString(offer.listing_id)) || {} }))
+      .sort(sortScheduleRecords)
 
     return NextResponse.json({ records })
   } catch (error) {
@@ -153,7 +176,5 @@ export async function GET() {
       { error: error instanceof Error ? error.message : 'Failed to load schedule' },
       { status: 500 }
     )
-  } finally {
-    await client.end().catch(() => {})
   }
 }
