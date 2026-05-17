@@ -320,6 +320,7 @@ Variables read by the current application source:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_SITE_URL=
 OPENAI_API_KEY=
 GOOGLE_PLACES_API_KEY=
 
@@ -332,11 +333,25 @@ NEXT_PUBLIC_MARKETPLACE_PLATFORM_FEE_RATE=0.1
 Notes:
 
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are required by Supabase browser/server clients and middleware.
+- `NEXT_PUBLIC_SITE_URL` is optional locally but recommended in Vercel. Set it to the production origin, for example `https://your-project.vercel.app`, with no trailing slash. Supabase OAuth, email confirmation, and password reset redirect URLs use it when present.
 - `OPENAI_API_KEY` is required by `/api/chat`.
 - `OPENAI_CHAT_MODEL` is optional; `/api/chat` defaults to `gpt-4o`.
 - `GOOGLE_PLACES_API_KEY` is required for Google place search, geocoding, nearby places, and Google place imagery. City image lookup can still use Wikipedia when a Wikipedia image is available.
 - `MARKETPLACE_PLATFORM_FEE_RATE` controls server-side transaction fee calculation.
 - `NEXT_PUBLIC_MARKETPLACE_PLATFORM_FEE_RATE` controls the fee preview shown on the guide offer page. Keep it aligned with the server-side rate.
+
+### Supabase Auth Redirects
+
+For Google sign-in on Vercel, configure Supabase Auth as well as the app environment:
+
+- In Vercel, set `NEXT_PUBLIC_SITE_URL` to the deployed production URL.
+- In Supabase Dashboard -> Authentication -> URL Configuration, set Site URL to the deployed production URL.
+- Add redirect URLs for production and local development:
+  - `https://your-project.vercel.app/auth/callback`
+  - `https://your-project.vercel.app/auth/update-password`
+  - `http://localhost:3000/auth/callback`
+  - `http://localhost:3000/auth/update-password`
+- In Google Cloud's OAuth client, the authorized redirect URI should be the Supabase callback URL, for example `https://<project-ref>.supabase.co/auth/v1/callback`.
 
 Additional placeholders currently present in `.env.example`:
 
